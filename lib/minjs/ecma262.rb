@@ -1,0 +1,6 @@
+require "minjs/ecma262/base"
+require "minjs/ecma262/env"
+require "minjs/ecma262/exp"
+require "minjs/ecma262/lit"
+require "minjs/ecma262/punc"
+require "minjs/ecma262/st"

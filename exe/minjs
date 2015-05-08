@@ -1,0 +1,12 @@
+#!/usr/bin/env ruby
+
+require 'minjs'
+
+argv = ARGV.dup
+f = []
+argv.each do |x|
+    f.push(open(x.to_s).read())
+end
+prog = Minjs::Compressor.new(:debug => false)
+prog.compress(f.join("\n"))
+puts prog.to_js({})
