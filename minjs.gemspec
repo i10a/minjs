@@ -14,7 +14,7 @@ Gem::Specification.new do |spec|
 #  end
 
   spec.summary       = %q{JavaScript compressor in pure Ruby}
-  spec.description   = %q{Minjs is a JavaScript comressor in pure Ruby}
+  spec.description   = %q{Minjs is a JavaScript compressor written in pure Ruby}
   spec.homepage      = "https://github.com/i10a/minjs"
   spec.license       = "MIT"
 
