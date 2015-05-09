@@ -9,6 +9,7 @@ require "minjs/compressor"
 require "minjs/ecma262"
 require "minjs/minjs_compressor"
 require "minjs/ctype"
+require "minjs/exceptions"
 
 module Minjs
   # Your code goes here...

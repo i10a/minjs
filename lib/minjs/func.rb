@@ -80,7 +80,7 @@ module Minjs
     end
 
     def func_body(lex, context)
-      source_elements(lex, context, :no_exception => true)
+      source_elements(lex, context)
     end
   end
 end

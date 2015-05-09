@@ -67,7 +67,7 @@ module Minjs
             t.push(a)
             lex.match_lit(ECMA262::PUNC_COMMA)
           else
-            return nil
+            raise ParseError.new("no `]' end of array", lex)
           end
         end
         ECMA262::ECMA262Array.new(t)
@@ -79,12 +79,13 @@ module Minjs
     def object_literal(lex, context, options)
       return nil unless lex.match_lit(ECMA262::PUNC_LCURLYBRAC)
       lex.eval_lit {
-        next ECMA262::ECMA262Object.new({}) if lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
-        if h=property_name_and_value_list(lex, context, options) #and lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
+        if lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
+          next ECMA262::ECMA262Object.new([])
+        end
+        if h=property_name_and_value_list(lex, context, options)
           ECMA262::ECMA262Object.new(h)
         else
-          lex.debug_lit
-          raise 'bad object'
+          raise ParseError.new("no `}' end of object", lex)
         end
       }
     end
@@ -96,29 +97,31 @@ module Minjs
     #
     def property_name_and_value_list(lex, context, options)
       lex.eval_lit{
-        h = {}
+        h = []
         while !lex.eof?
           if lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
             break
           end
           lex.eval_lit{
             a=property_name(lex, context) and lex.match_lit(ECMA262::PUNC_COLON) and b=assignment_exp(lex, context, options)
-            h[a] = b
-          } or lex.eval_lit{
-            if lex.match_lit(ECMA262::ID_GET) and a=property_name(lex, context) and lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and lex.match_lit(ECMA262::PUNC_LCURLYBRAC) and func_body(lex, context) and lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
-              h[a] = "getter" #TODO
-            elsif lex.match_lit(ECMA262::ID_SET) and a=property_name(lex, context) and lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and property_set_parameter_list(lex, context) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and lex.match_lit(ECMA262::PUNC_LCURLYBRAC) and func_body(lex, context) and lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
-              h[a] = "setter" #TODO
-            else
-              return nil
-            end
+            h.push([a, b])
           }
+#          or lex.eval_lit{
+#            if lex.match_lit(ECMA262::ID_GET) and a=property_name(lex, context) and lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and lex.match_lit(ECMA262::PUNC_LCURLYBRAC) and func_body(lex, context) and lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
+#              h[a] = "getter" #TODO
+#            elsif lex.match_lit(ECMA262::ID_SET) and a=property_name(lex, context) and lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and property_set_parameter_list(lex, context) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and lex.match_lit(ECMA262::PUNC_LCURLYBRAC) and func_body(lex, context) and lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
+#              h[a] = "setter" #TODO
+#            else
+#              return nil
+#            end
+#          }
 
           if lex.match_lit(ECMA262::PUNC_COMMA)
+            break if lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
           elsif lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
             break
           else
-            return nil
+            raise ParseError.new("no `}' end of object", lex)
           end
         end
         h
@@ -128,12 +131,14 @@ module Minjs
     def property_name(lex, context)
       lex.eval_lit {
         a = lex.fwd_lit
-        if a.kind_of? ECMA262::IdentifierName or a.kind_of? ECMA262::ECMA262String or a.kind_of? ECMA262::ECMA262Numeric
+        if a.kind_of?(ECMA262::ECMA262String)
+          a
+        elsif a.kind_of?(ECMA262::IdentifierName)
+          ECMA262::ECMA262String.new(a.to_js)
+        elsif a.kind_of?(ECMA262::ECMA262Numeric)
           a
         else
-          lex.debug_lit
-          raise "The Property name must be kind_of ItentiferName or String, but #{k.class}"
-          nil
+          raise ParseError.new("The Property name must be kind_of ItentiferName or String", lex)
         end
       }
     end
@@ -581,7 +586,7 @@ module Minjs
         t = a
         while punc = lex.match_lit(ECMA262::PUNC_LAND)
           if b = __send__(next_exp, lex, context, options)
-            t = ECMA262::LogicalAnd.new(t, b)
+            t = ECMA262::ExpLogicalAnd.new(t, b)
           else
             break
           end
@@ -600,7 +605,7 @@ module Minjs
         t = a
         while punc = lex.match_lit(ECMA262::PUNC_LOR)
           if b = __send__(next_exp, lex, context, options)
-            t = ECMA262::LogicalOr.new(t, b)
+            t = ECMA262::ExpLogicalOr.new(t, b)
           else
             break
           end
@@ -694,9 +699,9 @@ module Minjs
     #
     def exp(lex, context, options)
       lex.eval_lit{
-        t = assignment_exp(lex, context, options)
+        t = assignment_exp(lex, context, {:hint => :regexp}.merge(options))
         while punc = lex.match_lit(ECMA262::PUNC_COMMA)
-          if b = assignment_exp(lex,context, options)
+          if b = assignment_exp(lex,context, {:hint => :regexp}.merge(options))
             t = ECMA262::ExpComma.new(t, b)
           else
             break

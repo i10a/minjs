@@ -7,23 +7,28 @@ module Minjs
     # check next literal is ';' or '}' or LT
     #
     def semicolon(lex, context)
-      if a=lex.match_lit(ECMA262::PUNC_SEMICOLON)
-        a
-      elsif a=lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
-        lex.rewind_pos
-        a
-      elsif a=lex.match_lit(ECMA262::LIT_LINE_FEED, :nolt => true)
-        a
-      else
-        nil
-      end
+      lex.eval_lit{
+        a = lex.fwd_lit(:nolt => true)
+        if a == ECMA262::PUNC_SEMICOLON
+          a
+        elsif a == ECMA262::PUNC_RCURLYBRAC
+          lex.rewind_pos
+          a
+        elsif a == ECMA262::LIT_LINE_FEED
+          a
+        elsif a.lt?
+          a
+        else
+          nil
+        end
+      }
     end
 
     #12
     def statement(lex, context)
       [:block,
-       :empty_statement,
        :var_statement,
+       :exp_statement,
        :if_statement,
        :iteration_statement,
        :continue_statement,
@@ -35,7 +40,12 @@ module Minjs
        :throw_statement,
        :try_statement,
        :debugger_statement,
-       :exp_statement,
+       #
+       # function declaration in statement(block) is not permitted by ECMA262.
+       # however, almost all implementation permit it.
+       #
+       :func_declaration,
+       :empty_statement,
       ].each do |f|
         puts "* checking #{f.to_s}" if @debug
         t = lex.eval_lit {
@@ -49,6 +59,7 @@ module Minjs
     #12.1
     # block
     def block(lex, context)
+      pos0 = lex.pos
       return nil unless lex.match_lit(ECMA262::PUNC_LCURLYBRAC)
       if lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
         return ECMA262::StBlock.new(ECMA262::StList.new([]))
@@ -59,6 +70,7 @@ module Minjs
         else
           if s
             lex.debug_lit
+            puts lex.debug_code(pos0, lex.pos)
             raise 'no "}" end of block'
           else
             lex.debug_lit
@@ -99,7 +111,7 @@ module Minjs
           ECMA262::StVar.new(context, vl)
         else
           lex.debug_lit
-          raise ParseError.new("var_statement")
+          raise Minjs::ParseError.new("var_statement")
         end
       }
     end
@@ -142,14 +154,14 @@ module Minjs
     #12.3
     #
     def empty_statement(lex, context)
-      lex.eval_lit {
-        t = lex.fwd_lit
-        if t.nil?
-          ECMA262::StEmpty.new()
-        elsif t == ECMA262::PUNC_SEMICOLON
-          ECMA262::StEmpty.new()
-        elsif t == ECMA262::LIT_LINE_FEED
-          ECMA262::StEmpty.new()
+      lex.eval_lit{
+        a = lex.fwd_lit(:nolt => true)
+        if a == ECMA262::PUNC_SEMICOLON
+          ECMA262::StEmpty.new
+        elsif a == ECMA262::LIT_LINE_FEED
+          ECMA262::StEmpty.new
+        elsif a.lt?
+          ECMA262::StEmpty.new
         else
           nil
         end

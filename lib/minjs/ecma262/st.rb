@@ -4,6 +4,10 @@ module Minjs
       def to_exp?
         false
       end
+
+      def replace(from, to)
+        puts "warning: not implement"
+      end
     end
 
     #statement_list
@@ -124,9 +128,11 @@ module Minjs
       def to_js(options = {})
         concat(options, "{", @statement_list, "}")
       end
+
       def to_exp?
         @statement_list.length == 1 and @statement_list[0].to_exp?
       end
+
       def to_exp(options)
         @statement_list[0].to_exp({})
       end
@@ -282,7 +288,8 @@ module Minjs
           else_exp = @else_st.to_exp(options)
         else
           then_exp = @then_st.to_exp(options)
-          else_exp = ECMA262Numeric.new(0)
+          #else_exp = ECMA262Numeric.new(0)
+          return ExpLogicalAnd.new(ExpParen.new(@cond), ExpParen.new(then_exp))
         end
         if then_exp.kind_of? ExpComma
           then_exp = ExpParen.new(then_exp)
@@ -592,6 +599,8 @@ module Minjs
 
     #12.9
     class StReturn < St
+      attr_reader :exp
+
       def initialize(exp = nil)
         @exp = exp
       end
@@ -639,6 +648,14 @@ module Minjs
       def initialize(exp, blocks)
         @exp = exp
         @blocks = blocks
+      end
+
+      def replace(from, to)
+        if @exp == from
+          @exp = to
+        elsif @blocks == from
+          @blocks = to
+        end
       end
 
       def traverse(parent, &blocks)

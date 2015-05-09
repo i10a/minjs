@@ -6,13 +6,14 @@ module Minjs
 
     attr_reader :pos
     attr_reader :error_pos
+    attr_reader :codes
 
     def initialize(str = "", options = {})
       str = str.gsub(/\r\n/, "\n")
       @codes = str.codepoints
       @pos = 0
       @lit_cache = []
-      @lit_next = []
+      @lit_nextpos = []
       if options[:debug]
         @debug = true
       end
@@ -21,10 +22,17 @@ module Minjs
     def next_input_element(options = {})
       if @lit_cache[@pos]
         ret = @lit_cache[@pos]
-        @pos = @lit_next[@pos]
+        @pos = @lit_nextpos[@pos]
+        @error_pos = @pos
         return ret
       end
+      pos0 = @pos
       if ret = (white_space || line_terminator || comment || token)
+        if ret
+          @lit_cache[pos0] = ret
+          @lit_nextpos[pos0] = @pos
+        end
+        @error_pos = @pos
         return ret
       end
       #
@@ -37,12 +45,31 @@ module Minjs
       #
       #
       if options[:hint] == :div
-        div_punctuator
+        ret = div_punctuator
+        if ret
+          @lit_cache[pos0] = ret
+          @lit_nextpos[pos0] = @pos
+        end
+        @error_pos = @pos
+        return ret
       elsif options[:hint] == :regexp
-        regexp_literal
+        ret = regexp_literal
+        if ret
+          @lit_cache[pos0] = ret
+          @lit_nextpos[pos0] = @pos
+        end
+        @error_pos = @pos
+        return ret
       else
-        div_punctuator
+        #        p pos0
+        #        p @pos
+        #@error_pos = @pos
+        #debug_lit
         #raise 'no hint'
+        #regexp_literal
+        #div_punctuator
+        #nil #unknown
+        ECMA262::LIT_DIV_OR_REGEXP_LITERAL
       end
     end
 
@@ -85,18 +112,18 @@ module Minjs
       if @codes[@pos] == 0x2f and @codes[@pos + 1] == 0x2a
         @pos = @pos + 2
         pos0 = @pos
-        while @codes[@pos] != 0x2a or @codes[@pos + 1] != 0x2f
-          @pos = @pos + 1
-          if @codes[@pos] == 0x0a ||
-             @codes[@pos] == 0x0d ||
-             @codes[@pos] == 0x2028 ||
-             @codes[@pos] == 0x2029
+        lf = false
+        while (@codes[@pos] != 0x2a or @codes[@pos + 1] != 0x2f)
+          if @codes[@pos].nil?
+            raise ParseError.new("no `*/' at end of comment")
+          end
+          if line_terminator?(@codes[@pos])
             lf = true
           end
+          @pos = @pos + 1
         end
         @pos = @pos + 2
         return ECMA262::MultiLineComment.new(@codes[pos0...(@pos-2)].pack("U*"), lf)
-        #return ECMA262::LineFeed.get
       else
         nil
       end
@@ -106,14 +133,13 @@ module Minjs
       if @codes[@pos] == 0x2f and @codes[@pos + 1] == 0x2f
         @pos = @pos + 2
         pos0 = @pos
-        while true
-          code = @codes[@pos]
-          if (code == 0x0a || code == 0x0d || code == 0x2028 || code == 0x2029)
-            return ECMA262::SingleLineComment.new(@codes[pos0...@pos].pack("U*"))
-            #return ECMA262::WhiteSpace.get
-          else
-            @pos += 1
-          end
+        while !line_terminator?(@codes[@pos]) and @codes[@pos]
+          @pos += 1
+        end
+        if @codes[@pos].nil?
+          return ECMA262::SingleLineComment.new(@codes[pos0...@pos].pack("U*") + "\n")
+        else
+          return ECMA262::SingleLineComment.new(@codes[pos0...@pos].pack("U*"))
         end
       else
         nil
@@ -128,7 +154,7 @@ module Minjs
       ret = (identifier_name || numeric_literal || punctuator || string_literal)
       if ret
         @lit_cache[pos0] = ret
-        @lit_next[pos0] = @pos
+        @lit_nextpos[pos0] = @pos
       end
       ret
     end
@@ -316,32 +342,82 @@ module Minjs
       nil
     end
 
-    #TODO..
+    #
+    # 7.8.5
+    #
+    # RegularExpressionLiteral::
+    # 	/ RegularExpressionBody / RegularExpressionFlags
+    #
     def regexp_literal
       pos0 = @pos
-      if @codes[@pos] == 0x2f
-        while @codes[@pos]
+      return nil unless @codes[@pos] == 0x2f
+
+      body = regexp_body
+      flags = regexp_flags
+      return ECMA262::ECMA262RegExp.new(body, flags)
+    end
+
+    def regexp_body
+      if @codes[@pos] == 0x2a
+        raise ParseError.new("first character of regular expression is `*'")
+      end
+      pos0 = @pos
+      @pos += 1
+      while !(@codes[@pos] == 0x2f)
+        if @codes[@pos].nil?
+          raise ParseError.new("no `/' end of regular expression")
+        end
+        if line_terminator?(@codes[@pos])
+          debug_lit
+          raise ParseError.new("regular expression has line terminator in body")
+        end
+        if @codes[@pos] == 0x5c # \
           @pos += 1
-          code = @codes[@pos]
-          if code == 0x5c
-            @pos += 1
-          elsif code == 0x2f
-            @pos += 1
-            while @codes[@pos]
-              if (@codes[@pos] >= 0x61 and @codes[@pos] <= 0x7a) or
-                 (@codes[@pos] >= 0x41 and @codes[@pos] <= 0x5a)
-                @pos += 1
-              else
-                break
-              end
-            end
-            return ECMA262::ECMA262RegExp.new(@codes[pos0...@pos].pack("U*"))
+          if line_terminator?(@codes[@pos])
+            raise ParseError.new("regular expression has line terminator in body")
           end
+          @pos += 1
+        elsif @codes[@pos] == 0x5b # [
+          regexp_class
+        else
+          @pos += 1
         end
       end
-      #fail...
-      @pos = pos0
-      nil
+      @pos += 1
+      return @codes[(pos0+1)...(@pos-1)].pack("U*")
+    end
+
+    def regexp_class
+      if @codes[@pos] != 0x5b
+        raise ParseError.new('bad regular expression')
+      end
+      @pos += 1
+      while !(@codes[@pos] == 0x5d)
+        if @codes[@pos].nil?
+          raise ParseError.new("no `]' end of regular expression class")
+        end
+        if line_terminator?(@codes[@pos])
+          raise ParseError.new("regular expression has line terminator in body")
+        end
+        if @codes[@pos] == 0x5c # \
+          @pos += 1
+          if line_terminator?(@codes[@pos])
+            raise ParseError.new("regular expression has line terminator in body")
+          end
+          @pos += 1
+        else
+          @pos += 1
+        end
+      end
+      @pos += 1
+    end
+
+    def regexp_flags
+      pos0 = @pos
+      while(identifier_part?(@codes[@pos]))
+        @pos += 1
+      end
+      return @codes[pos0...@pos].pack("U*")
     end
 
     #7.8.3
@@ -362,7 +438,8 @@ module Minjs
           code = @codes[@pos]
           if (code >= 0x30 and code <= 0x39) || (code >= 0x41 and code <= 0x4f) || (code >= 0x61 and code <= 0x6f)
           else
-            return ECMA262::ECMA262Numeric.new(@codes[(pos0+2)...@pos].pack("U*").to_i(16))
+            raw = @codes[pos0...@pos].pack("U*")
+            return ECMA262::ECMA262Numeric.new(raw, @codes[(pos0+2)...@pos].pack("U*").to_i(16))
           end
           @pos += 1
         end
@@ -385,7 +462,8 @@ module Minjs
           @pos += 1
           e = exp_part
         end
-        return ECMA262::ECMA262Numeric.new(0, f, e)
+        raw = @codes[pos0...@pos].pack("U*")
+        return ECMA262::ECMA262Numeric.new(raw, 0, f, e)
       else
         nil
       end
@@ -402,7 +480,8 @@ module Minjs
           @pos += 1
           e = exp_part
         end
-        return ECMA262::ECMA262Numeric.new(i, f, e)
+        raw = @codes[pos0...@pos].pack("U*")
+        return ECMA262::ECMA262Numeric.new(raw, i, f, e)
       end
     end
 
@@ -445,34 +524,29 @@ module Minjs
       return nil if code.nil?
       pos0 = @pos
       if code == 0x27 #'
-        str = ''
-        while @codes[@pos]
-          @pos += 1
-          code = @codes[@pos]
-          if code == 0x5c
-            @pos += 1
-            str << esc_string
-          elsif code == 0x27 or code.nil?
-            @pos += 1
-            return ECMA262::ECMA262String.new(str)
-          else
-            str << code
-          end
-        end
+        term = 0x27
       elsif code == 0x22 #"
-        str = ''
-        while @codes[@pos]
+        term = 0x22
+      else
+        return nil
+      end
+
+      str = ''
+      while @codes[@pos]
+        @pos += 1
+        code = @codes[@pos]
+        if code.nil?
+          raise ParseError.new("no `#{term}' at end of string")
+        elsif line_terminator?(code)
+          raise ParseError.new("string has line terminator in body")
+        elsif code == 0x5c #\
           @pos += 1
-          code = @codes[@pos]
-          if code == 0x5c
-            @pos += 1
-            str << esc_string
-          elsif code == 0x22 or code.nil?
+          str << esc_string
+        elsif code == term
             @pos += 1
             return ECMA262::ECMA262String.new(str)
-          else
-            str << code
-          end
+        else
+          str << code
         end
       end
       nil
@@ -556,7 +630,7 @@ module Minjs
       pos0 = @pos
       return nil if eof?
       while lit = next_input_element(options)
-        if lit and (lit.ws? or lit.lf?)
+        if lit and (lit.ws? or lit.lt?)
           ;
         else
           break
@@ -579,7 +653,7 @@ module Minjs
         end
       else
         while lit = next_input_element(options)
-          if lit and (lit.ws? or lit.lf?)
+          if lit and (lit.ws? or lit.lt?)
             ;
           else
             break
@@ -591,7 +665,7 @@ module Minjs
 
     def ws_lit(options = {})
       ret = next_input_element(options)
-      if ret.ws? or ret.lf?
+      if ret and (ret.ws? or ret.lt?)
         ret
       else
         nil
@@ -602,6 +676,34 @@ module Minjs
       if @pos > 0
         @pos -= 1
       end
+    end
+
+    def debug_code(from, to = nil)
+      if to.nil?
+        to = (@error_pos || @pos)
+      end
+      @codes[from,to].pack("U*")
+    end
+
+    def debug_str(pos = nil)
+      if pos.nil?
+        pos = @error_pos
+        if pos.nil?
+          pos = @pos
+        end
+      end
+      if pos > 20
+        pos -= 20
+        pos0 = 20
+      elsif pos >= 0
+        pos0 = pos
+        pos = 0
+      end
+      t = ''
+      t << @codes[pos..(pos+80)].collect{|u| u == 10 ? 0x20 : u}.pack("U*")
+      t << "\n"
+      t << (' ' * pos0) + "^"
+      t
     end
 
     def debug_lit(pos = nil)
@@ -633,7 +735,7 @@ module Minjs
         ret = yield
       ensure
         if ret.nil?
-          @error_pos = @pos
+          #@error_pos = @pos
           @pos = saved_pos
           nil
         end

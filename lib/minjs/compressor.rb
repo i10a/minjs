@@ -6,6 +6,7 @@ require 'minjs/statement'
 require 'minjs/expression'
 require 'minjs/func'
 require 'minjs/program'
+require 'minjs/exceptions'
 
 module Minjs
   class Compressor
@@ -35,6 +36,7 @@ module Minjs
 
     def compress(data, options = {})
       parse(data)
+
       reorder_function_decl
       return_after
       simple_replacement
@@ -45,25 +47,25 @@ module Minjs
       if_to_cond #buggy
       compress_var
       reduce_exp
+      @heading_comments.reverse.each do |c|
+        @prog.source_elements.unshift(c)
+      end
+
       to_js(options)
     end
 
     def parse(data)
       @lex = Minjs::Lex.new(data)
       @global_context = ECMA262::Context.new
-      #@lex.parse()
 
-      comments = []
+      @heading_comments = []
       @lex.eval_lit{
         while a = @lex.ws_lit
-          comments.push(a)
+          @heading_comments.push(a)
         end
+        nil
       }
       @prog = source_elements(@lex, @global_context)
-      comments.reverse.each do |c|
-        @prog.source_elements.unshift(c)
-      end
-
       @prog
     end
 
@@ -131,6 +133,8 @@ module Minjs
       self.traverse {|st, parent|
         if st.kind_of? ECMA262::Prog
           st.grouping
+        elsif st.kind_of? ECMA262::StList
+          st.grouping
         end
       }
     end
@@ -138,7 +142,7 @@ module Minjs
     def reorder_function_decl
       self.traverse {|st, parent|
         if st.kind_of? ECMA262::StFunc and parent.kind_of? ECMA262::Prog and st.decl
-          if (idx=parent.index(st)) != 0
+          if parent.index(st)
             parent.remove(st)
             parent.source_elements.unshift(st)
           end
@@ -321,9 +325,9 @@ module Minjs
         #false => !1
         if st.kind_of? ECMA262::Boolean
           if st.true?
-            parent.replace(st, ECMA262::ExpLogicalNot.new(ECMA262::ECMA262Numeric.new(0)))
+            parent.replace(st, ECMA262::ExpLogicalNot.new(ECMA262::ECMA262Numeric.new('0', 0)))
           else
-            parent.replace(st, ECMA262::ExpLogicalNot.new(ECMA262::ECMA262Numeric.new(1)))
+            parent.replace(st, ECMA262::ExpLogicalNot.new(ECMA262::ECMA262Numeric.new('1', 1)))
           end
         #if(true){<then>}else{<else>} => then
         elsif st.kind_of? ECMA262::StIf
@@ -349,6 +353,16 @@ module Minjs
             while parent.statement_list[idx]
               parent.statement_list[idx] = ECMA262::StEmpty.new;
               idx += 1
+            end
+          elsif parent.kind_of? ECMA262::Prog
+            idx = parent.index(st)
+            idx += 1
+            while parent.source_elements[idx]
+              parent.source_elements[idx] = ECMA262::StEmpty.new;
+              idx += 1
+            end
+            if st.exp.nil?
+              parent.replace(st, ECMA262::StEmpty.new)
             end
           end
         end

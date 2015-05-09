@@ -1,3 +1,4 @@
+# coding: utf-8
 module Minjs
   module ECMA262
     class Literal < Base
@@ -5,7 +6,7 @@ module Minjs
         false
       end
 
-      def lf?
+      def lt?
         false
       end
 
@@ -13,6 +14,22 @@ module Minjs
         false
       end
     end
+
+    class DivOrRegexpLiteral < Literal
+      def traverse(parent, &block)
+      end
+
+      def to_js(options = {})
+        "??"
+      end
+
+      @@instance = self.new()
+      def self.get
+        @@instance
+      end
+    end
+
+    LIT_DIV_OR_REGEXP_LITERAL = DivOrRegexpLiteral.get
 
     class WhiteSpace < Literal
       def traverse(parent, &block)
@@ -36,7 +53,7 @@ module Minjs
       def traverse(parent, &block)
       end
 
-      def lf?
+      def lt?
         true
       end
 
@@ -152,15 +169,24 @@ module Minjs
     end
 
     class ECMA262Numeric < Literal
-      attr_accessor :integer, :decimal, :exp
+      attr_reader :integer, :decimal, :exp, :raw
 
-      def initialize(integer, decimal = nil, exp = nil)
-        if integer.kind_of? Float
+      def initialize(raw, integer, decimal = nil, exp = nil)
+        @raw = raw
+        if integer == :nan
+          integer = nil
+          @nan = true
+        elsif integer == :infinity
+          integer = nil
+          @infinity = true
+        elsif integer.kind_of? Float
           @integer, @decimal = integer.to_i.to_s
           @decimal = (integer - @integer).to_s.sub(/^.*0\./, '')
         else
-          @integer = integer
-          @decimal = decimal
+          @integer = integer.to_s
+          if decimal
+            @decimal = decimal.to_s
+          end
           @exp = exp
         end
         @decimal = nil if @decimal == 0
@@ -172,9 +198,17 @@ module Minjs
       end
 
       def to_js(options = {})
-        t = @integer.to_s
+        if @nan
+          return "NaN"
+        end
+        t = @integer.dup.to_s
+
         if @decimal
-          t << ".#{@decimal}"
+          if @integer == '0'
+            t = ".#{@decimal}"
+          else
+            t << ".#{@decimal}"
+          end
         end
         if @exp
           t << "e#{@exp}"
@@ -210,18 +244,131 @@ module Minjs
       def to_f
         "#{@integer}.#{@decimal}e#{@exp}".to_f
       end
+=begin
+TODO
+      #
+      # 9.8.1
+      #
+      def to_ecma262_string
+        if @nan
+          "NaN"
+        elsif @integer == 0 and @decimal.nil? and @exp.nil?
+          "0"
+        elsif @integer.to_i < 0
+          ECMA262Numeric.new(-@integer, @decimal, @exp).to_string
+        elsif @intinify
+          "Infinity"
+        else
+          #puts "to_f:"
+          #puts to_f
+          _i = @integer
+          _d = @decimal
+          _e = @exp.to_i || 0
+
+          if _d
+            _e -= _d.length
+            _i += _d
+            _d = nil
+          end
+
+          if _i.match(/^0/) and _i != '0'
+            _i = _i.sub(/^0/, '')
+          end
+          #puts "i,d,e:"
+          #p _i
+          #p _d
+          #p _e
+
+          while(_i % 10 == 0)
+            _i /= 10
+            _e += 1
+          end
+          k = _i.to_s.length
+          s = _i
+          n = k + _e
+          #
+          # Otherwise, let n, k, and s be integers such that k ≥ 1,
+          # 10k−1 ≤ s < 10k, the Number value for s × 10n−k is m,
+          # and k is as small as possible. Note that k is the number
+          # of digits in the decimal representation of s, that s is
+          # not divisible by 10, and that the least significant digit
+          # of s is not necessarily uniquely determined by these
+          # criteria.
+          #
+          #puts "k=#{k}"
+          #puts "s=#{s}"
+          #puts "n=#{n}"
+          #puts "#{s}e#{n-k}"
+          #puts eval("#{s}e#{n-k}")
+          #
+          # If k ≤ n ≤ 21, return the String consisting of the k digits
+          # of the decimal representation of s (in order, with no
+          # leading zeroes), followed by n−k occurrences of the
+          # character ‘0’.
+          #
+          if k <= n and n <= 21
+            "#{s * 10 ** (n-k)}"
+          #
+          # If 0 < n ≤ 21, return the String consisting of the most
+          # significant n digits of the decimal representation of s,
+          # followed by a decimal point ‘.’, followed by the
+          # remaining k−n digits of the decimal representation of s.
+          #
+          elsif 0 < n and n <= 21
+            "#{s[0...n]}.#{s[n..-1]}"
+          #
+          # If −6 < n ≤ 0, return the String consisting of the
+          # character ‘0’, followed by a decimal point ‘.’,
+          # followed by −n occurrences of the character ‘0’,
+          # followed by the k digits of the decimal representation of
+          # s.
+          #
+          elsif -6 < n and n <= 0
+            to_f.to_s #TODO
+            #"0.#{'0' * -n}#{s}"
+          #
+          # Otherwise, if k = 1, return the String consisting of the
+          # single digit of s, followed by lowercase character ‘e’,
+          # followed by a plus sign ‘+’ or minus sign ‘−’
+          # according to whether n−1 is positive or negative,
+          # followed by the decimal representation of the integer
+          # abs(n−1) (with no leading zeroes).
+          #
+          elsif k == 1
+            to_f.to_s #TODO
+            #"#{s}e#{n-1 > 0 ? '+' : '-'}#{(n-1).abs}"
+          #
+          # Return the String consisting of the most significant digit
+          # of the decimal representation of s, followed by a decimal
+          # point ‘.’, followed by the remaining k−1 digits of the
+          # decimal representation of s, followed by the lowercase
+          # character ‘e’, followed by a plus sign ‘+’ or minus
+          # sign ‘−’ according to whether n−1 is positive or
+          # negative, followed by the decimal representation of the
+          # integer abs(n−1) (with no leading zeroes).
+          #
+          else
+            to_f.to_s #TODO
+          end
+        end
+      end
+=end
+
+      NUMERIC_NAN = ECMA262Numeric.new('NaN', :nan)
     end
 
     class ECMA262RegExp < Literal
-      def initialize(val)
-        @val = val
+      def initialize(body, flags)
+        @body = body
+        @flags = flags
       end
+
       def traverse(parent)
         yield self, parent
       end
 
       def to_js(options = {})
-        @val
+        "/#{@body}/#{@flags}"
       end
     end
 
@@ -259,14 +406,7 @@ module Minjs
 
       public
       def initialize(val)
-        @val = {}
-        val.each do |k, v|
-          if k.kind_of? IdentifierName
-            @val[ECMA262String.new(k.val)] = v
-          elsif k.kind_of? ECMA262String
-            @val[k] = v
-          end
-        end
+        @val = val
       end
       def traverse(parent, &block)
         yield self, parent
@@ -277,7 +417,9 @@ module Minjs
       end
       def to_js(options = {})
         "{" + @val.collect{|x, y|
-          if idname?(x.val.to_s)
+          if x.kind_of? ECMA262Numeric
+            "#{x.raw}:#{y.to_js(options)}"
+          elsif idname?(x.val.to_s)
             "#{x.val.to_s}:#{y.to_js(options)}"
           else
             "#{x.to_js(options)}:#{y.to_js(options)}"
@@ -313,18 +455,18 @@ module Minjs
       end
 
       def to_js(options)
-        if lf?
-          "/*#{@comment}\n*/"
+        if lt?
+          "/*#{@comment}*/"
         else
           "/*#{@comment}*/"
         end
       end
 
       def ws?
-        !lf?
+        !lt?
       end
 
-      def lf? #TODO
+      def lt?
         @has_lf ? true : false
       end
     end

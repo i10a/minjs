@@ -1,10 +1,15 @@
 module Minjs
   module ECMA262
     class Exp < Base
+      def replace(from, to)
+        puts "warning: #{self.class}: not implement"
+      end
+
       def traverse
         yield(self)
         p "??#{self.class}"
       end
+
       def to_js(options = {})
         "??#{@val.to_js(options)}(#{_args})"
       end
@@ -17,10 +22,18 @@ module Minjs
       def initialize(val)
         @val = val
       end
+
+      def replace(from, to)
+        if @val == from
+          @val = to
+        end
+      end
+
       def traverse(parent, &block)
         @val.traverse(self, &block)
         yield self, parent
       end
+
       def to_js(options = {})
         concat options, sym, @val
       end
@@ -177,14 +190,14 @@ module Minjs
     end
 
     # ||
-    class LogicalOr < ExpArg2
+    class ExpLogicalOr < ExpArg2
       def sym
         "||"
       end
     end
 
     # &&
-    class LogicalAnd < ExpArg2
+    class ExpLogicalAnd < ExpArg2
       def sym
         "&&"
       end
@@ -278,25 +291,25 @@ module Minjs
         end
         # N + M => (N + M)
         if @val.kind_of? ECMA262Numeric and @val2.kind_of? ECMA262Numeric and @val.integer? and @val2.integer?
-          parent.replace(self, ECMA262Numeric.new(@val.to_num + @val2.to_num))
+          parent.replace(self, ECMA262Numeric.new(nil, @val.to_num + @val2.to_num))
         end
         if @val2.kind_of? ECMA262Numeric and @val2.integer?
           # ((a + N) + M) or ((N + a) + M)
           if @val.kind_of? ExpAdd
             if @val.val2.kind_of? ECMA262Numeric and @val.val2.integer?
-              @val2 = ECMA262Numeric.new(@val.val2.to_num + @val2.to_num)
+              @val2 = ECMA262Numeric.new(nil, @val.val2.to_num + @val2.to_num)
               @val = @val.val
             elsif @val.val.kind_of? ECMA262Numeric and @val.val.integer?
-              @val2 = ECMA262Numeric.new(@val.val.to_num + @val2.to_num)
+              @val2 = ECMA262Numeric.new(nil, @val.val.to_num + @val2.to_num)
               @val = @val.val2
             end
           # ((a - N) + M) or ((N - a) + M)
           elsif @val.kind_of? ExpSub
             if @val.val2.kind_of? ECMA262Numeric and @val.val2.integer?
-              @val2 = ECMA262Numeric.new(-(@val.val2.to_num - @val2.to_num))
+              @val2 = ECMA262Numeric.new(nil, -(@val.val2.to_num - @val2.to_num))
               @val = @val.val
             elsif @val.val.kind_of? ECMA262Numeric and @val.val.integer?
-              @val2 = ECMA262Numeric.new(-(@val.val.to_num - @val2.to_num))
+              @val2 = ECMA262Numeric.new(nil, -(@val.val.to_num - @val2.to_num))
               @val = @val.val2
             end
           end
@@ -321,25 +334,25 @@ module Minjs
         end
         # N - M => (N - M)
         if @val.kind_of? ECMA262Numeric and @val2.kind_of? ECMA262Numeric and @val.integer? and @val2.integer?
-          parent.replace(self, ECMA262Numeric.new(@val.to_num - @val2.to_num))
+          parent.replace(self, ECMA262Numeric.new(nil, @val.to_num - @val2.to_num))
         end
         if @val2.kind_of? ECMA262Numeric and @val2.integer?
           # ((a - N) - M) or ((N - a) - M)
           if @val.kind_of? ExpSub
             if @val.val2.kind_of? ECMA262Numeric and @val.val2.integer?
-              @val2 = ECMA262Numeric.new(@val.val2.to_num + @val2.to_num)
+              @val2 = ECMA262Numeric.new(nil, @val.val2.to_num + @val2.to_num)
               @val = @val.val
             elsif @val.val.kind_of? ECMA262Numeric and @val.val.integer?
-              @val2 = ECMA262Numeric.new(@val.val.to_num + @val2.to_num)
+              @val2 = ECMA262Numeric.new(nil, @val.val.to_num + @val2.to_num)
               @val = @val.val2
             end
           # ((a + N) - M) or ((N + a) - M)
           elsif @val.kind_of? ExpAdd
             if @val.val2.kind_of? ECMA262Numeric and @val.val2.integer?
-              @val2 = ECMA262Numeric.new(-(@val.val2.to_num - @val2.to_num))
+              @val2 = ECMA262Numeric.new(nil, -(@val.val2.to_num - @val2.to_num))
               @val = @val.val
             elsif @val.val.kind_of? ECMA262Numeric and @val.val.integer?
-              @val2 = ECMA262Numeric.new(-(@val.val.to_num - @val2.to_num))
+              @val2 = ECMA262Numeric.new(nil, -(@val.val.to_num - @val2.to_num))
               @val = @val.val2
             end
           end
@@ -392,15 +405,15 @@ module Minjs
         end
         # N * M => (N * M)
         if @val.kind_of? ECMA262Numeric and @val2.kind_of? ECMA262Numeric and @val.integer? and @val2.integer?
-          parent.replace(self, ECMA262Numeric.new(@val.to_num * @val2.to_num))
+          parent.replace(self, ECMA262Numeric.new(nil, @val.to_num * @val2.to_num))
         end
         # ((a * N) * M) or ((N * a) * M)
         if @val2.kind_of? ECMA262Numeric and @val2.integer? and @val.kind_of? ExpMul
           if @val.val2.kind_of? ECMA262Numeric and @val.val2.integer?
-            @val2 = ECMA262Numeric.new(@val.val2.to_num * @val2.to_num)
+            @val2 = ECMA262Numeric.new(nil, @val.val2.to_num * @val2.to_num)
             @val = @val.val
           elsif @val.val.kind_of? ECMA262Numeric and @val.val.integer?
-            @val2 = ECMA262Numeric.new(@val.val.to_num * @val2.to_num)
+            @val2 = ECMA262Numeric.new(nil, @val.val.to_num * @val2.to_num)
             @val = @val.val2
           end
         end
@@ -480,8 +493,13 @@ module Minjs
 
       def reduce(parent)
         if @val.kind_of? ECMA262Numeric
-          @val.integer = -@val.integer
-          parent.replace(self, @val)
+          if @val.integer.match(/^\-/)
+            integer = $'
+          else
+            integer = "-#{@val.integer}"
+          end
+          val = ECMA262Numeric.new(integer, integer, @val.decimal, @val.exp)
+          parent.replace(self, val)
         end
       end
     end
@@ -495,13 +513,23 @@ module Minjs
         "!"
       end
     end
+
     class ExpNew < Exp
-      def initialize(val, args)
-        @val = val
+      def initialize(name, args)
+        @name = name
         @args = args
       end
+
+      def replace(from, to)
+        if @name == from
+          @name = from
+        elsif @args and (idx = @args.index(from))
+          @args[idx] = to
+        end
+      end
+
       def traverse(parent, &block)
-        @val.traverse(self, &block)
+        @name.traverse(self, &block)
         if @args
           @args.each do |arg|
             arg.traverse(self, &block)
@@ -509,12 +537,13 @@ module Minjs
         end
         yield self, parent
       end
+
       def to_js(options = {})
         if @args
           args = @args.collect{|x| x.to_js(options)}.join(",")
-          concat options, :new, @val, '(', args, ')'
+          concat options, :new, @name, '(', args, ')'
         else
-          concat options, :new, @val
+          concat options, :new, @name
         end
       end
     end
