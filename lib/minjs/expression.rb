@@ -19,7 +19,7 @@ module Minjs
           STDERR.puts "*** primary_exp => ()" if @debug
           return ECMA262::ExpParen.new(a)
         else
-          raise 'error'
+          raise ParseError.new("no `)' at end of expression", lex)
         end
       end
 
@@ -103,18 +103,17 @@ module Minjs
             break
           end
           lex.eval_lit{
+            if lex.match_lit(ECMA262::ID_GET) and a=property_name(lex, context) and lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and lex.match_lit(ECMA262::PUNC_LCURLYBRAC) and b=func_body(lex, context) and lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
+              h.push([a, ECMA262::StFunc.new(context, ECMA262::ID_GET, [], b, :getter => true)])
+            elsif lex.match_lit(ECMA262::ID_SET) and a=property_name(lex, context) and lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and arg=property_set_parameter_list(lex, context) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and lex.match_lit(ECMA262::PUNC_LCURLYBRAC) and b=func_body(lex, context) and lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
+              h.push([a, ECMA262::StFunc.new(context, ECMA262::ID_SET, arg, b, :setter => true)])
+            else
+              nil
+            end
+          } or lex.eval_lit{
             a=property_name(lex, context) and lex.match_lit(ECMA262::PUNC_COLON) and b=assignment_exp(lex, context, options)
             h.push([a, b])
           }
-#          or lex.eval_lit{
-#            if lex.match_lit(ECMA262::ID_GET) and a=property_name(lex, context) and lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and lex.match_lit(ECMA262::PUNC_LCURLYBRAC) and func_body(lex, context) and lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
-#              h[a] = "getter" #TODO
-#            elsif lex.match_lit(ECMA262::ID_SET) and a=property_name(lex, context) and lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and property_set_parameter_list(lex, context) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and lex.match_lit(ECMA262::PUNC_LCURLYBRAC) and func_body(lex, context) and lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
-#              h[a] = "setter" #TODO
-#            else
-#              return nil
-#            end
-#          }
 
           if lex.match_lit(ECMA262::PUNC_COMMA)
             break if lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
@@ -138,7 +137,7 @@ module Minjs
         elsif a.kind_of?(ECMA262::ECMA262Numeric)
           a
         else
-          raise ParseError.new("The Property name must be kind_of ItentiferName or String", lex)
+          nil
         end
       }
     end
@@ -147,7 +146,7 @@ module Minjs
       lex.eval_lit {
         a = lex.fwd_lit
         if a.kind_of?(ECMA262::IdentifierName) and !a.reserved?
-          a
+          [a]
         else
           nil
         end
@@ -292,12 +291,11 @@ module Minjs
       STDERR.puts "*** postfix_exp" if @debug
       lex.debug_lit if @debug
 
-      next_exp = :left_hand_side_exp
       t = lex.eval_lit{
-        a = __send__(next_exp, lex, context, options)
+        a = left_hand_side_exp(lex, context, options)
         return nil if a.nil?
-        if punc = (lex.match_lit(ECMA262::PUNC_INC) ||
-                   lex.match_lit(ECMA262::PUNC_DEC))
+        if punc = (lex.match_lit(ECMA262::PUNC_INC, :nolt => true) ||
+                   lex.match_lit(ECMA262::PUNC_DEC, :nolt => true))
           if punc == ECMA262::PUNC_INC
             ECMA262::ExpPostInc.new(a)
           else
@@ -683,7 +681,7 @@ module Minjs
             when ECMA262::PUNC_XORLET
               ECMA262::ExpXorAssign.new(left_hand, b)
             else
-              raise "not implement"
+              raise "internal error"
             end
           else # some assignment operator presents but no assignment_expression => fail
             return nil

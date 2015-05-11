@@ -68,14 +68,7 @@ module Minjs
         if s = statement_list(lex, context) and lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
           ECMA262::StBlock.new(s)
         else
-          if s
-            lex.debug_lit
-            puts lex.debug_code(pos0, lex.pos)
-            raise 'no "}" end of block'
-          else
-            lex.debug_lit
-            raise "bad block"
-          end
+          raise ParseError.new('no "}" end of block', lex)
         end
       }
     end
@@ -98,7 +91,7 @@ module Minjs
     # variable_statement
     #
     def var_statement(lex, context)
-      raise 'error' if context.nil?
+      raise 'internal error' if context.nil?
       return nil unless lex.match_lit(ECMA262::ID_VAR)
       lex.eval_lit {
         if vl = var_decl_list(lex, context, {}) and semicolon(lex, context)
@@ -111,7 +104,7 @@ module Minjs
           ECMA262::StVar.new(context, vl)
         else
           lex.debug_lit
-          raise Minjs::ParseError.new("var_statement")
+          raise Minjs::ParseError.new("var_statement", lex)
         end
       }
     end
@@ -185,9 +178,10 @@ module Minjs
     #12.5
     #
     def if_statement(lex, context)
+      return nil unless lex.match_lit(ECMA262::ID_IF)
       lex.eval_lit {
-        unless lex.match_lit(ECMA262::ID_IF) and lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and cond=exp(lex, context, {}) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
-          next nil
+        unless lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and cond=exp(lex, context, {}) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
+          raise ParseError.new("bad statement", lex)
         end
         if lex.match_lit(ECMA262::ID_ELSE) and e=statement(lex, context)
           ECMA262::StIf.new(cond, s, e)
@@ -209,7 +203,7 @@ module Minjs
         ECMA262::StWhile.new(e, s)
       else
         lex.debug_lit
-        raise ParseError.new("while_statement")
+        raise ParseError.new("while_statement", lex)
       end
     end
 
@@ -219,7 +213,7 @@ module Minjs
         ECMA262::StDoWhile.new(e, s)
       else
         lex.debug_lit
-        raise ParseError.new("do_while_statement")
+        raise ParseError.new("do_while_statement", lex)
       end
     end
 
@@ -324,7 +318,7 @@ module Minjs
           ECMA262::StWith.new(e, s)
         else
           lex.debug_lit
-          raise ParseError.new("switch_statement")
+          raise ParseError.new("switch_statement", lex)
         end
       }
     end
@@ -338,7 +332,7 @@ module Minjs
           ECMA262::StSwitch.new(e, c)
         else
           lex.debug_lit
-          raise ParseError.new("switch_statement")
+          raise ParseError.new("switch_statement", lex)
         end
       }
     end
@@ -384,7 +378,7 @@ module Minjs
           ECMA262::StThrow.new(e)
         else
           lex.debug_lit
-          raise ParseError.new("throw_statement")
+          raise ParseError.new("throw_statement", lex)
         end
       }
     end

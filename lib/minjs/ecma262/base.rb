@@ -43,6 +43,10 @@ module Minjs
         end
         j.join("")
       end
+
+      def replace(from, to)
+        puts "warning: #{self.class}: replace not implement"
+      end
     end
 
     class Prog < Base
@@ -108,6 +112,12 @@ module Minjs
 
       def remove(st)
         @source_elements.delete(st)
+      end
+
+      def remove_empty_statement
+        @source_elements.reject!{|x|
+          x.class == StEmpty
+        }
       end
 
       def each(&block)

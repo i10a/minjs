@@ -13,6 +13,10 @@ module Minjs
       def to_exp?
         false
       end
+
+      def priority(exp)
+        10
+      end
     end
 
     class DivOrRegexpLiteral < Literal
@@ -169,10 +173,9 @@ module Minjs
     end
 
     class ECMA262Numeric < Literal
-      attr_reader :integer, :decimal, :exp, :raw
+      attr_reader :integer, :decimal, :exp
 
-      def initialize(raw, integer, decimal = nil, exp = nil)
-        @raw = raw
+      def initialize(integer, decimal = nil, exp = nil)
         if integer == :nan
           integer = nil
           @nan = true
@@ -187,10 +190,11 @@ module Minjs
           if decimal
             @decimal = decimal.to_s
           end
-          @exp = exp
+          if exp
+            @exp = exp.to_i
+          end
         end
         @decimal = nil if @decimal == 0
-        @exp = nil if @exp == 1
       end
 
       def traverse(parent, &block)
@@ -242,120 +246,52 @@ module Minjs
       end
 
       def to_f
-        "#{@integer}.#{@decimal}e#{@exp}".to_f
+        d = @decimal
+        if d.to_s == ''
+          d = '0'
+        end
+        "#{@integer}.#{d}e#{@exp}".to_f
       end
-=begin
-TODO
       #
       # 9.8.1
       #
       def to_ecma262_string
         if @nan
           "NaN"
-        elsif @integer == 0 and @decimal.nil? and @exp.nil?
+        elsif @integer == '0' and @decimal.nil? and @exp.nil?
           "0"
-        elsif @integer.to_i < 0
-          ECMA262Numeric.new(-@integer, @decimal, @exp).to_string
         elsif @intinify
           "Infinity"
         else
-          #puts "to_f:"
-          #puts to_f
-          _i = @integer
-          _d = @decimal
-          _e = @exp.to_i || 0
+          f = to_f.to_s
+          _n, _e = f.split('e')
+          _i, _d = _n.split('.')
 
-          if _d
-            _e -= _d.length
-            _i += _d
-            _d = nil
-          end
-
-          if _i.match(/^0/) and _i != '0'
-            _i = _i.sub(/^0/, '')
-          end
-          #puts "i,d,e:"
-          #p _i
-          #p _d
-          #p _e
-
-          while(_i % 10 == 0)
-            _i /= 10
-            _e += 1
-          end
-          k = _i.to_s.length
-          s = _i
-          n = k + _e
-          #
-          # Otherwise, let n, k, and s be integers such that k ≥ 1,
-          # 10k−1 ≤ s < 10k, the Number value for s × 10n−k is m,
-          # and k is as small as possible. Note that k is the number
-          # of digits in the decimal representation of s, that s is
-          # not divisible by 10, and that the least significant digit
-          # of s is not necessarily uniquely determined by these
-          # criteria.
-          #
-          #puts "k=#{k}"
-          #puts "s=#{s}"
-          #puts "n=#{n}"
-          #puts "#{s}e#{n-k}"
-          #puts eval("#{s}e#{n-k}")
-          #
-          # If k ≤ n ≤ 21, return the String consisting of the k digits
-          # of the decimal representation of s (in order, with no
-          # leading zeroes), followed by n−k occurrences of the
-          # character ‘0’.
-          #
-          if k <= n and n <= 21
-            "#{s * 10 ** (n-k)}"
-          #
-          # If 0 < n ≤ 21, return the String consisting of the most
-          # significant n digits of the decimal representation of s,
-          # followed by a decimal point ‘.’, followed by the
-          # remaining k−n digits of the decimal representation of s.
-          #
-          elsif 0 < n and n <= 21
-            "#{s[0...n]}.#{s[n..-1]}"
-          #
-          # If −6 < n ≤ 0, return the String consisting of the
-          # character ‘0’, followed by a decimal point ‘.’,
-          # followed by −n occurrences of the character ‘0’,
-          # followed by the k digits of the decimal representation of
-          # s.
-          #
-          elsif -6 < n and n <= 0
-            to_f.to_s #TODO
-            #"0.#{'0' * -n}#{s}"
-          #
-          # Otherwise, if k = 1, return the String consisting of the
-          # single digit of s, followed by lowercase character ‘e’,
-          # followed by a plus sign ‘+’ or minus sign ‘−’
-          # according to whether n−1 is positive or negative,
-          # followed by the decimal representation of the integer
-          # abs(n−1) (with no leading zeroes).
-          #
-          elsif k == 1
-            to_f.to_s #TODO
-            #"#{s}e#{n-1 > 0 ? '+' : '-'}#{(n-1).abs}"
-          #
-          # Return the String consisting of the most significant digit
-          # of the decimal representation of s, followed by a decimal
-          # point ‘.’, followed by the remaining k−1 digits of the
-          # decimal representation of s, followed by the lowercase
-          # character ‘e’, followed by a plus sign ‘+’ or minus
-          # sign ‘−’ according to whether n−1 is positive or
-          # negative, followed by the decimal representation of the
-          # integer abs(n−1) (with no leading zeroes).
-          #
+          e = _e.to_i
+          if(e == 0)
+            if _d.to_i != 0
+              return _n
+            else
+              return _i
+            end
+          elsif(e > 0 && e < 21)
+            _n = _i + _d
+            _n += '0' * (21 - _n.length)
+            return _n
+          elsif(e < 0 && e >= -6)
+            _n = "0." + ('0' * (-e-1)) + _i + _d
+            return _n
           else
-            to_f.to_s #TODO
+            if e<0
+              return "#{_i}.#{_d}e#{e}"
+            else
+              return "#{_i}.#{_d}e+#{e}"
+            end
           end
         end
       end
-=end
-
-      NUMERIC_NAN = ECMA262Numeric.new('NaN', :nan)
     end
+    NUMERIC_NAN = ECMA262Numeric.new(:nan)
 
     class ECMA262RegExp < Literal
       def initialize(body, flags)
@@ -417,12 +353,27 @@ TODO
       end
       def to_js(options = {})
         "{" + @val.collect{|x, y|
-          if x.kind_of? ECMA262Numeric
-            "#{x.raw}:#{y.to_js(options)}"
-          elsif idname?(x.val.to_s)
-            "#{x.val.to_s}:#{y.to_js(options)}"
+          if y.kind_of? StFunc and (y.getter? || y.setter?)
+            if y.name.val == :get
+              t = "get #{x.val.to_s}(){#{y.statements.to_js(options)}}"
+            else
+              t = "set #{x.val.to_s}(#{y.args[0].to_js(options)}){#{y.statements.to_js(options)}}"
+            end
           else
-            "#{x.to_js(options)}:#{y.to_js(options)}"
+            if x.kind_of? ECMA262Numeric
+              a = "#{x.to_ecma262_string}"
+              b = "#{x.to_js}"
+              if a.length <= b.length || a == "Infinity"
+                t = a
+              else
+                t = b
+              end
+            elsif idname?(x.val.to_s)
+              t = "#{x.val.to_s}"
+            else
+              t = "#{x.to_js(options)}"
+            end
+            t << ":#{y.to_js(options)}"
           end
         }.join(",") + "}"
       end

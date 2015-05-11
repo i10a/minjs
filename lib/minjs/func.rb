@@ -17,13 +17,17 @@ module Minjs
           lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and
           lex.match_lit(ECMA262::PUNC_LCURLYBRAC) and
           b=func_body(lex, new_context) and lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
-          f = ECMA262::StFunc.new(new_context, id, args, b, true)
+          f = ECMA262::StFunc.new(new_context, id, args, b, {:decl => true})
 
           context.var_env.record.create_mutable_binding(id, nil)
           context.var_env.record.set_mutable_binding(id, f, nil)
           f
         else
-          nil
+          if b
+            raise ParseError.new("No `}' at end of function", lex)
+          else
+            raise ParseError.new("Bad function declaration", lex)
+          end
         end
       }
     end
@@ -53,8 +57,11 @@ module Minjs
            end
            f
          else
-           lex.debug_lit
-           raise 'error'
+          if b
+            raise ParseError.new("No `}' at end of function", lex)
+          else
+            raise ParseError.new("Bad function declaration", lex)
+          end
          end
        }
     end

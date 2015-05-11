@@ -38,15 +38,17 @@ module Minjs
       parse(data)
 
       reorder_function_decl
-      return_after
       simple_replacement
       reorder_var
       assignment_after_var
       grouping_statement
       block_to_exp
-      if_to_cond #buggy
+      if_to_cond
       compress_var
       reduce_exp
+      remove_paren
+      #feature
+      #return_to_exp
       @heading_comments.reverse.each do |c|
         @prog.source_elements.unshift(c)
       end
@@ -141,7 +143,7 @@ module Minjs
 
     def reorder_function_decl
       self.traverse {|st, parent|
-        if st.kind_of? ECMA262::StFunc and parent.kind_of? ECMA262::Prog and st.decl
+        if st.kind_of? ECMA262::StFunc and parent.kind_of? ECMA262::Prog and st.decl?
           if parent.index(st)
             parent.remove(st)
             parent.source_elements.unshift(st)
@@ -193,6 +195,28 @@ module Minjs
       remove_block_in_block
     end
 
+    #feature
+    def remove_paren
+      self.traverse {|st, parent|
+        if st.kind_of? ECMA262::ExpParen
+          #
+          # ECMA262 say:
+          # expression statement cannot start with "function"
+          #
+          if parent.priority(st) > st.val.priority(nil)
+            if st.val.to_js.match(/^function/)
+              ;
+            elsif st.val.to_js.match(/^{/)
+              ;
+            else
+              parent.replace(st, st.val)
+            end
+          end
+        end
+      }
+      self
+    end
+
     def remove_block_in_block
       while true
         _retry = false
@@ -227,13 +251,47 @@ module Minjs
       }
     end
 
+    def block_to_statement
+      self.traverse {|st, parent|
+        if st.kind_of? ECMA262::StBlock and st.to_statement?
+          if parent.kind_of? ECMA262::StTry
+          else
+            parent.replace(st, st.to_statement)
+          end
+        end
+      }
+    end
+
     def if_to_cond
-      #traverse all statemtns and expression
       self.traverse {|st, parent|
         if st.kind_of? ECMA262::StIf and st.to_exp?
           if t = ECMA262::StExp.new(st.to_exp({}))
             parent.replace(st, t)
           end
+          # feature...
+=begin
+        elsif st.kind_of? ECMA262::StIf and st.to_return?
+          #
+          # if(...)
+          #   return a;
+          # return b;
+          #
+          # => if(...)return a;else return b;
+          #
+          if parent.kind_of? ECMA262::StList and st.else_st.nil? and (nxt = parent[parent.index(st) + 1]).kind_of? ECMA262::StReturn
+            st.replace(st.else_st, nxt)
+            parent.replace(nxt, ECMA262::StEmpty.new())
+            parent.replace(st, st.to_return)
+          #
+          # if(...)
+          # return a;
+          # else
+          # return b;
+          #
+          else
+            parent.replace(st, st.to_return)
+          end
+=end
         end
       }
     end
@@ -311,6 +369,7 @@ module Minjs
         end
       }
     end
+
     def reduce_exp
       self.traverse {|st, parent|
         if st.kind_of? ECMA262::Exp
@@ -325,9 +384,9 @@ module Minjs
         #false => !1
         if st.kind_of? ECMA262::Boolean
           if st.true?
-            parent.replace(st, ECMA262::ExpLogicalNot.new(ECMA262::ECMA262Numeric.new('0', 0)))
+            parent.replace(st, ECMA262::ExpParen.new(ECMA262::ExpLogicalNot.new(ECMA262::ECMA262Numeric.new(0))))
           else
-            parent.replace(st, ECMA262::ExpLogicalNot.new(ECMA262::ECMA262Numeric.new('1', 1)))
+            parent.replace(st, ECMA262::ExpParen.new(ECMA262::ExpLogicalNot.new(ECMA262::ECMA262Numeric.new(1))))
           end
         #if(true){<then>}else{<else>} => then
         elsif st.kind_of? ECMA262::StIf
@@ -344,29 +403,35 @@ module Minjs
       }
     end
 
-    def return_after
+    def return_to_exp
       self.traverse {|st, parent|
         if st.kind_of? ECMA262::StReturn
-          if parent.kind_of? ECMA262::StList
-            idx = parent.index(st)
-            idx += 1
-            while parent.statement_list[idx]
-              parent.statement_list[idx] = ECMA262::StEmpty.new;
-              idx += 1
+          if parent.kind_of? ECMA262::Prog
+            parent.remove_empty_statement
+            #
+            # a=1;return b; => return a=1,b;
+            #
+            # check statement:
+            # last one is return and its previous is expression or not
+            if parent.source_elements[-1] == st and (prev=parent.source_elements[-2]).class == ECMA262::StExp
+              if st.exp
+                st.replace(st.exp, ECMA262::ExpComma.new(prev.exp, st.exp))
+                parent.replace(prev, ECMA262::StEmpty.new())
+              end
             end
-          elsif parent.kind_of? ECMA262::Prog
-            idx = parent.index(st)
-            idx += 1
-            while parent.source_elements[idx]
-              parent.source_elements[idx] = ECMA262::StEmpty.new;
-              idx += 1
-            end
-            if st.exp.nil?
-              parent.replace(st, ECMA262::StEmpty.new)
+          elsif parent.kind_of? ECMA262::StList
+            parent.remove_empty_statement
+            if parent.statement_list[-1] == st and (prev=parent.statement_list[-2]).class == ECMA262::StExp
+              if st.exp
+                st.replace(st.exp, ECMA262::ExpComma.new(prev.exp, st.exp))
+                parent.replace(prev, ECMA262::StEmpty.new())
+              end
             end
           end
         end
       }
+      block_to_statement
+      if_to_cond
     end
     #
     # var a; a=1

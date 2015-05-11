@@ -9,10 +9,6 @@ module Minjs
         t = source_element(lex, context)
         if t
           prog.push(t)
-#        elsif !options[:no_exception]
-#          lex.debug_lit
-#          raise 'error'
-#          return nil
         else
           break
         end

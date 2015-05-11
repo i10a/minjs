@@ -5,8 +5,12 @@ module Minjs
         false
       end
 
-      def replace(from, to)
-        puts "warning: not implement"
+      def to_return?
+        false
+      end
+
+      def priority(exp)
+        999
       end
     end
 
@@ -58,6 +62,12 @@ module Minjs
 
       def remove(st)
         @statement_list.delete(st)
+      end
+
+      def remove_empty_statement
+        @statement_list.reject!{|x|
+          x.class == StEmpty
+        }
       end
 
       def traverse(parent, &block)
@@ -114,9 +124,6 @@ module Minjs
 
       #statement_list:StList
       def initialize(statement_list)
-        if statement_list.class == Array
-          raise 'bad class'
-        end
         @statement_list = statement_list
       end
 
@@ -135,6 +142,17 @@ module Minjs
 
       def to_exp(options)
         @statement_list[0].to_exp({})
+      end
+
+      def to_statement?
+        @statement_list.statement_list.select{|s|
+          s.class != StEmpty
+        }.length == 1
+      end
+
+      def to_statement
+        statement_list.remove_empty_statement
+        @statement_list[0]
       end
     end
     #
@@ -223,10 +241,18 @@ module Minjs
       def initialize(exp)
         @exp = exp
       end
+
+      def replace(from, to)
+        if @exp == from
+          @exp = to
+        end
+      end
+
       def traverse(parent, &block)
         @exp.traverse(self, &block)
         yield self, parent
       end
+
       def to_js(options = {})
         concat(options, @exp, ";")
       end
@@ -275,9 +301,35 @@ module Minjs
         end
       end
 
+      def to_return?
+        if !@else_st
+          return true if @then_st.class == StReturn
+        else
+          return true if @then_st.class == StReturn and @else_st.class == StReturn
+        end
+      end
+
+      def to_return
+        if !@else_st
+          cond = ExpParen.new(@cond)
+          then_exp = ExpParen.new(then_st.exp)
+          else_exp = ExpVoid.new(ECMA262Numeric.new('0'))
+          StReturn.new(ExpCond.new(cond, then_exp, else_exp))
+        else
+          cond = ExpParen.new(@cond)
+          then_exp = ExpParen.new(then_st.exp)
+          else_exp = ExpParen.new(else_st.exp)
+          StReturn.new(ExpCond.new(cond, then_exp, else_exp))
+        end
+      end
+
       def to_exp?
-        return false if @then_st.to_exp? == false
-        return false if @else_st and @else_st.to_exp? == false
+        if !@else_st
+          return false if @then_st.to_exp? == false
+        else
+          return false if @then_st.to_exp? == false
+          return false if @else_st.to_exp? == false
+        end
         return true
       end
 
@@ -288,7 +340,6 @@ module Minjs
           else_exp = @else_st.to_exp(options)
         else
           then_exp = @then_st.to_exp(options)
-          #else_exp = ECMA262Numeric.new(0)
           return ExpLogicalAnd.new(ExpParen.new(@cond), ExpParen.new(then_exp))
         end
         if then_exp.kind_of? ExpComma
@@ -365,6 +416,9 @@ module Minjs
       end
     end
 
+    #
+    # for(var i=0,... ; ; )
+    #
     class StForVar < St
       attr_reader :context
 
@@ -433,11 +487,7 @@ module Minjs
             concat options, x[0]
           end
         }.join(",")
-#        if options[:compress_var]
-#          t = concat({:for_args => true}.merge(options), :for, "(", _var_decl_list, ";", @exp2, ";", @exp3, ")")
-#        else
-          t = concat({:for_args => true}.merge(options), :for, "(", _var_decl_list, ";", @exp2, ";", @exp3, ")")
-#        end
+        t = concat({:for_args => true}.merge(options), :for, "(var", _var_decl_list, ";", @exp2, ";", @exp3, ")")
         concat options, t, statement
       end
     end
@@ -637,7 +687,7 @@ module Minjs
       end
 
       def to_js(options = {})
-        concat options, :with, "(", @exp, ")","{", @statement, "}"
+        concat options, :with, "(", @exp, ")", @statement
       end
     end
     #12.11
@@ -740,8 +790,6 @@ module Minjs
           @catch[1] = to
         elsif from == @finally
           @finally = to
-        else
-          raise 'unknown'
         end
       end
 
@@ -778,16 +826,21 @@ module Minjs
     class StFunc < St
       attr_reader :name
       attr_reader :args
-      attr_reader :statement
+      attr_reader :statements
       attr_reader :context
-      attr_reader :decl
 
-      def initialize(context, name, args, statements, decl = false)
+      def initialize(context, name, args, statements, options = {})
         @name = name
-        @args = args
+        @args = args #=> array
         @statements = statements #=> Prog
         @context = context
-        @decl = decl
+        @decl = options[:decl]
+        @getter = options[:getter]
+        @setter = options[:setter]
+      end
+
+      def priority(exp)
+        10
       end
 
       def traverse(parent, &block)
@@ -801,7 +854,25 @@ module Minjs
 
       def to_js(options = {})
         _args = @args.collect{|x|x.to_js(options)}.join(",")
-        concat options, :function, @name, '(', _args, ")", "{", @statements, "}"
+        if @getter
+          concat options, :get, @name, '(', _args, ")", "{", @statements, "}"
+        elsif @setter
+          concat options, :set, @name, '(', _args, ")", "{", @statements, "}"
+        else
+          concat options, :function, @name, '(', _args, ")", "{", @statements, "}"
+        end
+      end
+
+      def getter?
+        @getter
+      end
+
+      def setter?
+        @setter
+      end
+
+      def decl?
+        @decl
       end
     end
   end

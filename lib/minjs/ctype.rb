@@ -1,5 +1,10 @@
 module Minjs
   module Ctype
+    def hex_number?(code)
+      code >= 0x30 && code <= 0x39 or
+        code >= 0x41 && code <= 0x46 or
+        code >= 0x61 && code <= 0x66
+    end
     def white_space?(code)
       code == 0x20 || code == 0x9 || code == 0xb || code == 0xc || code == 0xa0 || code == 0xfeff
     end

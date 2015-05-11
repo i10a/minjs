@@ -1,20 +1,19 @@
 module Minjs
   module ECMA262
     class Exp < Base
-      def replace(from, to)
-        puts "warning: #{self.class}: not implement"
-      end
-
       def traverse
         yield(self)
-        p "??#{self.class}"
       end
 
       def to_js(options = {})
-        "??#{@val.to_js(options)}(#{_args})"
+        raise "internal error"
       end
 
       def reduce(parent)
+      end
+
+      def priority(exp)
+        9999
       end
     end
 
@@ -77,8 +76,14 @@ module Minjs
 
     # ( exp )
     class ExpParen < Exp
+      attr_reader :val
+
       def initialize(val)
         @val = val
+      end
+
+      def priority(exp)
+        0
       end
 
       def replace(from, to)
@@ -102,60 +107,96 @@ module Minjs
       def sym
         "="
       end
+      def priority(exp)
+        130
+      end
     end
     class ExpDivAssign < ExpAssign
       def sym
         "/="
+      end
+      def priority(exp)
+        130
       end
     end
     class ExpMulAssign < ExpAssign
       def sym
         "*="
       end
+      def priority(exp)
+        130
+      end
     end
     class ExpModAssign < ExpAssign
       def sym
-        "/="
+        "%="
+      end
+      def priority(exp)
+        130
       end
     end
     class ExpAddAssign < ExpAssign
       def sym
         "+="
       end
+      def priority(exp)
+        130
+      end
     end
     class ExpSubAssign < ExpAssign
       def sym
         "-="
+      end
+      def priority(exp)
+        130
       end
     end
     class ExpLShiftAssign < ExpAssign
       def sym
         "<<="
       end
+      def priority(exp)
+        130
+      end
     end
     class ExpRShiftAssign < ExpAssign
       def sym
         ">>="
+      end
+      def priority(exp)
+        130
       end
     end
     class ExpURShiftAssign < ExpAssign
       def sym
         ">>>="
       end
+      def priority(exp)
+        130
+      end
     end
     class ExpAndAssign < ExpAssign
       def sym
         "&="
+      end
+      def priority(exp)
+        130
       end
     end
     class ExpOrAssign < ExpAssign
       def sym
         "|="
       end
+      def priority(exp)
+        130
+      end
     end
     class ExpXorAssign < ExpAssign
       def sym
         "^="
+      end
+      def priority(exp)
+        130
       end
     end
 
@@ -165,6 +206,10 @@ module Minjs
         @val = val
         @val2 = val2
         @val3 = val3
+      end
+
+      def priority(exp)
+        120
       end
 
       def replace(from, to)
@@ -194,12 +239,18 @@ module Minjs
       def sym
         "||"
       end
+      def priority(exp)
+        118
+      end
     end
 
     # &&
     class ExpLogicalAnd < ExpArg2
       def sym
         "&&"
+      end
+      def priority(exp)
+        116
       end
     end
 
@@ -208,6 +259,9 @@ module Minjs
       def sym
         "|"
       end
+      def priority(exp)
+        108
+      end
     end
 
     # ^
@@ -215,12 +269,18 @@ module Minjs
       def sym
         "^"
       end
+      def priority(exp)
+        106
+      end
     end
 
     # &
     class ExpAnd < ExpArg2
       def sym
         "&"
+      end
+      def priority(exp)
+        104
       end
     end
 
@@ -230,11 +290,17 @@ module Minjs
       def sym
         "=="
       end
+      def priority(exp)
+        90
+      end
     end
     # !=
     class ExpNotEq < ExpArg2
       def sym
         "!="
+      end
+      def priority(exp)
+        90
       end
     end
     # ===
@@ -242,11 +308,17 @@ module Minjs
       def sym
         "==="
       end
+      def priority(exp)
+        90
+      end
     end
     # !==
     class ExpStrictNotEq < ExpArg2
       def sym
         "!=="
+      end
+      def priority(exp)
+        90
       end
     end
 
@@ -254,11 +326,17 @@ module Minjs
       def sym
         "<"
       end
+      def priority(exp)
+        80
+      end
     end
 
     class ExpGt < ExpArg2
       def sym
         ">"
+      end
+      def priority(exp)
+        80
       end
     end
 
@@ -266,11 +344,17 @@ module Minjs
       def sym
         "<="
       end
+      def priority(exp)
+        80
+      end
     end
 
     class ExpGtEq < ExpArg2
       def sym
         ">="
+      end
+      def priority(exp)
+        80
       end
     end
 
@@ -278,6 +362,9 @@ module Minjs
     class ExpAdd < ExpArg2
       def sym
         "+"
+      end
+      def priority(exp)
+        60
       end
 
       def reduce(parent)
@@ -291,25 +378,25 @@ module Minjs
         end
         # N + M => (N + M)
         if @val.kind_of? ECMA262Numeric and @val2.kind_of? ECMA262Numeric and @val.integer? and @val2.integer?
-          parent.replace(self, ECMA262Numeric.new(nil, @val.to_num + @val2.to_num))
+          parent.replace(self, ECMA262Numeric.new(@val.to_num + @val2.to_num))
         end
         if @val2.kind_of? ECMA262Numeric and @val2.integer?
           # ((a + N) + M) or ((N + a) + M)
           if @val.kind_of? ExpAdd
             if @val.val2.kind_of? ECMA262Numeric and @val.val2.integer?
-              @val2 = ECMA262Numeric.new(nil, @val.val2.to_num + @val2.to_num)
+              @val2 = ECMA262Numeric.new(@val.val2.to_num + @val2.to_num)
               @val = @val.val
             elsif @val.val.kind_of? ECMA262Numeric and @val.val.integer?
-              @val2 = ECMA262Numeric.new(nil, @val.val.to_num + @val2.to_num)
+              @val2 = ECMA262Numeric.new(@val.val.to_num + @val2.to_num)
               @val = @val.val2
             end
           # ((a - N) + M) or ((N - a) + M)
           elsif @val.kind_of? ExpSub
             if @val.val2.kind_of? ECMA262Numeric and @val.val2.integer?
-              @val2 = ECMA262Numeric.new(nil, -(@val.val2.to_num - @val2.to_num))
+              @val2 = ECMA262Numeric.new(-(@val.val2.to_num - @val2.to_num))
               @val = @val.val
             elsif @val.val.kind_of? ECMA262Numeric and @val.val.integer?
-              @val2 = ECMA262Numeric.new(nil, -(@val.val.to_num - @val2.to_num))
+              @val2 = ECMA262Numeric.new(-(@val.val.to_num - @val2.to_num))
               @val = @val.val2
             end
           end
@@ -321,6 +408,9 @@ module Minjs
     class ExpSub < ExpArg2
       def sym
         "-"
+      end
+      def priority(exp)
+        60
       end
 
       def reduce(parent)
@@ -334,25 +424,25 @@ module Minjs
         end
         # N - M => (N - M)
         if @val.kind_of? ECMA262Numeric and @val2.kind_of? ECMA262Numeric and @val.integer? and @val2.integer?
-          parent.replace(self, ECMA262Numeric.new(nil, @val.to_num - @val2.to_num))
+          parent.replace(self, ECMA262Numeric.new(@val.to_num - @val2.to_num))
         end
         if @val2.kind_of? ECMA262Numeric and @val2.integer?
           # ((a - N) - M) or ((N - a) - M)
           if @val.kind_of? ExpSub
             if @val.val2.kind_of? ECMA262Numeric and @val.val2.integer?
-              @val2 = ECMA262Numeric.new(nil, @val.val2.to_num + @val2.to_num)
+              @val2 = ECMA262Numeric.new(@val.val2.to_num + @val2.to_num)
               @val = @val.val
             elsif @val.val.kind_of? ECMA262Numeric and @val.val.integer?
-              @val2 = ECMA262Numeric.new(nil, @val.val.to_num + @val2.to_num)
+              @val2 = ECMA262Numeric.new(@val.val.to_num + @val2.to_num)
               @val = @val.val2
             end
           # ((a + N) - M) or ((N + a) - M)
           elsif @val.kind_of? ExpAdd
             if @val.val2.kind_of? ECMA262Numeric and @val.val2.integer?
-              @val2 = ECMA262Numeric.new(nil, -(@val.val2.to_num - @val2.to_num))
+              @val2 = ECMA262Numeric.new(-(@val.val2.to_num - @val2.to_num))
               @val = @val.val
             elsif @val.val.kind_of? ECMA262Numeric and @val.val.integer?
-              @val2 = ECMA262Numeric.new(nil, -(@val.val.to_num - @val2.to_num))
+              @val2 = ECMA262Numeric.new(-(@val.val.to_num - @val2.to_num))
               @val = @val.val2
             end
           end
@@ -365,11 +455,17 @@ module Minjs
       def sym
         "instanceof"
       end
+      def priority(exp)
+        80
+      end
     end
 
     class ExpIn < ExpArg2
       def sym
         "in"
+      end
+      def priority(exp)
+        80
       end
     end
 
@@ -377,21 +473,33 @@ module Minjs
       def sym
         "<<"
       end
+      def priority(exp)
+        70
+      end
     end
     class ExpRShift < ExpArg2
       def sym
         ">>"
+      end
+      def priority(exp)
+        70
       end
     end
     class ExpURShift < ExpArg2
       def sym
         ">>>"
       end
+      def priority(exp)
+        70
+      end
     end
 
     class ExpMul < ExpArg2
       def sym
         "*"
+      end
+      def priority(exp)
+        50
       end
 
       def reduce(parent)
@@ -405,15 +513,15 @@ module Minjs
         end
         # N * M => (N * M)
         if @val.kind_of? ECMA262Numeric and @val2.kind_of? ECMA262Numeric and @val.integer? and @val2.integer?
-          parent.replace(self, ECMA262Numeric.new(nil, @val.to_num * @val2.to_num))
+          parent.replace(self, ECMA262Numeric.new(@val.to_num * @val2.to_num))
         end
         # ((a * N) * M) or ((N * a) * M)
         if @val2.kind_of? ECMA262Numeric and @val2.integer? and @val.kind_of? ExpMul
           if @val.val2.kind_of? ECMA262Numeric and @val.val2.integer?
-            @val2 = ECMA262Numeric.new(nil, @val.val2.to_num * @val2.to_num)
+            @val2 = ECMA262Numeric.new(@val.val2.to_num * @val2.to_num)
             @val = @val.val
           elsif @val.val.kind_of? ECMA262Numeric and @val.val.integer?
-            @val2 = ECMA262Numeric.new(nil, @val.val.to_num * @val2.to_num)
+            @val2 = ECMA262Numeric.new(@val.val.to_num * @val2.to_num)
             @val = @val.val2
           end
         end
@@ -423,10 +531,16 @@ module Minjs
       def sym
         "/"
       end
+      def priority(exp)
+        50
+      end
     end
     class ExpMod < ExpArg2
       def sym
         "%"
+      end
+      def priority(exp)
+        50
       end
     end
     #
@@ -437,20 +551,32 @@ module Minjs
       def sym
         "delete"
       end
+      def priority(exp)
+        40
+      end
     end
     class ExpVoid < ExpArg1
       def sym
         "void"
+      end
+      def priority(exp)
+        40
       end
     end
     class ExpTypeof < ExpArg1
       def sym
         "typeof"
       end
+      def priority(exp)
+        40
+      end
     end
     class ExpPostInc < ExpArg1
       def sym
         "++"
+      end
+      def priority(exp)
+        30
       end
       def to_js(options = {})
         concat options, @val, sym
@@ -460,6 +586,9 @@ module Minjs
       def sym
         "--"
       end
+      def priority(exp)
+        30
+      end
       def to_js(options = {})
         concat options, @val, sym
       end
@@ -468,15 +597,24 @@ module Minjs
       def sym
         "++"
       end
+      def priority(exp)
+        40
+      end
     end
     class ExpPreDec < ExpArg1
       def sym
         "--"
       end
+      def priority(exp)
+        40
+      end
     end
     class ExpPositive < ExpArg1
       def sym
         "+"
+      end
+      def priority(exp)
+        40
       end
 
       def reduce(parent)
@@ -490,6 +628,9 @@ module Minjs
       def sym
         "-"
       end
+      def priority(exp)
+        40
+      end
 
       def reduce(parent)
         if @val.kind_of? ECMA262Numeric
@@ -498,7 +639,7 @@ module Minjs
           else
             integer = "-#{@val.integer}"
           end
-          val = ECMA262Numeric.new(integer, integer, @val.decimal, @val.exp)
+          val = ECMA262Numeric.new(integer, @val.decimal, @val.exp)
           parent.replace(self, val)
         end
       end
@@ -507,10 +648,16 @@ module Minjs
       def sym
         "~"
       end
+      def priority(exp)
+        40
+      end
     end
     class ExpLogicalNot < ExpArg1
       def sym
         "!"
+      end
+      def priority(exp)
+        40
       end
     end
 
@@ -518,6 +665,10 @@ module Minjs
       def initialize(name, args)
         @name = name
         @args = args
+      end
+
+      def priority(exp)
+        20
       end
 
       def replace(from, to)
@@ -559,6 +710,14 @@ module Minjs
         @args = args
       end
 
+      def priority(exp)
+        if @args.index(exp)
+          999
+        else
+          20
+        end
+      end
+
       def replace(from, to)
         @args.each_index do |i|
           arg = @args[i]
@@ -585,15 +744,20 @@ module Minjs
     #
     # => val.val2
     #
-    class ExpProp < Exp
+    class ExpProp < ExpArg2
       def initialize(val, val2)
         @val = val
         if val2.kind_of? IdentifierName
           @val2 = ECMA262::ECMA262String.new(val2.val)
         else
-          raise "val2 must be kind_of ItentiferName"
+          raise "internal error: val2 must be kind_of ItentiferName"
         end
       end
+
+      def priority(exp)
+        20
+      end
+
       def traverse(parent, &block)
         @val.traverse(self, &block)
         @val2.traverse(self, &block)
@@ -606,11 +770,11 @@ module Minjs
     #
     # => val[val2]
     #
-    class ExpPropBrac < Exp
-      def initialize(val, val2)
-        @val = val
-        @val2 = val2
+    class ExpPropBrac < ExpArg2
+      def priority(exp)
+        20
       end
+
       def traverse(parent, &block)
         @val.traverse(self, &block)
         @val2.traverse(self, &block)
@@ -624,6 +788,9 @@ module Minjs
     class ExpComma < ExpArg2
       def sym
         ","
+      end
+      def priority(exp)
+        140
       end
     end
   end

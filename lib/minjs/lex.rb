@@ -115,7 +115,7 @@ module Minjs
         lf = false
         while (@codes[@pos] != 0x2a or @codes[@pos + 1] != 0x2f)
           if @codes[@pos].nil?
-            raise ParseError.new("no `*/' at end of comment")
+            raise ParseError.new("no `*/' at end of comment", self)
           end
           if line_terminator?(@codes[@pos])
             lf = true
@@ -159,21 +159,44 @@ module Minjs
       ret
     end
 
+    def unicode_escape?
+      if @codes[@pos] == 0x5c and
+         @codes[@pos+1] == 0x75 and
+         hex_number?(@codes[@pos+2]) and
+         hex_number?(@codes[@pos+3]) and
+         hex_number?(@codes[@pos+4]) and
+         hex_number?(@codes[@pos+5])
+        [@codes[@pos+2],@codes[@pos+3],@codes[@pos+4],@codes[@pos+5]].pack("U*").to_i(16)
+      else
+        false
+      end
+    end
+
     def identifier_name
       pos0 = @pos
-      code = @codes[@pos]
-      return nil if code.nil?
-      if identifier_start?(code)
-        while true
+      return nil if @codes[@pos].nil?
+
+      chars = []
+      if u=unicode_escape? and identifier_start?(u)
+        chars.push(u)
+        @pos += 6
+      elsif identifier_start?(@codes[@pos])
+        chars.push(@codes[@pos])
+        @pos += 1
+      else
+        return nil
+      end
+
+      while true
+        code = @codes[@pos]
+        if u=unicode_escape? and (identifier_start?(u) || identifier_part?(u))
+          chars.push(u)
+          @pos += 6
+        elsif identifier_part?(@codes[@pos])
+          chars.push(@codes[@pos])
           @pos += 1
-          code = @codes[@pos]
-          if code.nil?
-            break
-          elsif identifier_part?(code)
-            ;#
-          else
-            return ECMA262::IdentifierName.new(nil, @codes[pos0...@pos].pack("U*").to_sym)
-          end
+        else
+          return ECMA262::IdentifierName.new(nil, chars.pack("U*").to_sym)
         end
       end
     end
@@ -359,22 +382,22 @@ module Minjs
 
     def regexp_body
       if @codes[@pos] == 0x2a
-        raise ParseError.new("first character of regular expression is `*'")
+        raise ParseError.new("first character of regular expression is `*'", self)
       end
       pos0 = @pos
       @pos += 1
       while !(@codes[@pos] == 0x2f)
         if @codes[@pos].nil?
-          raise ParseError.new("no `/' end of regular expression")
+          raise ParseError.new("no `/' end of regular expression", self)
         end
         if line_terminator?(@codes[@pos])
           debug_lit
-          raise ParseError.new("regular expression has line terminator in body")
+          raise ParseError.new("regular expression has line terminator in body", self)
         end
         if @codes[@pos] == 0x5c # \
           @pos += 1
           if line_terminator?(@codes[@pos])
-            raise ParseError.new("regular expression has line terminator in body")
+            raise ParseError.new("regular expression has line terminator in body", self)
           end
           @pos += 1
         elsif @codes[@pos] == 0x5b # [
@@ -389,20 +412,20 @@ module Minjs
 
     def regexp_class
       if @codes[@pos] != 0x5b
-        raise ParseError.new('bad regular expression')
+        raise ParseError.new('bad regular expression', self)
       end
       @pos += 1
       while !(@codes[@pos] == 0x5d)
         if @codes[@pos].nil?
-          raise ParseError.new("no `]' end of regular expression class")
+          raise ParseError.new("no `]' end of regular expression class", self)
         end
         if line_terminator?(@codes[@pos])
-          raise ParseError.new("regular expression has line terminator in body")
+          raise ParseError.new("regular expression has line terminator in body", self)
         end
         if @codes[@pos] == 0x5c # \
           @pos += 1
           if line_terminator?(@codes[@pos])
-            raise ParseError.new("regular expression has line terminator in body")
+            raise ParseError.new("regular expression has line terminator in body", self)
           end
           @pos += 1
         else
@@ -437,9 +460,11 @@ module Minjs
         while true
           code = @codes[@pos]
           if (code >= 0x30 and code <= 0x39) || (code >= 0x41 and code <= 0x4f) || (code >= 0x61 and code <= 0x6f)
+            ;
+          elsif identifier_start?(code)
+            raise ParseError.new("The source character immediately following a NumericLiteral must not be an IdentifierStart or DecimalDigit", self)
           else
-            raw = @codes[pos0...@pos].pack("U*")
-            return ECMA262::ECMA262Numeric.new(raw, @codes[(pos0+2)...@pos].pack("U*").to_i(16))
+            return ECMA262::ECMA262Numeric.new(@codes[(pos0+2)...@pos].pack("U*").to_i(16))
           end
           @pos += 1
         end
@@ -462,27 +487,34 @@ module Minjs
           @pos += 1
           e = exp_part
         end
-        raw = @codes[pos0...@pos].pack("U*")
-        return ECMA262::ECMA262Numeric.new(raw, 0, f, e)
-      else
-        nil
+        if identifier_start?(@codes[@pos])
+          raise ParseError.new("The source character immediately following a NumericLiteral must not be an IdentifierStart or DecimalDigit", self)
+        end
+
+        return ECMA262::ECMA262Numeric.new(0, f, e)
       end
+
       if code >= 0x30 and code <= 0x39
         i = decimal_digits
-        if @codes[@pos] == 0x2e
+        if @codes[@pos] == 0x2e #.
           @pos += 1
           f = decimal_digits
-          if @codes[@pos] == 0x65 || @codes[@pos] == 0x45
+          if @codes[@pos] == 0x65 || @codes[@pos] == 0x45 #e or E
             @pos += 1
             e = exp_part
           end
-        elsif @codes[@pos] == 0x65 || @codes[@pos] == 0x45
+        elsif @codes[@pos] == 0x65 || @codes[@pos] == 0x45 #e or E
           @pos += 1
           e = exp_part
         end
-        raw = @codes[pos0...@pos].pack("U*")
-        return ECMA262::ECMA262Numeric.new(raw, i, f, e)
+        if identifier_start?(@codes[@pos])
+          raise ParseError.new("The source character immediately following a NumericLiteral must not be an IdentifierStart or DecimalDigit", self)
+        end
+
+        return ECMA262::ECMA262Numeric.new(i, f, e)
       end
+
+      nil
     end
 
     def exp_part
@@ -493,7 +525,7 @@ module Minjs
         neg = true
       end
       if neg
-        e = -decimal_digits
+        e = "-#{decimal_digits}"
       else
         e = decimal_digits
       end
@@ -510,7 +542,7 @@ module Minjs
           if code >= 0x30 and code <= 0x39
             @pos += 1
           else
-            return @codes[pos0...@pos].pack("U*").to_i
+            return @codes[pos0...@pos].pack("U*")
           end
         end
       else
@@ -536,9 +568,9 @@ module Minjs
         @pos += 1
         code = @codes[@pos]
         if code.nil?
-          raise ParseError.new("no `#{term}' at end of string")
+          raise ParseError.new("no `#{term}' at end of string", self)
         elsif line_terminator?(code)
-          raise ParseError.new("string has line terminator in body")
+          raise ParseError.new("string has line terminator in body", self)
         elsif code == 0x5c #\
           @pos += 1
           str << esc_string
@@ -740,6 +772,23 @@ module Minjs
           nil
         end
       end
+    end
+
+    def line_col(pos)
+      _pos = 0
+      row = 0
+      col = 1
+      @codes.each do |code|
+        break if _pos >= pos
+        if line_terminator?(code)
+          row += 1
+          row = 0
+        else
+          col += 1
+        end
+        _pos += 1
+      end
+      return [row+1, col]
     end
   end
 end
