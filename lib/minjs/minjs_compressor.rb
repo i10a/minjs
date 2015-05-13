@@ -29,7 +29,8 @@ module Minjs
           tmp.write(data)
           tmp.close
         end
-        t = Minjs::Compressor.new.compress(data)
+        #TODO
+        t = Minjs::Compressor.new(:debug => false).compress(data)
         if DEBUG
           tmp = open(output, "w")
           tmp.write(t)

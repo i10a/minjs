@@ -47,7 +47,7 @@ module Minjs
        :func_declaration,
        :empty_statement,
       ].each do |f|
-        puts "* checking #{f.to_s}" if @debug
+        #puts "* checking #{f.to_s}" if @debug
         t = lex.eval_lit {
           __send__(f, lex, context)
         }
@@ -62,7 +62,7 @@ module Minjs
       pos0 = lex.pos
       return nil unless lex.match_lit(ECMA262::PUNC_LCURLYBRAC)
       if lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
-        return ECMA262::StBlock.new(ECMA262::StList.new([]))
+        return ECMA262::StBlock.new(ECMA262::StatementList.new([]))
       end
       lex.eval_lit {
         if s = statement_list(lex, context) and lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
@@ -83,7 +83,7 @@ module Minjs
             break
           end
         end
-        ECMA262::StList.new(t)
+        ECMA262::StatementList.new(t)
       }
     end
     #
@@ -212,7 +212,6 @@ module Minjs
       if s=statement(lex, context) and lex.match_lit(ECMA262::ID_WHILE) and lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and e=exp(lex, context, {}) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and semicolon(lex, context)
         ECMA262::StDoWhile.new(e, s)
       else
-        lex.debug_lit
         raise ParseError.new("do_while_statement", lex)
       end
     end

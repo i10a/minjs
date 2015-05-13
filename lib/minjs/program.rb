@@ -13,7 +13,7 @@ module Minjs
           break
         end
       end
-      ECMA262::Prog.new(context, prog)
+      ECMA262::Prog.new(context, ECMA262::SourceElements.new(prog))
     end
 
     def source_element(lex, context)

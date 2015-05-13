@@ -9,113 +9,11 @@ module Minjs
         false
       end
 
-      def priority(exp)
+      def priority
         999
       end
     end
 
-    #statement_list
-    class StList < St
-      attr_reader :statement_list
-      #
-      # statement_list: [statement, statement, ...]
-      #
-      def initialize(statement_list)
-        @statement_list = statement_list
-      end
-
-      def grouping
-        sl = @statement_list
-        i = 0
-        while i < sl.length
-          st = sl[i]
-          i0 = i
-          prev = nil
-          t = nil
-          while st and st.to_exp?
-            if prev and prev.to_exp?
-              t = ECMA262::ExpComma.new(t, st.to_exp({}))
-            elsif prev.nil?
-              t = st.to_exp({})
-            else
-              break
-            end
-            prev = st
-            i += 1
-            st = sl[i]
-          end
-          if i0 != i and i - i0 >= 2
-            sl[i0...i] = StExp.new(t)
-            i = (i - i0 + 1)
-          else
-            i += 1
-          end
-        end
-      end
-
-      def replace(from, to)
-        idx = @statement_list.index(from)
-        if idx
-          @statement_list[idx] = to
-        end
-      end
-
-      def remove(st)
-        @statement_list.delete(st)
-      end
-
-      def remove_empty_statement
-        @statement_list.reject!{|x|
-          x.class == StEmpty
-        }
-      end
-
-      def traverse(parent, &block)
-        @statement_list.each do|st|
-          st.traverse(self, &block)
-        end
-        yield self, parent
-      end
-
-      def to_js(options = {})
-        concat options, @statement_list
-      end
-
-      def length
-        @statement_list.length
-      end
-
-      def to_exp?
-        @statement_list.each do |s|
-          return false if s.to_exp? == false
-        end
-        return true
-      end
-
-      def to_exp(options)
-        return nil if to_exp? == false
-        t = @statement_list[0].to_exp(options)
-        return t.to_exp(options) if @statement_list.length <= 1
-        i = 1
-        while(i < @statement_list.length)
-          t = ExpComma.new(t, @statement_list[i])
-          i += 1
-        end
-        t
-      end
-
-      def each(&block)
-        @statement_list.each(&block)
-      end
-
-      def [](i)
-        @statement_list[i]
-      end
-
-      def index(st)
-        @statement_list.index(st)
-      end
-    end
     #
     # 12.1
     #
@@ -125,6 +23,10 @@ module Minjs
       #statement_list:StList
       def initialize(statement_list)
         @statement_list = statement_list
+      end
+
+      def deep_dup
+        self.class.new(@statement_list.deep_dup)
       end
 
       def traverse(parent, &block)
@@ -137,17 +39,22 @@ module Minjs
       end
 
       def to_exp?
-        @statement_list.length == 1 and @statement_list[0].to_exp?
+        t = @statement_list.statement_list.select{|s|
+          s.class != StEmpty
+        }
+        t.length == 1 and t[0].to_exp?
       end
 
-      def to_exp(options)
+      def to_exp(options = {})
+        statement_list.remove_empty_statement
         @statement_list[0].to_exp({})
       end
 
       def to_statement?
-        @statement_list.statement_list.select{|s|
+        t = @statement_list.statement_list.select{|s|
           s.class != StEmpty
-        }.length == 1
+        }
+        t.length == 1 and !t[0].kind_of?(StIf)
       end
 
       def to_statement
@@ -220,15 +127,29 @@ module Minjs
         end
         @vars = v1.concat(v2)
       end
+
+      def remove_paren
+        @vars.each do |x|
+          if x[1] and x[1].kind_of? ExpParen and x[1].val.priority <= 130
+            x[1] = x[1].val
+          end
+        end
+      end
     end
 
     #12.3 empty
     class StEmpty < St
       def initialize()
       end
+
+      def deep_dup
+        self.class.new()
+      end
+
       def traverse(parent, &block)
         yield self, parent
       end
+
       def to_js(options = {})
         ";"
       end
@@ -240,6 +161,10 @@ module Minjs
 
       def initialize(exp)
         @exp = exp
+      end
+
+      def deep_dup
+        self.class.new(@exp.deep_dup)
       end
 
       def replace(from, to)
@@ -257,12 +182,18 @@ module Minjs
         concat(options, @exp, ";")
       end
 
-      def to_exp(options)
+      def to_exp(options = {})
         @exp
       end
 
       def to_exp?
         true
+      end
+
+      def remove_paren
+        if @exp.kind_of? ExpParen
+          @exp = @exp.val if @exp.remove_paren?
+        end
       end
     end
 
@@ -293,6 +224,10 @@ module Minjs
         yield self, parent
       end
 
+      def deep_dup
+        self.class.new(@cond.deep_dup, @then_st.deep_dup, @else_st ? @else_st.deep_dup : nil)
+      end
+
       def to_js(options = {})
         if @else_st
           concat options, :if, "(", @cond, ")", @then_st, :else, @else_st
@@ -303,24 +238,17 @@ module Minjs
 
       def to_return?
         if !@else_st
-          return true if @then_st.class == StReturn
+          return false
         else
           return true if @then_st.class == StReturn and @else_st.class == StReturn
         end
       end
 
       def to_return
-        if !@else_st
-          cond = ExpParen.new(@cond)
-          then_exp = ExpParen.new(then_st.exp)
-          else_exp = ExpVoid.new(ECMA262Numeric.new('0'))
-          StReturn.new(ExpCond.new(cond, then_exp, else_exp))
-        else
-          cond = ExpParen.new(@cond)
-          then_exp = ExpParen.new(then_st.exp)
-          else_exp = ExpParen.new(else_st.exp)
-          StReturn.new(ExpCond.new(cond, then_exp, else_exp))
-        end
+        cond = ExpParen.new(@cond)
+        then_exp = ExpParen.new(then_st.exp ? then_st.exp : ExpVoid.new(ExpParen.new(ECMA262Numeric.new(0))))
+        else_exp = ExpParen.new(else_st.exp ? else_st.exp : ExpVoid.new(ExpParen.new(ECMA262Numeric.new(0))))
+        StReturn.new(ExpCond.new(cond, then_exp, else_exp))
       end
 
       def to_exp?
@@ -333,7 +261,7 @@ module Minjs
         return true
       end
 
-      def to_exp(options)
+      def to_exp(options = {})
         return nil if to_exp? == false
         if @else_st
           then_exp = @then_st.to_exp(options)
@@ -355,6 +283,12 @@ module Minjs
           ExpCond.new(ExpParen.new(@cond), then_exp, else_exp)
         else
           ExpCond.new(@cond, then_exp, else_exp)
+        end
+      end
+
+      def remove_paren
+        if @cond.kind_of? ExpParen
+          @cond = @cond.val
         end
       end
     end
@@ -386,6 +320,12 @@ module Minjs
 
         concat(options, :while, "(", @exp, ")", statement)
       end
+
+      def remove_paren
+        if @exp.kind_of? ExpParen
+          @exp = @exp.val
+        end
+      end
     end
 
     class StDoWhile < St
@@ -413,6 +353,59 @@ module Minjs
         end
 
         concat options, :do, statement, :while, "(", @exp, ")", ";"
+      end
+      def remove_paren
+        if @exp.kind_of? ExpParen
+          @exp = @exp.val
+        end
+      end
+    end
+
+    #
+    # 12.6.3 the for statement
+    #
+    class StFor < St
+      def initialize(exp1, exp2, exp3, statement)
+        @exp1 = exp1
+        @exp2 = exp2
+        @exp3 = exp3
+        @statement = statement
+      end
+
+      def replace(from, to)
+        if from == @statement
+          @statement = to
+        end
+      end
+
+      def traverse(parent, &block)
+        @exp1.traverse(self, &block)
+        @exp2.traverse(self, &block)
+        @exp3.traverse(self, &block)
+        @statement.traverse(self, &block)
+        yield self, parent
+      end
+
+      def to_js(options = {})
+        if @statement.kind_of? StBlock and @statement.statement_list.length == 1
+          statement = @statement.statement_list.statement_list[0]
+        else
+          statement = @statement
+        end
+
+        concat options, :for, "(", @exp1, ";", @exp2, ";", @exp3, ")", statement
+      end
+
+      def remove_paren
+        if @exp1.kind_of? ExpParen
+          @exp1 = @exp1.val
+        end
+        if @exp2.kind_of? ExpParen
+          @exp2 = @exp2.val
+        end
+        if @exp3.kind_of? ExpParen
+          @exp3 = @exp3.val
+        end
       end
     end
 
@@ -490,13 +483,26 @@ module Minjs
         t = concat({:for_args => true}.merge(options), :for, "(var", _var_decl_list, ";", @exp2, ";", @exp3, ")")
         concat options, t, statement
       end
+
+      def remove_paren
+        @var_decl_list.each do|x|
+          if x[1] and x[1].kind_of? ExpParen
+            x[1] = x[1].val
+          end
+        end
+        if @exp2.kind_of? ExpParen
+          @exp2 = @exp2.val
+        end
+        if @exp3.kind_of? ExpParen
+          @exp3 = @exp3.val
+        end
+      end
     end
 
-    class StFor < St
-      def initialize(exp1, exp2, exp3, statement)
+    class StForIn < St
+      def initialize(exp1, exp2, statement)
         @exp1 = exp1
         @exp2 = exp2
-        @exp3 = exp3
         @statement = statement
       end
 
@@ -509,7 +515,6 @@ module Minjs
       def traverse(parent, &block)
         @exp1.traverse(self, &block)
         @exp2.traverse(self, &block)
-        @exp3.traverse(self, &block)
         @statement.traverse(self, &block)
         yield self, parent
       end
@@ -521,7 +526,16 @@ module Minjs
           statement = @statement
         end
 
-        concat options, :for, "(", @exp1, ";", @exp2, ";", @exp3, ")", statement
+        concat options, :for, '(', @exp1, :in, @exp2, ')', statement
+      end
+
+      def remove_paren
+        if @exp1.kind_of? ExpParen and @exp1.priority <= 20 #left-hand
+          @exp1 = @exp1.val
+        end
+        if @exp2.kind_of? ExpParen
+          @exp2 = @exp2.val
+        end
       end
     end
 
@@ -570,44 +584,20 @@ module Minjs
           _var_decl = concat(options, @var_decl[0])
         end
 
-#        if options[:compress_var]
-#          concat options, :for, "(", _var_decl, :in, @exp2, ")", statement
-#        else
         concat options, :for, "(", :var, _var_decl, :in, @exp2, ")", statement
-#        end
-      end
-    end
-
-    class StForIn < St
-      def initialize(exp1, exp2, statement)
-        @exp1 = exp1
-        @exp2 = exp2
-        @statement = statement
       end
 
-      def replace(from, to)
-        if from == @statement
-          @statement = to
+      def remove_paren
+        if @var_decl[1] and @var_decl[1].kind_of? ExpParen
+          @var_decl[1] = @var_decl[1].val
+        end
+        if @exp2.kind_of? ExpParen
+          @exp2 = @exp2.val
         end
       end
 
-      def traverse(parent, &block)
-        @exp1.traverse(self, &block)
-        @exp2.traverse(self, &block)
-        @statement.traverse(self, &block)
-        yield self, parent
-      end
-
-      def to_js(options = {})
-        if @statement.kind_of? StBlock and @statement.statement_list.length == 1
-          statement = @statement.statement_list.statement_list[0]
-        else
-          statement = @statement
-        end
-
-        concat options, :for, '(', @exp1, :in, @exp2, ')', statement
-      end
     end
+
 
     #12.7
     class StContinue < St
@@ -655,14 +645,27 @@ module Minjs
         @exp = exp
       end
 
+      def deep_dup
+        self.class.new(exp ? exp.deep_dup : nil)
+      end
+
       def replace(from, to)
         if from == @exp
           @exp = to
         end
       end
+
       def traverse(parent, &block)
         @exp.traverse(self, &block) if @exp
         yield self, parent
+      end
+
+      def to_return?
+        true
+      end
+
+      def to_return
+        self
       end
 
       def to_js(options = {})
@@ -670,6 +673,11 @@ module Minjs
           concat options, :return, @exp, ";"
         else
           concat options, :return, ";"
+        end
+      end
+      def remove_paren
+        if @exp.kind_of? ExpParen
+          @exp = @exp.val
         end
       end
     end
@@ -688,6 +696,11 @@ module Minjs
 
       def to_js(options = {})
         concat options, :with, "(", @exp, ")", @statement
+      end
+      def remove_paren
+        if @exp.kind_of? ExpParen
+          @exp = @exp.val
+        end
       end
     end
     #12.11
@@ -729,6 +742,17 @@ module Minjs
           end
         end
         t = concat(options, t, "}")
+      end
+
+      def remove_paren
+        if @exp.kind_of? ExpParen
+          @exp = @exp.val
+        end
+        @blocks.each do |b|
+          if b[0] and b[0].kind_of? ExpParen
+            b[0] = b[0].val
+          end
+        end
       end
     end
     #12.12
@@ -822,7 +846,12 @@ module Minjs
         concat options, :debugger, ";"
       end
     end
-    #13 function
+
+    #
+    # 13 function / function expression
+    #
+    # 11.1.5 getter/setter
+    #
     class StFunc < St
       attr_reader :name
       attr_reader :args
@@ -839,8 +868,15 @@ module Minjs
         @setter = options[:setter]
       end
 
-      def priority(exp)
+      def priority
         10
+      end
+
+      def deep_dup
+        self.class.new(@context, @name.deep_dup,
+                       @args.collect{|args|args.deep_dup},
+                       @statements.deep_dup,
+                       {decl: @decl, getter: @getter, setter: @setter})
       end
 
       def traverse(parent, &block)

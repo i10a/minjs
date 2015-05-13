@@ -14,7 +14,7 @@ module Minjs
         false
       end
 
-      def priority(exp)
+      def priority
         10
       end
     end
@@ -136,6 +136,11 @@ module Minjs
       def initialize(val)
         @val = val
       end
+
+      def deep_dup
+        self.class.new(@val)
+      end
+
       def traverse(parent)
         yield self, parent
       end
@@ -195,6 +200,10 @@ module Minjs
           end
         end
         @decimal = nil if @decimal == 0
+      end
+
+      def deep_dup
+        self.class.new(@integer, @decimal, @exp)
       end
 
       def traverse(parent, &block)
@@ -297,6 +306,10 @@ module Minjs
       def initialize(body, flags)
         @body = body
         @flags = flags
+      end
+
+      def deep_dup
+        self.class.new(@body, @flags)
       end
 
       def traverse(parent)
@@ -424,11 +437,12 @@ module Minjs
 
     class IdentifierName < Literal
       attr_accessor :context
-      attr_accessor :val
+      attr_reader :val
 
       @@sym = {}
 
       def initialize(context, val)
+        @context = context
         @val = val.to_sym
       end
 
@@ -456,6 +470,10 @@ module Minjs
 
       def traverse(parent)
         yield self, parent
+      end
+
+      def deep_dup
+        self.class.new(@context, @val)
       end
 
       def to_js(options = {})

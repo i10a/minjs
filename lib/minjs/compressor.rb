@@ -1,4 +1,5 @@
 #!/usr/bin/env ruby
+# coding: utf-8
 require 'minjs/lex'
 require 'minjs/ecma262'
 require 'minjs/literal'
@@ -35,22 +36,33 @@ module Minjs
     end
 
     def compress(data, options = {})
+      p 'parse' if @debug
       parse(data)
 
+      p 'reorder_function_decl' if @debug
       reorder_function_decl
+      p 'simple_replacement' if @debug
       simple_replacement
+      p 'reorder_var' if @debug
       reorder_var
+      p 'assignment_after_var' if @debug
       assignment_after_var
+      p 'grouping_statement' if @debug
       grouping_statement
-      block_to_exp
+      p 'block_to_statement' if @debug
+      block_to_statement
+      p 'if_to_cond' if @debug
       if_to_cond
+      p 'compress_var' if @debug
       compress_var
+      p 'reduce_exp' if @debug
       reduce_exp
+      p 'remove_paren' if @debug
       remove_paren
-      #feature
-      #return_to_exp
+      p 'return_to_exp' if @debug
+      return_to_exp
       @heading_comments.reverse.each do |c|
-        @prog.source_elements.unshift(c)
+        @prog.source_elements.source_elements.unshift(c)
       end
 
       to_js(options)
@@ -71,9 +83,9 @@ module Minjs
       @prog
     end
 
-    def traverse(&block)
-      @prog.traverse(nil, &block)
-    end
+#    def traverse(&block)
+#      @prog.traverse(nil, &block)
+#    end
 
     def next_sym(s)
       def c2i(c)
@@ -131,34 +143,36 @@ module Minjs
 
     end
 
-    def grouping_statement
-      self.traverse {|st, parent|
-        if st.kind_of? ECMA262::Prog
-          st.grouping
-        elsif st.kind_of? ECMA262::StList
+    def grouping_statement(node = @prog)
+      node.traverse(nil) {|st, parent|
+        if st.kind_of? ECMA262::StatementList
           st.grouping
         end
       }
+      self
     end
 
-    def reorder_function_decl
-      self.traverse {|st, parent|
-        if st.kind_of? ECMA262::StFunc and parent.kind_of? ECMA262::Prog and st.decl?
+    def reorder_function_decl(node = @prog)
+      node.traverse(nil) {|st, parent|
+        if st.kind_of? ECMA262::StFunc and parent.kind_of? ECMA262::StatementList and st.decl?
           if parent.index(st)
             parent.remove(st)
             parent.source_elements.unshift(st)
           end
         end
       }
+      self
     end
 
-    def reorder_var
-      #traverse all statemtns and expression
-      self.traverse {|st, parent|
+    def reorder_var(node = @prog)
+      node.traverse(nil) {|st, parent|
         if st.kind_of? ECMA262::Prog
           vars = nil
           context = nil
           st.instance_eval{
+            #
+            # collect all of var variable in this function
+            #
             vars = @context.var_env.record.binding.find_all {|k, v|
               v and v[:_parameter_list].nil? and !v[:value].kind_of?(ECMA262::StFunc)
             }.collect{|x|
@@ -173,12 +187,10 @@ module Minjs
                   @vars.each do |vl|
                     if vl[1]
                       blk.push(ECMA262::StExp.new(ECMA262::ExpAssign.new(vl[0], vl[1])))
-                      #parent2.replace(st2, ECMA262::StExp.new(ECMA262::ExpAssign.new(vl[0], vl[1])))
                     else
-                      #parent2.replace(st2, ECMA262::StEmpty.new())
                     end
                   end
-                  parent2.replace(st2, ECMA262::StBlock.new(ECMA262::StList.new(blk)))
+                  parent2.replace(st2, ECMA262::StBlock.new(ECMA262::StatementList.new(blk)))
                 }
               elsif st2.kind_of? ECMA262::StForVar and st2.context == @context
                 parent2.replace(st2, st2.to_st_for)
@@ -187,7 +199,7 @@ module Minjs
               end
             }
             if vars.length > 0
-              @source_elements.unshift ECMA262::StVar.new(@context, vars)
+              @source_elements.source_elements.unshift ECMA262::StVar.new(@context, vars)
             end
           }
         end
@@ -195,38 +207,20 @@ module Minjs
       remove_block_in_block
     end
 
-    #feature
-    def remove_paren
-      self.traverse {|st, parent|
-        if st.kind_of? ECMA262::ExpParen
-          #
-          # ECMA262 say:
-          # expression statement cannot start with "function"
-          #
-          if parent.priority(st) > st.val.priority(nil)
-            if st.val.to_js.match(/^function/)
-              ;
-            elsif st.val.to_js.match(/^{/)
-              ;
-            else
-              parent.replace(st, st.val)
-            end
-          end
+    def remove_paren(node = @prog)
+      node.traverse(nil) {|st, parent|
+        if st.respond_to? :remove_paren
+          st.remove_paren
         end
       }
       self
     end
 
-    def remove_block_in_block
+    def remove_block_in_block(node = @prog)
       while true
         _retry = false
-        self.traverse {|st, parent|
-          if parent.kind_of? ECMA262::Prog and st.kind_of? ECMA262::StBlock
-            idx = parent.index(st)
-            parent.source_elements[idx..idx] = st.statement_list.statement_list
-            _retry = true
-            break
-          elsif parent.kind_of? ECMA262::StList and st.kind_of? ECMA262::StBlock
+        node.traverse(nil) {|st, parent|
+          if parent.kind_of? ECMA262::StatementList and st.kind_of? ECMA262::StBlock
             idx = parent.index(st)
             parent.statement_list[idx..idx] = st.statement_list.statement_list
             _retry = true
@@ -239,66 +233,69 @@ module Minjs
       end
     end
 
-    def block_to_exp
-      self.traverse {|st, parent|
-        if st.kind_of? ECMA262::StBlock and st.to_exp?
-          if parent.kind_of? ECMA262::StTry
-          else
-            t = st.to_exp({})
-            parent.replace(st, ECMA262::StExp.new(t))
-          end
-        end
-      }
-    end
-
-    def block_to_statement
-      self.traverse {|st, parent|
-        if st.kind_of? ECMA262::StBlock and st.to_statement?
-          if parent.kind_of? ECMA262::StTry
-          else
+    def block_to_statement(node = @prog)
+      node.traverse(nil) {|st, parent|
+        if st.kind_of? ECMA262::StBlock and !parent.kind_of?(ECMA262::StTry)
+          if st.to_statement?
             parent.replace(st, st.to_statement)
           end
         end
       }
+      self
     end
 
-    def if_to_cond
-      self.traverse {|st, parent|
+    def if_to_cond(node = nil)
+      node = @prog if node.nil?
+      node.traverse(nil) {|st, parent|
+        #
+        #feature
+        #
+        # if(a)return a;
+        # return b;
+        # => if(a)return a;else return b;
+        #
+
+        if st.kind_of? ECMA262::StIf and parent.kind_of? ECMA262::StatementList
+          i = parent.index(st)
+          if parent[i+1].nil? and !parent.kind_of?(ECMA262::SourceElements)
+            next
+          end
+          if parent[i+1].nil? or parent[i+1].to_return?
+            s = st
+            while s.kind_of? ECMA262::StIf and s.else_st and s.then_st.to_return?
+              s = s.else_st
+            end
+            if s and s.kind_of? ECMA262::StIf and s.then_st.to_return?
+              if parent[i+1]
+                s.replace(s.else_st, parent[i+1])
+                parent.replace(parent[i+1], ECMA262::StEmpty.new)
+              else
+                s.replace(s.else_st, ECMA262::StReturn.new(ECMA262::ExpVoid.new(ECMA262::ECMA262Numeric.new(0))))
+              end
+            end
+          end
+        end
+      }
+      node.traverse(nil) {|st, parent|
         if st.kind_of? ECMA262::StIf and st.to_exp?
           if t = ECMA262::StExp.new(st.to_exp({}))
             parent.replace(st, t)
           end
-          # feature...
-=begin
         elsif st.kind_of? ECMA262::StIf and st.to_return?
-          #
-          # if(...)
-          #   return a;
-          # return b;
-          #
-          # => if(...)return a;else return b;
-          #
-          if parent.kind_of? ECMA262::StList and st.else_st.nil? and (nxt = parent[parent.index(st) + 1]).kind_of? ECMA262::StReturn
-            st.replace(st.else_st, nxt)
-            parent.replace(nxt, ECMA262::StEmpty.new())
-            parent.replace(st, st.to_return)
-          #
-          # if(...)
-          # return a;
-          # else
-          # return b;
-          #
-          else
+          t = st.to_return
+          if t.to_js().length < st.to_js().length
             parent.replace(st, st.to_return)
           end
-=end
         end
       }
+      remove_paren
     end
 
-    def compress_var
+    def compress_var(node = @prog)
+      #
       #traverse all statemtns and expression
-      self.traverse {|st, parent|
+      #
+      node.traverse(nil) {|st, parent|
         if st.kind_of? ECMA262::StFunc and st.context.var_env.outer
           var_sym = :a
           #
@@ -307,7 +304,8 @@ module Minjs
           vars = {}
           st.traverse(parent) {|st2|
             if st2.kind_of? ECMA262::IdentifierName
-              vars[st2.val.to_sym] = true
+              vars[st2.val.to_sym] ||= 0
+              vars[st2.val.to_sym] += 1
             end
           }
           #
@@ -315,12 +313,12 @@ module Minjs
           #
           var_vars = {}
           st.context.var_env.record.binding.each do|k, v|
-            var_vars[k] = true
+            var_vars[k] = vars[k]
           end
           st.traverse(parent) {|st2|
             if st2.kind_of? ECMA262::StFunc
               st2.context.var_env.record.binding.each do|k, v|
-                var_vars[k] = true
+                var_vars[k] = vars[k]
               end
             end
           }
@@ -340,9 +338,13 @@ module Minjs
             end
           end
           #
+          # sort var_vars
+          #
+          var_vars = var_vars.sort {|(k1,v1), (k2,v2)| v2 <=> v1}
+          #
           # check var_vars
           #
-          var_vars.each {|name, v|
+          var_vars.each {|name, count|
             if name.nil?
               next
             end
@@ -357,7 +359,9 @@ module Minjs
                 if st2.kind_of? ECMA262::IdentifierName and st2.context and st2.context.var_env == st.context.var_env.outer
                   ;
                 elsif st2.kind_of? ECMA262::IdentifierName and st2.val == name
-                  st2.val = var_sym
+                  st2.instance_eval{
+                    @val = var_sym
+                  }
                 elsif st2.kind_of? ECMA262::StFunc
                   st2.context.var_env.record.binding[var_sym] = st2.context.var_env.record.binding[name]
                   st2.context.var_env.record.binding.delete(name)
@@ -368,18 +372,19 @@ module Minjs
           }
         end
       }
+      self
     end
 
-    def reduce_exp
-      self.traverse {|st, parent|
+    def reduce_exp(node = @prog)
+      node.traverse(nil) {|st, parent|
         if st.kind_of? ECMA262::Exp
           st.reduce(parent)
         end
       }
     end
 
-    def simple_replacement
-      self.traverse {|st, parent|
+    def simple_replacement(node = @prog)
+      node.traverse(nil) {|st, parent|
         #true => !0
         #false => !1
         if st.kind_of? ECMA262::Boolean
@@ -403,23 +408,10 @@ module Minjs
       }
     end
 
-    def return_to_exp
-      self.traverse {|st, parent|
+    def return_to_exp(node = @prog)
+      node.traverse(nil) {|st, parent|
         if st.kind_of? ECMA262::StReturn
-          if parent.kind_of? ECMA262::Prog
-            parent.remove_empty_statement
-            #
-            # a=1;return b; => return a=1,b;
-            #
-            # check statement:
-            # last one is return and its previous is expression or not
-            if parent.source_elements[-1] == st and (prev=parent.source_elements[-2]).class == ECMA262::StExp
-              if st.exp
-                st.replace(st.exp, ECMA262::ExpComma.new(prev.exp, st.exp))
-                parent.replace(prev, ECMA262::StEmpty.new())
-              end
-            end
-          elsif parent.kind_of? ECMA262::StList
+          if parent.kind_of? ECMA262::StatementList
             parent.remove_empty_statement
             if parent.statement_list[-1] == st and (prev=parent.statement_list[-2]).class == ECMA262::StExp
               if st.exp
@@ -427,19 +419,21 @@ module Minjs
                 parent.replace(prev, ECMA262::StEmpty.new())
               end
             end
+            parent.remove_empty_statement
           end
         end
       }
       block_to_statement
       if_to_cond
+      self
     end
     #
     # var a; a=1
     # => var a=1
     #
-    def assignment_after_var
-      self.traverse {|st, parent|
-        if st.kind_of? ECMA262::StExp and parent.kind_of? ECMA262::Prog
+    def assignment_after_var(node = @prog)
+      node.traverse(nil) {|st, parent|
+        if st.kind_of? ECMA262::StExp and parent.kind_of? ECMA262::SourceElements
           if st.exp.kind_of? ECMA262::ExpAssign
             idx = parent.index(st)
             while idx > 0

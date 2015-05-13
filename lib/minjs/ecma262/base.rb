@@ -47,6 +47,138 @@ module Minjs
       def replace(from, to)
         puts "warning: #{self.class}: replace not implement"
       end
+
+      def deep_dup
+        puts "warning: #{self.class}: deep_dup not implement"
+      end
+    end
+
+    class StatementList < Base
+      attr_reader :statement_list
+
+      def initialize(statement_list)
+        @statement_list = statement_list
+      end
+
+      def grouping
+        remove_empty_statement
+        nsl = []
+        sl = []
+        g = []
+        @statement_list.each do |st|
+          if st.to_exp?
+            g.push(st)
+          else
+            if g.length > 0
+              sl.push(g)
+            end
+            sl.push([st])
+            g = []
+          end
+        end
+        if g.length > 0
+          sl.push(g)
+        end
+
+        sl.each do |g|
+          if g.length == 1
+            nsl.push(g[0])
+          else
+            i = 1
+            t = g[0].to_exp
+            while i < g.length
+              t = ExpComma.new(t, g[i].to_exp)
+              i += 1
+            end
+            nsl.push(StExp.new(t))
+          end
+        end
+
+        @statement_list = nsl
+      end
+
+      def deep_dup
+        self.class.new(@statement_list.collect{|s| s.deep_dup})
+      end
+
+      def replace(from, to)
+        idx = @statement_list.index(from)
+        if idx
+          @statement_list[idx] = to
+        end
+      end
+
+      def remove(st)
+        @statement_list.delete(st)
+      end
+
+      def remove_empty_statement
+        @statement_list.reject!{|x|
+          x.class == StEmpty
+        }
+      end
+
+      def traverse(parent, &block)
+        @statement_list.each do|st|
+          st.traverse(self, &block)
+        end
+        yield self, parent
+      end
+
+      def to_js(options = {})
+        concat options, @statement_list
+      end
+
+      def length
+        @statement_list.length
+      end
+
+      def to_exp?
+        @statement_list.each do |s|
+          return false if s.to_exp? == false
+        end
+        return true
+      end
+
+      def to_exp(options = {})
+        return nil if to_exp? == false
+        t = @statement_list[0].to_exp(options)
+        return t.to_exp(options) if @statement_list.length <= 1
+        i = 1
+        while(i < @statement_list.length)
+          t = ExpComma.new(t, @statement_list[i])
+          i += 1
+        end
+        t
+      end
+
+      def each(&block)
+        @statement_list.each(&block)
+      end
+
+      def [](i)
+        @statement_list[i]
+      end
+
+      def index(st)
+        @statement_list.index(st)
+      end
+    end
+
+    class SourceElements < StatementList
+      #
+      # source_elements: [statement, statement, ...]
+      #
+      def initialize(source_elements)
+        @statement_list = source_elements
+      end
+
+      def source_elements
+        @statement_list
+      end
+      def source_elements=(source_elements)
+        @statement_list = source_elements
+      end
     end
 
     class Prog < Base
@@ -58,49 +190,53 @@ module Minjs
         @context = context
       end
 
+      def deep_dup
+        self.class.new(context, source_elements.deep_dup)
+      end
       def traverse(parent, &block)
-        @source_elements.each do |s|
-          s.traverse(self, &block)
-        end
+        @source_elements.traverse(self, &block)
         yield self, parent
       end
 
       def to_js(options = {})
-        tt = ''
-        vars = @context.var_env.record.binding.find_all {|k, v|
-          v and v[:_parameter_list].nil? and !v[:value].kind_of?(StFunc)
-        }.collect{|x|x[0]}
-
-        tt = concat(options, tt, @source_elements)
+        concat options, @source_elements
       end
-
+=begin
       def grouping
-        sl = @source_elements
-        i = 0
-        while i < sl.length
-          st = sl[i]
-          i0 = i
-          prev = nil
-          t = nil
-          while st and st.to_exp?
-            if prev and prev.to_exp?
-              t = ECMA262::ExpComma.new(t, st.to_exp({}))
-            elsif prev.nil?
-              t = st.to_exp({})
-            else
-              break
-            end
-            prev = st
-            i += 1
-            st = sl[i]
-          end
-          if i0 != i and i - i0 >= 2
-            sl[i0...i] = StExp.new(t)
-            i = (i - i0 + 1)
+        remove_empty_statement
+        nsl = []
+        sl = []
+        g = []
+        @source_elements.each do |st|
+          if st.to_exp?
+            g.push(st)
           else
-            i += 1
+            if g.length > 0
+              sl.push(g)
+            end
+            sl.push([st])
+            g = []
           end
         end
+        if g.length > 0
+          sl.push(g)
+        end
+
+        sl.each do |g|
+          if g.length == 1
+            nsl.push(g[0])
+          else
+            i = 1
+            t = g[0].to_exp
+            while i < g.length
+              t = ExpComma.new(t, g[i].to_exp)
+              i += 1
+            end
+            nsl.push(StExp.new(t))
+          end
+        end
+
+        @source_elements = nsl
       end
 
       def replace(from, to)
@@ -131,7 +267,7 @@ module Minjs
       def index(st)
         @source_elements.index(st)
       end
-
+=end
     end
   end
 end

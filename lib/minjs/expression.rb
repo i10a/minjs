@@ -435,16 +435,15 @@ module Minjs
     # 11.8
     #
     def relational_exp(lex, context, options)
-      next_exp = :shift_exp
       lex.eval_lit {
-        a = __send__(next_exp, lex, context, options)
+        a = shift_exp(lex, context, options)
         next nil if !a
 
         t = a
         while (punc = lex.match_lit(ECMA262::PUNC_LT) || lex.match_lit(ECMA262::PUNC_GT) ||
                       lex.match_lit(ECMA262::PUNC_LTEQ) || lex.match_lit(ECMA262::PUNC_GTEQ) ||
-                      lex.match_lit(ECMA262::ID_INSTANCEOF) || lex.match_lit(ECMA262::ID_IN))
-          if b = __send__(next_exp, lex, context, options)
+                      lex.match_lit(ECMA262::ID_INSTANCEOF) || (!options[:no_in] && lex.match_lit(ECMA262::ID_IN)))
+          if b = shift_exp(lex, context, options)
             if punc == ECMA262::PUNC_LT
               t = ECMA262::ExpLt.new(t, b)
             elsif punc == ECMA262::PUNC_GT
