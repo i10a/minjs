@@ -124,11 +124,9 @@ module Minjs
 
     def var_decl(lex, context, options)
       lex.eval_lit {
-        a = lex.fwd_lit
+        a = identifier(lex, context)
         if !a
-          nil
-        elsif !a.kind_of?(ECMA262::IdentifierName)
-          nil
+          raise ParseError.new("bad identifier");
         else
           b = initialiser(lex, context, options)
           [a, b]
@@ -236,8 +234,8 @@ module Minjs
         # for(var i ; cond ; exp)
         next nil unless lex.match_lit(ECMA262::PUNC_LPARENTHESIS)
         if lex.match_lit(ECMA262::ID_VAR) and vl=var_decl_list(lex, context, :no_in =>true) and lex.match_lit(ECMA262::PUNC_SEMICOLON) and (e=exp(lex, context, {})||true) and lex.match_lit(ECMA262::PUNC_SEMICOLON) and (e2=exp(lex, context, {})||true) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
-          e = ECMA262::ExpEmpty.new if e == true
-          e2 = ECMA262::ExpEmpty.new if e2 == true
+          e = nil if e == true
+          e2 = nil if e2 == true
           #10.5
           vl.each do |v|
             dn = v[0]
@@ -260,9 +258,9 @@ module Minjs
         # for(i ; cond; exp)
         next nil unless lex.match_lit(ECMA262::PUNC_LPARENTHESIS)
         if (v=exp(lex, context, :no_in => true) || true) and lex.match_lit(ECMA262::PUNC_SEMICOLON) and (e=exp(lex, context, {}) || true) and lex.match_lit(ECMA262::PUNC_SEMICOLON) and (e2=exp(lex, context, {})||true) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
-          v = ECMA262::ExpEmpty.new if v == true
-          e = ECMA262::ExpEmpty.new if e == true
-          e2 = ECMA262::ExpEmpty.new if e2 == true
+          v = nil if v == true
+          e = nil if e == true
+          e2 = nil if e2 == true
           ECMA262::StFor.new(v, e, e2, s)
         else
           nil
@@ -405,25 +403,33 @@ module Minjs
     def try_statement(lex, context)
       return nil unless lex.match_lit(ECMA262::ID_TRY)
       lex.eval_lit {
+        catch_context = ECMA262::Context.new
+        catch_env = context.lex_env.new_declarative_env()
+        catch_context.lex_env = catch_env
+        catch_context.var_env = context.var_env
+
         t = block(lex, context)
         break nil unless t
 
         lex.eval_lit{
-          c = try_catch(lex, context)
+          c = try_catch(lex, catch_context)
           break nil unless c
 
           f = try_finally(lex, context)
-          ECMA262::StTry.new(t, c, f)
+          ECMA262::StTry.new(context, catch_context, t, c, f)
         } || lex.eval_lit{
           f = try_finally(lex, context)
           break nil unless f
-          ECMA262::StTry.new(t, nil, f)
+          ECMA262::StTry.new(context, catch_context, t, nil, f)
         }
       }
     end
-    def try_catch(lex, context)
+    def try_catch(lex, catch_context)
       return nil unless lex.match_lit(ECMA262::ID_CATCH)
-      if lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and i=identifier(lex, context) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and b=block(lex, context)
+
+      if lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and i=identifier(lex, catch_context) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and b=block(lex, catch_context)
+        catch_context.lex_env.record.create_mutable_binding(i, nil)
+        catch_context.lex_env.record.set_mutable_binding(i, :undefined, nil)
         [i, b]
       else
         nil

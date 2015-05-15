@@ -34,9 +34,9 @@ module Minjs
     #
     def boolean_literal(lex, context)
       if lex.match_lit(ECMA262::ID_TRUE)
-        ECMA262::Boolean.new(:true)
+        ECMA262::Boolean.get(:true)
       elsif lex.match_lit(ECMA262::ID_FALSE)
-        ECMA262::Boolean.new(:false)
+        ECMA262::Boolean.get(:false)
       else
         nil
       end

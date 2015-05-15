@@ -1,7 +1,7 @@
 # coding: utf-8
 require 'spec_helper'
 
-describe 'Expression' do
+describe 'Compression' do
   describe 'RemoveParen' do
     it 'remove paren' do
       c = test_compressor

@@ -1,5 +1,23 @@
 module Minjs
   module ECMA262
+    PRIORITY_PRIMARY = 10
+    PRIORITY_LEFT_HAND_SIDE = 20
+    PRIORITY_POSTFIX = 30
+    PRIORITY_UNARY = 40
+    PRIORITY_MULTIPLICATIVE = 50
+    PRIORITY_ADDITIVE = 60
+    PRIORITY_SHIFT = 70
+    PRIORITY_RELATIONAL = 80
+    PRIORITY_EQUALITY = 90
+    PRIORITY_BITWISE_AND = 100
+    PRIORITY_BITWISE_XOR = 106
+    PRIORITY_BITWISE_OR = 108
+    PRIORITY_LOGICAL_AND = 110
+    PRIORITY_LOGICAL_OR = 116
+    PRIORITY_CONDITIONAL = 120
+    PRIORITY_ASSIGNMENT = 130
+    PRIORITY_COMMA = 140
+
     class Exp < Base
       def traverse
         yield(self)
@@ -15,6 +33,7 @@ module Minjs
       def priority
         9999
       end
+
     end
 
     module BinaryOperation
@@ -25,6 +44,17 @@ module Minjs
         if @val2.kind_of? ExpParen and @val2.val.priority < self.priority
           @val2 = @val2.val
         end
+        self
+      end
+      def add_paren
+        if @val.priority > self.priority
+          @val = ExpParen.new(@val)
+        end
+        if @val2.priority > self.priority
+          @val2 = ExpParen.new(@val2)
+        end
+
+        self
       end
     end
 
@@ -33,21 +63,42 @@ module Minjs
         if @val.kind_of? ExpParen and @val.val.priority <= self.priority
           @val = @val.val if @val.remove_paren?
         end
+        self
+      end
+
+      def add_paren
+        if @val.priority > self.priority
+          @val = ExpParen.new(@val)
+        end
+
+        self
       end
     end
 
     module AssignmentOperation
       def remove_paren
-        if @val.kind_of? ExpParen and @val.val.priority <= 20
+        if @val.kind_of? ExpParen and @val.val.priority <= PRIORITY_LEFT_HAND_SIDE
           @val = @val.val if @val.remove_paren?
         end
-        if @val2.kind_of? ExpParen and @val2.val.priority <= 130
+        if @val2.kind_of? ExpParen and @val2.val.priority <= PRIORITY_ASSIGNMENT
           @val2 = @val2.val
         end
+        self
+      end
+      def add_paren
+        if @val.priority > PRIORITY_LEFT_HAND_SIDE
+          @val = ExpParen.new(@val)
+        end
+        if @val2.priority > PRIORITY_ASSIGNMENT
+          @val2 = ExpParen.new(@val2)
+        end
+        self
       end
     end
 
     class ExpArg1 < Exp
+      attr_reader :val
+
       def initialize(val)
         @val = val
       end
@@ -70,6 +121,12 @@ module Minjs
       def to_js(options = {})
         concat options, sym, @val
       end
+
+#      def reduce(parent)
+#        if @val.kind_of?(Literal) and !@val.kind_of? IdentifierName
+#          #TODO
+#        end
+#      end
     end
 
     class ExpArg2 < Exp
@@ -101,22 +158,12 @@ module Minjs
       def to_js(options = {})
         concat options, @val, sym, @val2
       end
-    end
 
-    #
-    # ""
-    #
-    class ExpEmpty < Exp
-      def deep_dup
-        self.class.new
-      end
-
-      def traverse(parent, &block)
-      end
-
-      def to_js(options = {})
-        ""
-      end
+#      def reduce(parent)
+#        if @val.kind_of?(Literal) and !@val.kind_of? IdentifierName
+#          #TODO
+#        end
+#      end
     end
 
     #
@@ -130,7 +177,7 @@ module Minjs
       end
 
       def priority
-        10
+        PRIORITY_PRIMARY
       end
 
       def deep_dup
@@ -165,6 +212,11 @@ module Minjs
         if @val.kind_of? ExpParen
           @val = @val.val if @val.remove_paren?
         end
+        self
+      end
+
+      def add_paren
+        self
       end
     end
     #
@@ -176,7 +228,7 @@ module Minjs
     #
     class ExpPropBrac < ExpArg2
       def priority
-        20
+        PRIORITY_LEFT_HAND_SIDE
       end
 
       def traverse(parent, &block)
@@ -190,12 +242,20 @@ module Minjs
       end
 
       def remove_paren
-        if @val.kind_of? ExpParen and @val.val.priority <= 20
+        if @val.kind_of? ExpParen and @val.val.priority <= PRIORITY_LEFT_HAND_SIDE
           @val = @val.val if @val.remove_paren?
         end
         if @val2.kind_of? ExpParen
           @val2 = @val2.val
         end
+        self
+      end
+
+      def add_paren
+        if @val.priority > PRIORITY_LEFT_HAND_SIDE
+          @val = ExpPare.new(@val)
+        end
+        self
       end
     end
     #
@@ -212,7 +272,7 @@ module Minjs
       end
 
       def priority
-        20
+        PRIORITY_LEFT_HAND_SIDE
       end
 
       def traverse(parent, &block)
@@ -226,9 +286,17 @@ module Minjs
       end
 
       def remove_paren
-        if @val.kind_of? ExpParen and @val.val.priority <= 20
+        if @val.kind_of? ExpParen and @val.val.priority <= PRIORITY_LEFT_HAND_SIDE
           @val = @val.val if @val.remove_paren?
         end
+        self
+      end
+
+      def add_paren
+        if @val.priority > PRIORITY_LEFT_HAND_SIDE
+          @val = ExpPare.new(@val)
+        end
+        self
       end
     end
     #11.2
@@ -244,7 +312,7 @@ module Minjs
       end
 
       def priority
-        20
+        PRIORITY_LEFT_HAND_SIDE
       end
 
       def deep_dup
@@ -275,18 +343,35 @@ module Minjs
       end
 
       def remove_paren
-        if @name.kind_of? ExpParen and @name.val.priority <= 20
+        if @name.kind_of? ExpParen and @name.val.priority <= PRIORITY_LEFT_HAND_SIDE
           @name = @name.val if @name.remove_paren?
         end
         if @args
           @args.map! do |arg|
-            if arg.kind_of? ExpParen and arg.val.priority <= 130 #AssignmentOperators
+            if arg.kind_of? ExpParen and arg.val.priority <= PRIORITY_ASSIGNMENT #AssignmentOperators
               arg.val if arg.remove_paren?
             else
               arg
             end
           end
         end
+        self
+      end
+
+      def add_paren
+        if @name.priority > PRIORITY_LEFT_HAND_SIDE
+          @name = ExpPare.new(@name)
+        end
+        if @args
+          @args.map! do |arg|
+            if arg.priority > PRIORITY_ASSIGNMENT
+              ExpParen.new(arg)
+            else
+              arg
+            end
+          end
+        end
+        self
       end
 
     end
@@ -302,7 +387,7 @@ module Minjs
       end
 
       def priority
-        20
+        PRIORITY_LEFT_HAND_SIDE
       end
 
       def deep_dup
@@ -338,18 +423,35 @@ module Minjs
       end
 
       def remove_paren
-        if @name.kind_of? ExpParen and @name.val.priority <= 20
+        if @name.kind_of? ExpParen and @name.val.priority <= PRIORITY_LEFT_HAND_SIDE
           @name = @name.val if @name.remove_paren?
         end
         if @args
           @args.map! do |arg|
-            if arg.kind_of? ExpParen and arg.val.priority <= 130 #AssignmentOperators
+            if arg.kind_of? ExpParen and arg.val.priority <= PRIORITY_ASSIGNMENT
               arg.val if arg.remove_paren?
             else
               arg
             end
           end
         end
+        self
+      end
+
+      def add_paren
+        if @name.priority > PRIORITY_LEFT_HAND_SIDE
+          @name = ExpParen.new(@name)
+        end
+        if @args
+          @args.map! do |arg|
+            if arg.priority > PRIORITY_ASSIGNMENT
+              ExpParen.new(arg)
+            else
+              arg
+            end
+          end
+        end
+        self
       end
     end
 
@@ -361,9 +463,11 @@ module Minjs
       def sym
         "++"
       end
+
       def priority
-        30
+        PRIORITY_POSTFIX
       end
+
       def to_js(options = {})
         concat options, @val, sym
       end
@@ -373,9 +477,11 @@ module Minjs
       def sym
         "--"
       end
+
       def priority
-        30
+        PRIORITY_POSTFIX
       end
+
       def to_js(options = {})
         concat options, @val, sym
       end
@@ -390,17 +496,24 @@ module Minjs
         "delete"
       end
       def priority
-        40
+        PRIORITY_UNARY
       end
     end
     class ExpVoid < ExpArg1
       include UnaryOperation
+
       def sym
         "void"
       end
+
       def priority
-        40
+        PRIORITY_UNARY
       end
+
+      def ecma262_typeof
+        :undefined
+      end
+
     end
     class ExpTypeof < ExpArg1
       include UnaryOperation
@@ -408,7 +521,11 @@ module Minjs
         "typeof"
       end
       def priority
-        40
+        PRIORITY_UNARY
+      end
+
+      def ecma262_typeof
+        :string
       end
     end
 
@@ -417,8 +534,9 @@ module Minjs
       def sym
         "++"
       end
+
       def priority
-        40
+        PRIORITY_UNARY
       end
     end
     class ExpPreDec < ExpArg1
@@ -426,8 +544,9 @@ module Minjs
       def sym
         "--"
       end
+
       def priority
-        40
+        PRIORITY_UNARY
       end
     end
     class ExpPositive < ExpArg1
@@ -435,14 +554,19 @@ module Minjs
       def sym
         "+"
       end
+
       def priority
-        40
+        PRIORITY_UNARY
       end
 
       def reduce(parent)
         if @val.kind_of? ECMA262Numeric
           parent.replace(self, @val)
         end
+      end
+
+      def ecma262_typeof
+        :number
       end
     end
 
@@ -451,8 +575,9 @@ module Minjs
       def sym
         "-"
       end
+
       def priority
-        40
+        PRIORITY_UNARY
       end
 
       def reduce(parent)
@@ -466,14 +591,24 @@ module Minjs
           parent.replace(self, val)
         end
       end
+
+      def ecma262_typeof
+        :number
+      end
     end
+
     class ExpBitwiseNot < ExpArg1
       include UnaryOperation
       def sym
         "~"
       end
+
       def priority
-        40
+        PRIORITY_UNARY
+      end
+
+      def ecma262_typeof
+        :number
       end
     end
     class ExpLogicalNot < ExpArg1
@@ -481,11 +616,47 @@ module Minjs
       def sym
         "!"
       end
+
       def priority
-        40
+        PRIORITY_UNARY
+      end
+
+      #feature
+      def reduce(parent)
+        if @val.kind_of? ECMA262Numeric and (@val.to_js == "0" || @val.to_js == "1")
+          return
+        end
+
+        if (e = ecma262_eval(:boolean)) != nil
+          if e
+            parent.replace(self, ExpLogicalNot.new(ECMA262Numeric.new(0)))
+          else
+            parent.replace(self, ExpLogicalNot.new(ECMA262Numeric.new(1)))
+          end
+        elsif @val.kind_of? ExpLogicalNot and
+           @val.val.respond_to?(:ecma262_typeof) and
+           @val.val.ecma262_typeof == :boolean
+            parent.replace(self, @val.val)
+        end
+      end
+
+      def ecma262_eval(type)
+        if @val.respond_to? :ecma262_eval
+          e = @val.ecma262_eval(type)
+          if e.nil?
+            return nil
+          else
+            return !e
+          end
+        else
+          nil
+        end
+      end
+
+      def ecma262_typeof
+        :boolean
       end
     end
-
     #
     # 11.5.1 Applying the * Operator
     #
@@ -497,7 +668,13 @@ module Minjs
       end
 
       def priority
-        50
+        PRIORITY_MULTIPLICATIVE
+      end
+
+      def swap
+        t = @val
+        @val = @val2
+        @val2 = t
       end
 
       def reduce(parent)
@@ -537,7 +714,7 @@ module Minjs
         "/"
       end
       def priority
-        50
+        PRIORITY_MULTIPLICATIVE
       end
     end
 
@@ -550,7 +727,7 @@ module Minjs
         "%"
       end
       def priority
-        50
+        PRIORITY_MULTIPLICATIVE
       end
     end
 
@@ -564,7 +741,13 @@ module Minjs
       end
 
       def priority
-        60
+        PRIORITY_ADDITIVE
+      end
+
+      def swap
+        t = @val
+        @val = @val2
+        @val2 = t
       end
 
       def reduce(parent)
@@ -617,7 +800,7 @@ module Minjs
       end
 
       def priority
-        60
+        PRIORITY_ADDITIVE
       end
 
       def reduce(parent)
@@ -669,7 +852,7 @@ module Minjs
         "<<"
       end
       def priority
-        70
+        PRIORITY_SHIFT
       end
     end
     #
@@ -681,7 +864,7 @@ module Minjs
         ">>"
       end
       def priority
-        70
+        PRIORITY_SHIFT
       end
     end
     #
@@ -693,7 +876,7 @@ module Minjs
         ">>>"
       end
       def priority
-        70
+        PRIORITY_SHIFT
       end
     end
     #
@@ -705,7 +888,7 @@ module Minjs
         "<"
       end
       def priority
-        80
+        PRIORITY_RELATIONAL
       end
     end
 
@@ -718,7 +901,7 @@ module Minjs
         ">"
       end
       def priority
-        80
+        PRIORITY_RELATIONAL
       end
     end
     #
@@ -730,7 +913,7 @@ module Minjs
         "<="
       end
       def priority
-        80
+        PRIORITY_RELATIONAL
       end
     end
     #
@@ -742,7 +925,7 @@ module Minjs
         ">="
       end
       def priority
-        80
+        PRIORITY_RELATIONAL
       end
     end
     #
@@ -754,7 +937,7 @@ module Minjs
         "instanceof"
       end
       def priority
-        80
+        PRIORITY_RELATIONAL
       end
     end
     #
@@ -766,7 +949,7 @@ module Minjs
         "in"
       end
       def priority
-        80
+        PRIORITY_RELATIONAL
       end
     end
     #
@@ -778,7 +961,7 @@ module Minjs
         "=="
       end
       def priority
-        90
+        PRIORITY_EQUALITY
       end
     end
     #
@@ -790,7 +973,7 @@ module Minjs
         "!="
       end
       def priority
-        90
+        PRIORITY_EQUALITY
       end
     end
     #
@@ -801,8 +984,16 @@ module Minjs
       def sym
         "==="
       end
+
       def priority
-        90
+        PRIORITY_EQUALITY
+      end
+
+      def reduce(parent)
+        if @val.respond_to?(:ecma262_typeof) and @val2.respond_to?(:ecma262_typeof) and
+           @val.ecma262_typeof == @val2.ecma262_typeof
+          parent.replace(self, ExpEq.new(@val, @val2))
+        end
       end
     end
     #
@@ -813,8 +1004,16 @@ module Minjs
       def sym
         "!=="
       end
+
       def priority
-        90
+        PRIORITY_EQUALITY
+      end
+
+      def reduce(parent)
+        if @val.respond_to?(:ecma262_typeof) and @val2.respond_to?(:ecma262_typeof) and
+           @val.ecma262_typeof == @val2.ecma262_typeof
+          parent.replace(self, ExpNotEq.new(@val, @val2))
+        end
       end
     end
     #
@@ -825,8 +1024,15 @@ module Minjs
       def sym
         "&"
       end
+
       def priority
-        100
+        PRIORITY_BITWISE_AND
+      end
+
+      def swap
+        t = @val
+        @val = @val2
+        @val2 = t
       end
     end
     # ^
@@ -835,8 +1041,15 @@ module Minjs
       def sym
         "^"
       end
+
       def priority
-        106
+        PRIORITY_BITWISE_XOR
+      end
+
+      def swap
+        t = @val
+        @val = @val2
+        @val2 = t
       end
     end
 
@@ -846,8 +1059,15 @@ module Minjs
       def sym
         "|"
       end
+
       def priority
-        108
+        PRIORITY_BITWISE_OR
+      end
+
+      def swap
+        t = @val
+        @val = @val2
+        @val2 = t
       end
     end
     #
@@ -856,12 +1076,15 @@ module Minjs
     # &&
     class ExpLogicalAnd < ExpArg2
       include BinaryOperation
+
       def sym
         "&&"
       end
+
       def priority
-        110
+        PRIORITY_LOGICAL_AND
       end
+
     end
     # ||
     class ExpLogicalOr < ExpArg2
@@ -869,8 +1092,9 @@ module Minjs
       def sym
         "||"
       end
+
       def priority
-        116
+        PRIORITY_LOGICAL_OR
       end
     end
     #
@@ -886,19 +1110,33 @@ module Minjs
       end
 
       def priority
-        120
+        PRIORITY_CONDITIONAL
       end
 
       def remove_paren
-        if @val.kind_of? ExpParen and @val.val.priority < 120
+        if @val.kind_of? ExpParen and @val.val.priority < PRIORITY_CONDITIONAL
           @val = @val.val if @val.remove_paren?
         end
-        if @val2.kind_of? ExpParen and @val2.val.priority <= 130
+        if @val2.kind_of? ExpParen and @val2.val.priority <= PRIORITY_ASSIGNMENT
           @val2 = @val2.val
         end
-        if @val3.kind_of? ExpParen and @val3.val.priority <= 130
+        if @val3.kind_of? ExpParen and @val3.val.priority <= PRIORITY_ASSIGNMENT
           @val3 = @val3.val
         end
+        self
+      end
+
+      def add_paren
+        if @val.priority > PRIORITY_CONDITIONAL
+          @val = ExpParen.new(@val)
+        end
+        if @val2.priority > PRIORITY_ASSIGNMENT
+          @val2 = ExpParen.new(@val2)
+        end
+        if @val3.priority > PRIORITY_ASSIGNMENT
+          @val3 = ExpParen.new(@val3)
+        end
+        self
       end
 
       def deep_dup
@@ -934,8 +1172,60 @@ module Minjs
       def sym
         "="
       end
+
       def priority
-        130
+        PRIORITY_ASSIGNMENT
+      end
+
+      def reduce(parent)
+        #
+        # a = a / b => a /= b
+        #
+        if @val2.kind_of? ExpDiv and @val2.val == @val
+          parent.replace(self,
+                         ExpParen.new(
+                           ExpDivAssign.new(@val, @val2.val2)))
+        elsif @val2.kind_of? ExpMul and @val2.val == @val
+          parent.replace(self,
+                         ExpParen.new(
+                           ExpMulAssign.new(@val, @val2.val2)))
+        elsif @val2.kind_of? ExpMod and @val2.val == @val
+          parent.replace(self,
+                         ExpParen.new(
+                           ExpModAssign.new(@val, @val2.val2)))
+        elsif @val2.kind_of? ExpAdd and @val2.val == @val
+          parent.replace(self,
+                         ExpParen.new(
+                           ExpAddAssign.new(@val, @val2.val2)))
+        elsif @val2.kind_of? ExpSub and @val2.val == @val
+          parent.replace(self,
+                         ExpParen.new(
+                           ExpSubAssign.new(@val, @val2.val2)))
+        elsif @val2.kind_of? ExpLShift and @val2.val == @val
+          parent.replace(self,
+                         ExpParen.new(
+                           ExpLShiftAssign.new(@val, @val2.val2)))
+        elsif @val2.kind_of? ExpRShift and @val2.val == @val
+          parent.replace(self,
+                         ExpParen.new(
+                           ExpRShiftAssign.new(@val, @val2.val2)))
+        elsif @val2.kind_of? ExpURShift and @val2.val == @val
+          parent.replace(self,
+                         ExpParen.new(
+                           ExpURShiftAssign.new(@val, @val2.val2)))
+        elsif @val2.kind_of? ExpAnd and @val2.val == @val
+          parent.replace(self,
+                         ExpParen.new(
+                           ExpAndAssign.new(@val, @val2.val2)))
+        elsif @val2.kind_of? ExpOr and @val2.val == @val
+          parent.replace(self,
+                         ExpParen.new(
+                           ExpOrAssign.new(@val, @val2.val2)))
+        elsif @val2.kind_of? ExpXor and @val2.val == @val
+          parent.replace(self,
+                         ExpParen.new(
+                           ExpXorAssign.new(@val, @val2.val2)))
+        end
       end
     end
     class ExpDivAssign < ExpAssign
@@ -944,7 +1234,7 @@ module Minjs
         "/="
       end
       def priority
-        130
+        PRIORITY_ASSIGNMENT
       end
     end
     class ExpMulAssign < ExpAssign
@@ -953,7 +1243,7 @@ module Minjs
         "*="
       end
       def priority
-        130
+        PRIORITY_ASSIGNMENT
       end
     end
     class ExpModAssign < ExpAssign
@@ -962,7 +1252,7 @@ module Minjs
         "%="
       end
       def priority
-        130
+        PRIORITY_ASSIGNMENT
       end
     end
     class ExpAddAssign < ExpAssign
@@ -971,7 +1261,7 @@ module Minjs
         "+="
       end
       def priority
-        130
+        PRIORITY_ASSIGNMENT
       end
     end
     class ExpSubAssign < ExpAssign
@@ -980,7 +1270,7 @@ module Minjs
         "-="
       end
       def priority
-        130
+        PRIORITY_ASSIGNMENT
       end
     end
     class ExpLShiftAssign < ExpAssign
@@ -989,7 +1279,7 @@ module Minjs
         "<<="
       end
       def priority
-        130
+        PRIORITY_ASSIGNMENT
       end
     end
     class ExpRShiftAssign < ExpAssign
@@ -998,7 +1288,7 @@ module Minjs
         ">>="
       end
       def priority
-        130
+        PRIORITY_ASSIGNMENT
       end
     end
     class ExpURShiftAssign < ExpAssign
@@ -1007,7 +1297,7 @@ module Minjs
         ">>>="
       end
       def priority
-        130
+        PRIORITY_ASSIGNMENT
       end
     end
     class ExpAndAssign < ExpAssign
@@ -1016,7 +1306,7 @@ module Minjs
         "&="
       end
       def priority
-        130
+        PRIORITY_ASSIGNMENT
       end
     end
     class ExpOrAssign < ExpAssign
@@ -1025,7 +1315,7 @@ module Minjs
         "|="
       end
       def priority
-        130
+        PRIORITY_ASSIGNMENT
       end
     end
     class ExpXorAssign < ExpAssign
@@ -1034,7 +1324,7 @@ module Minjs
         "^="
       end
       def priority
-        130
+        PRIORITY_ASSIGNMENT
       end
     end
     #
@@ -1045,8 +1335,9 @@ module Minjs
       def sym
         ","
       end
+
       def priority
-        140
+        PRIORITY_COMMA
       end
     end
   end

@@ -58,24 +58,7 @@ module Minjs
         t = @statement_list.statement_list.select{|s|
           s.class != StEmpty
         }
-        return false if t.length != 1
-        #
-        #  if(a){ //<= this block must not be removed
-        #    while(true)
-        #      if(b){
-        #        ;
-        #      }
-        #  }
-        #  else{
-        #   ;
-        #  }
-        #
-        last_st = t[0].last_statement[-2]
-        if last_st.kind_of?(StIf) and last_st.else_st.nil?
-          return false
-        else
-          return true
-        end
+        t.length == 1
       end
 
       def to_statement
@@ -167,11 +150,21 @@ module Minjs
 
       def remove_paren
         @vars.each do |x|
-          if x[1] and x[1].kind_of? ExpParen and x[1].val.priority <= 130
+          if x[1] and x[1].kind_of? ExpParen and x[1].val.priority <= PRIORITY_ASSIGNMENT
             x[1] = x[1].val
           end
         end
       end
+
+      def add_paren
+        @vars.each do |x|
+          if x[1] and x[1].priority > PRIORITY_ASSIGNMENT
+            x[1] = ExpParen.new(x[1])
+          end
+        end
+        self
+      end
+
       def last_statement
         [self]
       end
@@ -238,6 +231,11 @@ module Minjs
           @exp = @exp.val if @exp.remove_paren?
         end
       end
+
+      def add_paren
+        self
+      end
+
       def last_statement
         [self]
       end
@@ -258,7 +256,9 @@ module Minjs
       end
 
       def replace(from, to)
-        if from == @then_st
+        if from == @cond
+          @cond = to
+        elsif from == @then_st
           @then_st = to
         elsif from == @else_st
           @else_st = to
@@ -313,26 +313,22 @@ module Minjs
 
       def to_exp(options = {})
         return nil if to_exp? == false
-        if @else_st
+        if !@else_st
           then_exp = @then_st.to_exp(options)
-          else_exp = @else_st.to_exp(options)
+          if @cond.kind_of? ExpLogicalNot
+            return ExpParen.new(ExpLogicalOr.new(ExpParen.new(@cond.val), ExpParen.new(then_exp)))
+          else
+            return ExpParen.new(ExpLogicalAnd.new(ExpParen.new(@cond), ExpParen.new(then_exp)))
+          end
         else
-          then_exp = @then_st.to_exp(options)
-          return ExpLogicalAnd.new(ExpParen.new(@cond), ExpParen.new(then_exp))
-        end
-        if then_exp.kind_of? ExpComma
-          then_exp = ExpParen.new(then_exp)
-        end
-        if else_exp.kind_of? ExpComma
-          else_exp = ExpParen.new(else_exp)
+          then_exp = ExpParen.new(@then_st.to_exp(options))
+          else_exp = ExpParen.new(@else_st.to_exp(options))
         end
 
-        if @cond.kind_of? ExpComma
-          ExpCond.new(ExpParen.new(@cond), then_exp, else_exp)
-        elsif @cond.kind_of? ExpAssign
-          ExpCond.new(ExpParen.new(@cond), then_exp, else_exp)
+        if @cond.kind_of? ExpLogicalNot
+          ExpCond.new(ExpParen.new(@cond.val), else_exp, then_exp)
         else
-          ExpCond.new(@cond, then_exp, else_exp)
+          ExpCond.new(ExpParen.new(@cond), then_exp, else_exp)
         end
       end
 
@@ -340,6 +336,11 @@ module Minjs
         if @cond.kind_of? ExpParen
           @cond = @cond.val
         end
+        self
+      end
+
+      def add_paren
+        self
       end
 
       def last_statement
@@ -354,6 +355,8 @@ module Minjs
 
     #12.6
     class StWhile < St
+      attr_reader :exp, :statement
+
       def initialize(exp, statement)
         @exp, @statement = exp, statement
       end
@@ -388,6 +391,11 @@ module Minjs
         if @exp.kind_of? ExpParen
           @exp = @exp.val
         end
+        self
+      end
+
+      def add_paren
+        self
       end
 
       def last_statement
@@ -426,11 +434,18 @@ module Minjs
 
         concat options, :do, statement, :while, "(", @exp, ")", ";"
       end
+
       def remove_paren
         if @exp.kind_of? ExpParen
           @exp = @exp.val
         end
+        self
       end
+
+      def add_paren
+        self
+      end
+
       def last_statement
         list = [self]
         list.concat @statement.last_statement
@@ -441,6 +456,8 @@ module Minjs
     # 12.6.3 the for statement
     #
     class StFor < St
+      attr_reader :exp1, :exp2, :exp3, :statement
+
       def initialize(exp1, exp2, exp3, statement)
         @exp1 = exp1
         @exp2 = exp2
@@ -456,15 +473,21 @@ module Minjs
       end
 
       def replace(from, to)
-        if from == @statement
+        if from == @exp1
+          @exp1 = to
+        elsif from == @exp2
+          @exp2 = to
+        elsif from == @exp3
+          @exp3 = to
+        elsif from == @statement
           @statement = to
         end
       end
 
       def traverse(parent, &block)
-        @exp1.traverse(self, &block)
-        @exp2.traverse(self, &block)
-        @exp3.traverse(self, &block)
+        @exp1.traverse(self, &block) if @exp1
+        @exp2.traverse(self, &block) if @exp2
+        @exp3.traverse(self, &block) if @exp3
         @statement.traverse(self, &block)
         yield self, parent
       end
@@ -489,7 +512,13 @@ module Minjs
         if @exp3.kind_of? ExpParen
           @exp3 = @exp3.val
         end
+        self
       end
+
+      def add_paren
+        self
+      end
+
       def last_statement
         list = [self]
         list.concat @statement.last_statement
@@ -537,8 +566,8 @@ module Minjs
             x[1].traverse(self, &block)
           end
         end
-        @exp2.traverse(self, &block)
-        @exp3.traverse(self, &block)
+        @exp2.traverse(self, &block) if @exp2
+        @exp3.traverse(self, &block) if @exp3
         @statement.traverse(self, &block)
         yield self, parent
       end
@@ -593,7 +622,13 @@ module Minjs
         if @exp3.kind_of? ExpParen
           @exp3 = @exp3.val
         end
+        self
       end
+
+      def add_paren
+        self
+      end
+
       def last_statement
         list = [self]
         list.concat @statement.last_statement
@@ -635,13 +670,22 @@ module Minjs
       end
 
       def remove_paren
-        if @exp1.kind_of? ExpParen and @exp1.priority <= 20 #left-hand
+        if @exp1.kind_of? ExpParen and @exp1.val.priority <= PRIORITY_LEFT_HAND_SIDE
           @exp1 = @exp1.val
         end
         if @exp2.kind_of? ExpParen
           @exp2 = @exp2.val
         end
+        self
       end
+
+      def add_paren
+        if @exp1.priority > PRIORITY_LEFT_HAND_SIDE
+          @exp1 = ExpParen.new(@exp1)
+        end
+        self
+      end
+
       def last_statement
         list = [self]
         list.concat @statement.last_statement
@@ -687,6 +731,7 @@ module Minjs
         end
         StForIn.new(t, @exp2, @statement)
       end
+
       def to_js(options = {})
         if @statement.kind_of? StBlock and @statement.statement_list.length == 1
           statement = @statement.statement_list.statement_list[0]
@@ -710,6 +755,11 @@ module Minjs
         if @exp2.kind_of? ExpParen
           @exp2 = @exp2.val
         end
+        self
+      end
+
+      def add_paren
+        self
       end
 
       def last_statement
@@ -733,6 +783,7 @@ module Minjs
         @exp.traverse(self, &block) if @exp
         yield self, parent
       end
+
       def to_js(options = {})
         if @exp
           concat options, :continue, @exp, ";"
@@ -740,6 +791,7 @@ module Minjs
           concat options, :continue, ";"
         end
       end
+
       def last_statement
         [self]
       end
@@ -767,6 +819,7 @@ module Minjs
           concat options, :break, ";"
         end
       end
+
       def last_statement
         [self]
       end
@@ -814,11 +867,18 @@ module Minjs
           concat options, :return, ";"
         end
       end
+
       def remove_paren
         if @exp.kind_of? ExpParen
           @exp = @exp.val
         end
+        self
       end
+
+      def add_paren
+        self
+      end
+
       def last_statement
         [self]
       end
@@ -843,11 +903,18 @@ module Minjs
       def to_js(options = {})
         concat options, :with, "(", @exp, ")", @statement
       end
+
       def remove_paren
         if @exp.kind_of? ExpParen
           @exp = @exp.val
         end
+        self
       end
+
+      def add_paren
+        self
+      end
+
       def last_statement
         list = [self]
         list.concat @statement.last_statement
@@ -910,7 +977,13 @@ module Minjs
             b[0] = b[0].val
           end
         end
+        self
       end
+
+      def add_paren
+        self
+      end
+
       def last_statement
         list = [self]
       end
@@ -976,7 +1049,13 @@ module Minjs
 
     #12.14
     class StTry < St
-      def initialize(try, catch, finally)
+      attr_reader :context
+      attr_reader :catch_context
+      attr_reader :try, :catch, :finally
+
+      def initialize(context, catch_context, try, catch, finally)
+        @context = context
+        @catch_context = catch_context
         @try = try
         @catch = catch
         @finally = finally
@@ -1021,6 +1100,7 @@ module Minjs
         [self]
       end
     end
+
     #12.15
     class StDebugger < St
       def deep_dup

@@ -15,7 +15,7 @@ module Minjs
       end
 
       def priority
-        10
+        PRIORITY_PRIMARY
       end
     end
 
@@ -98,6 +98,14 @@ module Minjs
       def self.get
         @@instance
       end
+
+      def to_ecma262_boolean
+        false
+      end
+
+      def ecma262_typeof
+        :boolean
+      end
     end
 
     class Boolean < Literal
@@ -130,7 +138,7 @@ module Minjs
       @@true = self.new(:true)
       @@false = self.new(:false)
       def self.get(val)
-        if val.to_sym == :true
+        if val.to_sym == :true || val == true
           @@true
         else
           @@false
@@ -182,6 +190,18 @@ module Minjs
           end
         end
         t << "\""
+      end
+
+      def to_ecma262_boolean
+        if @val.length == 0
+          false
+        else
+          true
+        end
+      end
+
+      def ecma262_typeof
+        :string
       end
     end
 
@@ -307,6 +327,27 @@ module Minjs
           end
         end
       end
+
+      def to_ecma262_boolean
+        if @val == :nan or to_ecma262_string == "0"
+          false
+        else
+          true
+        end
+      end
+
+      def ecma262_typeof
+        :number
+      end
+
+      def ecma262_eval(type)
+        case type
+        when :boolean
+          to_ecma262_boolean
+        else
+          nil
+        end
+      end
     end
     NUMERIC_NAN = ECMA262Numeric.new(:nan)
 
@@ -349,6 +390,9 @@ module Minjs
       end
       def to_js(options = {})
         "[" + @val.collect{|x| x.to_s}.join(",") + "]"
+      end
+      def to_ecma262_boolean
+        true
       end
     end
 
@@ -408,6 +452,18 @@ module Minjs
           end
         }.join(",") + "}"
       end
+      def to_ecma262_boolean
+        true
+      end
+#      def ecma262_eval(type)
+#
+#        case type
+#        when :boolean
+#          to_ecma262_boolean
+#        else
+#          nil
+#        end
+#      end
     end
 
     class SingleLineComment < Literal

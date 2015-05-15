@@ -1,7 +1,7 @@
 # coding: utf-8
 require 'spec_helper'
 
-describe 'Expression' do
+describe 'Compression' do
   describe 'BlockToStatement' do
     it 'convert block to statement' do
       c = test_compressor

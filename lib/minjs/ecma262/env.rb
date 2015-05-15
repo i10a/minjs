@@ -8,12 +8,14 @@ module Minjs
         @binding = {}
         @options = {}
       end
+
       def create_mutable_binding(n, d, options = {})
         if n.kind_of? IdentifierName
           n = n.val
         end
         @binding[n] = {:value => nil}
       end
+
       def set_mutable_binding(n, v, s, options = {})
         if n.kind_of? IdentifierName
           n = n.val
@@ -54,7 +56,8 @@ module Minjs
       attr_accessor :this_binding
 
       def initialize(options = {})
-        @var_env = @lex_env = LexEnv.new(options)
+        @var_env = LexEnv.new(options)
+        @lex_env = LexEnv.new(options)
         @this_binding = ExObject.new(
           {
             attr: {

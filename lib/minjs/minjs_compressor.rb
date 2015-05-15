@@ -20,7 +20,7 @@ module Minjs
     def evaluate(context, locals, &block)
       case context.content_type
       when 'application/javascript'
-        if logger.debug?
+        if logger.info?
           @@c = 0 unless defined?(@@c)
           puts "start: compressing"
           file = "tmp#{@@c}.js"
@@ -34,7 +34,7 @@ module Minjs
         end
         #TODO
         t = Minjs::Compressor.new(:logger => logger).compress(data)
-        if logger.debug?
+        if logger.info?
           tmp = open(output, "w")
           tmp.write(t)
           tmp.close

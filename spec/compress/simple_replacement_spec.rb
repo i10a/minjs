@@ -2,21 +2,19 @@
 require 'spec_helper'
 
 describe 'Compression' do
-  describe 'Grouping' do
+  describe 'SimpleReplacement' do
     it 'convert sequence of statement to single expression statement' do
       c = test_compressor
       c.parse <<-EOS
-if(true){
-;
-a=1;
-;
-b=2;
-c=3;
-d=4;
-}
+true;
+false;
+if(1)a;
+if(0)a;
+if(0)a;else b;
+while(1);
 EOS
-      js = c.grouping_statement.to_js
-      expect(js).to eq "if(true){a=1,b=2,c=3,d=4}"
+      js = c.simple_replacement.to_js
+      expect(js).to eq "(!0);(!1);a;b;for(;;);"
     end
   end
 end

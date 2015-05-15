@@ -21,6 +21,8 @@ module Minjs
 
           context.var_env.record.create_mutable_binding(id, nil)
           context.var_env.record.set_mutable_binding(id, f, nil)
+          context.lex_env.record.create_mutable_binding(id, nil)
+          context.lex_env.record.set_mutable_binding(id, f, nil)
           f
         else
           if b
@@ -52,6 +54,8 @@ module Minjs
            if id_opt
              new_context.var_env.record.create_mutable_binding(id_opt, nil)
              new_context.var_env.record.set_mutable_binding(id_opt, f, nil)
+             new_context.lex_env.record.create_mutable_binding(id_opt, nil)
+             new_context.lex_env.record.set_mutable_binding(id_opt, f, nil)
              id_opt.context = new_context
            end
            f
@@ -80,6 +84,8 @@ module Minjs
         ret.each do |argName|
           context.var_env.record.create_mutable_binding(argName, nil)
           context.var_env.record.set_mutable_binding(argName, :undefined, nil, {:_parameter_list => true})
+          context.lex_env.record.create_mutable_binding(argName, nil)
+          context.lex_env.record.set_mutable_binding(argName, :undefined, nil, {:_parameter_list => true})
         end
         ret
       }
