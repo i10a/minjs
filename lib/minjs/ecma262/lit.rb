@@ -78,6 +78,10 @@ module Minjs
         @val = :null
       end
 
+      def deep_dup
+        self #not dup
+      end
+
       def traverse(parent, &block)
         yield self, parent
       end
@@ -105,6 +109,10 @@ module Minjs
         else
           @val = :"false"
         end
+      end
+
+      def deep_dup
+        self #//not dup
       end
 
       def traverse(parent, &block)
@@ -326,8 +334,13 @@ module Minjs
 
     class ECMA262Array < Literal
       def initialize(val)
-        @val = val
+        @val = val # val is Array
       end
+
+      def deep_dup
+        self.class.new(@val.collect{|x| x ? x.deep_dup : nil})
+      end
+
       def traverse(parent, &block)
         yield self, parent
         @val.each do |k|
@@ -357,6 +370,11 @@ module Minjs
       def initialize(val)
         @val = val
       end
+
+      def deep_dup
+        self.class.new(@val.collect{|x, y| [x.deep_dup, y ? y.deep_dup : y]})
+      end
+
       def traverse(parent, &block)
         yield self, parent
         @val.each do |k, v|

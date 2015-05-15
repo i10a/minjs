@@ -51,6 +51,12 @@ while(j<10){
 EOS
       expect(js).to eq "j=0;undefined:while(j<10){++j;i=0;while(i<10){++i;if(i<5)continue;undefined;console.log(j)}};"
     end
-
+    it 'cause syntax error' do
+      expect {
+        js = test_parse <<-EOS
+continue this//this is not identifier
+EOS
+      }.to raise_error(Minjs::ParseError)
+    end
   end
 end

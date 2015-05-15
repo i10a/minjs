@@ -4,7 +4,7 @@ require 'spec_helper'
 describe 'Expression' do
   describe 'CompressVar' do
     it 'compress var name' do
-      c = Minjs::Compressor.new
+      c = test_compressor
       c.parse <<-EOS
 function xxxx()
 {
@@ -27,7 +27,8 @@ function xxxx()
 }
 EOS
       js = c.compress_var.to_js
-      expect(js).to eq "function xxxx(){var v,t;function l(){var c,d,a,b}function m(c,d){var g,h,a,b}function n(c,d){var e,f}function r(c,d){v,t;function i(){}v:while(true)}};"
+
+      expect(js).to eq "function xxxx(){var l,m;function s(){var c,d,a,b}function r(c,d){var g,h,a,b}function q(c,d){var e,f}function p(c,d){l,m;function i(){}l:while(true)}};"
     end
   end
 end

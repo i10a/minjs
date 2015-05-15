@@ -4,7 +4,7 @@ require 'spec_helper'
 describe 'Expression' do
   describe 'Grouping' do
     it 'convert sequence of statement to single expression statement' do
-      c = Minjs::Compressor.new
+      c = test_compressor
       c.parse <<-EOS
 if(true){
 ;

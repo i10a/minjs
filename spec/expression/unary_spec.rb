@@ -29,5 +29,35 @@ c
 EOS
       expect(js).to eq "++a;--b;b;++c;"
     end
+
+    it 'cause syntax error' do
+      expect {
+        js = test_parse 'delete'
+      }.to raise_error(Minjs::ParseError)
+      expect {
+        js = test_parse 'void'
+      }.to raise_error(Minjs::ParseError)
+      expect {
+        js = test_parse 'typeof'
+      }.to raise_error(Minjs::ParseError)
+      expect {
+        js = test_parse '++'
+      }.to raise_error(Minjs::ParseError)
+      expect {
+        js = test_parse '--'
+      }.to raise_error(Minjs::ParseError)
+      expect {
+        js = test_parse '+'
+      }.to raise_error(Minjs::ParseError)
+      expect {
+        js = test_parse '-'
+      }.to raise_error(Minjs::ParseError)
+      expect {
+        js = test_parse '!'
+      }.to raise_error(Minjs::ParseError)
+      expect {
+        js = test_parse '~'
+      }.to raise_error(Minjs::ParseError)
+    end
   end
 end

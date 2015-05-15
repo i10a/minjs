@@ -9,5 +9,13 @@ a=1?b=2:c=3
 EOS
       expect(js).to eq "a=1?b=2:c=3;"
     end
+    it 'cause syntax error' do
+      expect {
+        js = test_parse '1?a:'
+      }.to raise_error(Minjs::ParseError)
+      expect {
+        js = test_parse '1?'
+      }.to raise_error(Minjs::ParseError)
+    end
   end
 end

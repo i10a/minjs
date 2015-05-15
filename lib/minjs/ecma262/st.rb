@@ -12,6 +12,10 @@ module Minjs
       def priority
         999
       end
+
+      def last_statement
+        puts "warning: #{self.class}: last_statement not implement"
+      end
     end
 
     #
@@ -54,12 +58,38 @@ module Minjs
         t = @statement_list.statement_list.select{|s|
           s.class != StEmpty
         }
-        t.length == 1 and !t[0].kind_of?(StIf)
+        return false if t.length != 1
+        #
+        #  if(a){ //<= this block must not be removed
+        #    while(true)
+        #      if(b){
+        #        ;
+        #      }
+        #  }
+        #  else{
+        #   ;
+        #  }
+        #
+        last_st = t[0].last_statement[-2]
+        if last_st.kind_of?(StIf) and last_st.else_st.nil?
+          return false
+        else
+          return true
+        end
       end
 
       def to_statement
         statement_list.remove_empty_statement
         @statement_list[0]
+      end
+
+      def last_statement
+        list = [self]
+        t = @statement_list.statement_list.select{|s|
+          s.class != StEmpty
+        }
+        return [nil] if t[-1].nil?
+        list.concat(t[-1].last_statement)
       end
     end
     #
@@ -75,6 +105,13 @@ module Minjs
       def initialize(context, vars)
         @vars = vars
         @context = context
+      end
+
+      def deep_dup
+        self.class.new(@context,
+                       @vars.collect{|x,y|
+                         [x.deep_dup, y ? y.deep_dup : nil]
+                       })
       end
 
       def replace(from, to)
@@ -135,6 +172,9 @@ module Minjs
           end
         end
       end
+      def last_statement
+        [self]
+      end
     end
 
     #12.3 empty
@@ -152,6 +192,9 @@ module Minjs
 
       def to_js(options = {})
         ";"
+      end
+      def last_statement
+        [nil]
       end
     end
 
@@ -195,6 +238,9 @@ module Minjs
           @exp = @exp.val if @exp.remove_paren?
         end
       end
+      def last_statement
+        [self]
+      end
     end
 
     #12.5
@@ -205,6 +251,10 @@ module Minjs
         @cond = cond
         @then_st = then_st
         @else_st = else_st
+      end
+
+      def deep_dup
+        self.class.new(@cond.deep_dup, @then_st.deep_dup, @else_st.deep_dup)
       end
 
       def replace(from, to)
@@ -291,12 +341,25 @@ module Minjs
           @cond = @cond.val
         end
       end
+
+      def last_statement
+        list = [self]
+        if @else_st
+          list.concat @else_st.last_statement
+        else
+          list.concat @then_st.last_statement
+        end
+      end
     end
 
     #12.6
     class StWhile < St
       def initialize(exp, statement)
         @exp, @statement = exp, statement
+      end
+
+      def deep_dup
+        self.class.new(@exp.deep_dup, @statement.deep_dup)
       end
 
       def replace(from, to)
@@ -326,11 +389,20 @@ module Minjs
           @exp = @exp.val
         end
       end
+
+      def last_statement
+        list = [self]
+        list.concat @statement.last_statement
+      end
     end
 
     class StDoWhile < St
       def initialize(exp, statement)
         @exp, @statement = exp, statement
+      end
+
+      def deep_dup
+        self.class.new(@exp.deep_dup, @statement.deep_dup)
       end
 
       def replace(from, to)
@@ -359,6 +431,10 @@ module Minjs
           @exp = @exp.val
         end
       end
+      def last_statement
+        list = [self]
+        list.concat @statement.last_statement
+      end
     end
 
     #
@@ -370,6 +446,13 @@ module Minjs
         @exp2 = exp2
         @exp3 = exp3
         @statement = statement
+      end
+
+      def deep_dup
+        self.class.new(@exp1 && @exp1.deep_dup,
+                       @exp2 && @exp2.deep_dup,
+                       @exp3 && @exp3.deep_dup,
+                       @statement.deep_dup)
       end
 
       def replace(from, to)
@@ -407,6 +490,10 @@ module Minjs
           @exp3 = @exp3.val
         end
       end
+      def last_statement
+        list = [self]
+        list.concat @statement.last_statement
+      end
     end
 
     #
@@ -425,6 +512,16 @@ module Minjs
         @exp2 = exp2
         @exp3 = exp3
         @statement = statement
+      end
+
+      def deep_dup
+        self.class.new(@context,
+                       @var_decl_list.collect{|x,y|
+                         [x.deep_dup, y.deep_dup]
+                       },
+                       @exp2 && @exp2.deep_dup,
+                       @exp3 && @exp3.deep_dup,
+                       @statement.deep_dup)
       end
 
       def replace(from, to)
@@ -497,6 +594,10 @@ module Minjs
           @exp3 = @exp3.val
         end
       end
+      def last_statement
+        list = [self]
+        list.concat @statement.last_statement
+      end
     end
 
     class StForIn < St
@@ -504,6 +605,10 @@ module Minjs
         @exp1 = exp1
         @exp2 = exp2
         @statement = statement
+      end
+
+      def deep_dup
+        self.class.new(@exp1.deep_dup, @exp2.deep_dup, @statement.deep_dup)
       end
 
       def replace(from, to)
@@ -537,6 +642,10 @@ module Minjs
           @exp2 = @exp2.val
         end
       end
+      def last_statement
+        list = [self]
+        list.concat @statement.last_statement
+      end
     end
 
     class StForInVar < St
@@ -547,6 +656,13 @@ module Minjs
         @var_decl = var_decl
         @exp2 = exp2
         @statement = statement
+      end
+
+      def deep_dup
+        self.class.new(@context,
+                       [@var_decl[0].deep_dup, @var_decl[1] ? @var_decl[1].deep_dup : nil],
+                       @exp2.deep_dup,
+                       @statement.deep_dup)
       end
 
       def traverse(parent, &block)
@@ -596,6 +712,10 @@ module Minjs
         end
       end
 
+      def last_statement
+        list = [self]
+        list.concat @statement.last_statement
+      end
     end
 
 
@@ -604,6 +724,11 @@ module Minjs
       def initialize(exp = nil)
         @exp = exp
       end
+
+      def deep_dup
+        self.class.new(@exp)
+      end
+
       def traverse(parent, &block)
         @exp.traverse(self, &block) if @exp
         yield self, parent
@@ -615,12 +740,19 @@ module Minjs
           concat options, :continue, ";"
         end
       end
+      def last_statement
+        [self]
+      end
     end
 
     #12.8
     class StBreak < St
       def initialize(exp = nil)
         @exp = exp
+      end
+
+      def deep_dup
+        self.class.new(@exp)
       end
 
       def traverse(parent, &block)
@@ -635,6 +767,9 @@ module Minjs
           concat options, :break, ";"
         end
       end
+      def last_statement
+        [self]
+      end
     end
 
     #12.9
@@ -643,6 +778,10 @@ module Minjs
 
       def initialize(exp = nil)
         @exp = exp
+      end
+
+      def deep_dup
+        self.class.new(@exp)
       end
 
       def deep_dup
@@ -680,12 +819,19 @@ module Minjs
           @exp = @exp.val
         end
       end
+      def last_statement
+        [self]
+      end
     end
     #12.10
     class StWith < St
       def initialize(exp, statement)
         @exp = exp
         @statement = statement
+      end
+
+      def deep_dup
+        self.class.new(@exp)
       end
 
       def traverse(parent, &block)
@@ -702,6 +848,10 @@ module Minjs
           @exp = @exp.val
         end
       end
+      def last_statement
+        list = [self]
+        list.concat @statement.last_statement
+      end
     end
     #12.11
     class StSwitch < St
@@ -711,6 +861,13 @@ module Minjs
       def initialize(exp, blocks)
         @exp = exp
         @blocks = blocks
+      end
+
+      def deep_dup
+        self.class.new(@exp,
+                       @blocks.collect{|x, y|
+                         [x.deep_dup, y.deep_dup]
+                       })
       end
 
       def replace(from, to)
@@ -754,12 +911,19 @@ module Minjs
           end
         end
       end
+      def last_statement
+        list = [self]
+      end
     end
     #12.12
     class StLabelled < St
       def initialize(id, statement)
         @id = id
         @statement = statement
+      end
+
+      def deep_dup
+        self.class.new(@id, @statement)
       end
 
       def replace(from, to)
@@ -779,12 +943,21 @@ module Minjs
       def to_js(options = {})
         concat options, @id, ":", @statement
       end
+
+      def last_statement
+        list = [self]
+        list.concat @statement.last_statement
+      end
     end
 
     #12.13
     class StThrow < St
       def initialize(exp)
         @exp = exp
+      end
+
+      def deep_dup
+        self.class.new(@exp)
       end
 
       def traverse(parent, &block)
@@ -795,6 +968,10 @@ module Minjs
       def to_js(options = {})
         concat options, :throw, @exp, ";"
       end
+
+      def last_statement
+        [self]
+      end
     end
 
     #12.14
@@ -803,6 +980,10 @@ module Minjs
         @try = try
         @catch = catch
         @finally = finally
+      end
+
+      def deep_dup
+        self.class.new(@try, @catch, @finally)
       end
 
       def replace(from, to)
@@ -836,14 +1017,24 @@ module Minjs
           concat(options, :try, @try, :finally, @finally)
         end
       end
+      def last_statement
+        [self]
+      end
     end
     #12.15
     class StDebugger < St
+      def deep_dup
+        self.class.new
+      end
+
       def traverse
         yield self, parent
       end
       def to_js(options = {})
         concat options, :debugger, ";"
+      end
+      def last_statement
+        [self]
       end
     end
 
@@ -873,7 +1064,7 @@ module Minjs
       end
 
       def deep_dup
-        self.class.new(@context, @name.deep_dup,
+        self.class.new(@context, @name ? @name.deep_dup : nil,
                        @args.collect{|args|args.deep_dup},
                        @statements.deep_dup,
                        {decl: @decl, getter: @getter, setter: @setter})
@@ -909,6 +1100,10 @@ module Minjs
 
       def decl?
         @decl
+      end
+
+      def last_statement
+        [self]
       end
     end
   end

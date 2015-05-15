@@ -14,9 +14,7 @@ module Minjs
       @pos = 0
       @lit_cache = []
       @lit_nextpos = []
-      if options[:debug]
-        @debug = true
-      end
+      @logger = options[:logger]
     end
 
     def next_input_element(options = {})
@@ -391,7 +389,6 @@ module Minjs
           raise ParseError.new("no `/' end of regular expression", self)
         end
         if line_terminator?(@codes[@pos])
-          debug_lit
           raise ParseError.new("regular expression has line terminator in body", self)
         end
         if @codes[@pos] == 0x5c # \
@@ -535,6 +532,7 @@ module Minjs
     def decimal_digits
       pos0 = @pos
       code = @codes[@pos]
+      return nil if code.nil?
       if code >= 0x30 and code <= 0x39
         @pos += 1
         while true
@@ -652,7 +650,6 @@ module Minjs
     def match_lit(l, options = {})
       eval_lit {
         t = fwd_lit(options)
-        STDERR.puts "match_lit #{t} <=> #{l} #{t==l}" if @debug
         t == l ? t : nil
       }
     end
@@ -717,7 +714,7 @@ module Minjs
       @codes[from,to].pack("U*")
     end
 
-    def debug_str(pos = nil)
+    def debug_str(pos = nil, line = nil, col = nil)
       if pos.nil?
         pos = @error_pos
         if pos.nil?
@@ -731,8 +728,11 @@ module Minjs
         pos0 = pos
         pos = 0
       end
+      if col and col > 2
+        pos0 = col - 2;
+      end
       t = ''
-      t << @codes[pos..(pos+80)].collect{|u| u == 10 ? 0x20 : u}.pack("U*")
+      t << @codes[pos..(pos+80)].pack("U*")
       t << "\n"
       t << (' ' * pos0) + "^"
       t

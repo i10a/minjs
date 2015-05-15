@@ -4,7 +4,7 @@ require 'spec_helper'
 describe 'Expression' do
   describe 'BlockToStatement' do
     it 'convert return statement to expression' do
-      c = Minjs::Compressor.new
+      c = test_compressor
       c.parse <<-EOS
 function zzz(a){
 if(a == 1){

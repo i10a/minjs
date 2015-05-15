@@ -16,6 +16,8 @@ module Minjs
           a
         elsif a == ECMA262::LIT_LINE_FEED
           a
+        elsif a.nil?
+          ECMA262::LIT_LINE_FEED
         elsif a.lt?
           a
         else
@@ -28,7 +30,6 @@ module Minjs
     def statement(lex, context)
       [:block,
        :var_statement,
-       :exp_statement,
        :if_statement,
        :iteration_statement,
        :continue_statement,
@@ -40,6 +41,7 @@ module Minjs
        :throw_statement,
        :try_statement,
        :debugger_statement,
+       :exp_statement,
        #
        # function declaration in statement(block) is not permitted by ECMA262.
        # however, almost all implementation permit it.
@@ -47,7 +49,6 @@ module Minjs
        :func_declaration,
        :empty_statement,
       ].each do |f|
-        #puts "* checking #{f.to_s}" if @debug
         t = lex.eval_lit {
           __send__(f, lex, context)
         }
@@ -103,7 +104,6 @@ module Minjs
           end
           ECMA262::StVar.new(context, vl)
         else
-          lex.debug_lit
           raise Minjs::ParseError.new("var_statement", lex)
         end
       }
@@ -170,7 +170,11 @@ module Minjs
         if a=exp(lex, context, {}) and semicolon(lex, context)
           ECMA262::StExp.new(a)
         else
-          nil
+          if a
+            raise ParseError.new("no semicolon at end of expression statement", lex)
+          else
+            nil
+          end
         end
       }
     end
@@ -202,7 +206,6 @@ module Minjs
       if lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and e=exp(lex, context, {}) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
         ECMA262::StWhile.new(e, s)
       else
-        lex.debug_lit
         raise ParseError.new("while_statement", lex)
       end
     end
@@ -274,8 +277,14 @@ module Minjs
       lex.eval_lit {
         if semicolon(lex, context)
           ECMA262::StContinue.new
-        elsif e=exp(lex, context, {}) and semicolon(lex, context)
+        elsif e=identifier(lex, context) and semicolon(lex, context)
           ECMA262::StContinue.new(e)
+        else
+          if e
+            raise ParseError.new("no semicolon at end of continue statement", lex)
+          else
+            raise ParseError.new("bad continue statement", lex)
+          end
         end
       }
     end
@@ -287,8 +296,14 @@ module Minjs
       lex.eval_lit {
         if semicolon(lex, context)
           ECMA262::StBreak.new
-        elsif e=exp(lex, context, {}) and semicolon(lex, context)
+        elsif e=identifier(lex, context) and semicolon(lex, context)
           ECMA262::StBreak.new(e)
+        else
+          if e
+            raise ParseError.new("no semicolon at end of break statement", lex)
+          else
+            raise ParseError.new("bad break statement", lex)
+          end
         end
       }
     end
@@ -316,7 +331,6 @@ module Minjs
         if lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and e=exp(lex, context, {}) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
           ECMA262::StWith.new(e, s)
         else
-          lex.debug_lit
           raise ParseError.new("switch_statement", lex)
         end
       }
@@ -330,7 +344,6 @@ module Minjs
         if lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and e=exp(lex, context, {}) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and  c = case_block(lex, context)
           ECMA262::StSwitch.new(e, c)
         else
-          lex.debug_lit
           raise ParseError.new("switch_statement", lex)
         end
       }
@@ -373,11 +386,16 @@ module Minjs
     def throw_statement(lex, context)
       return nil unless lex.match_lit(ECMA262::ID_THROW)
       lex.eval_lit{
-        if e=exp(lex, context, {}) and semicolon(lex, context)
+        if semicolon(lex, context)
+          raise ParseError.new("no line terminator here", lex)
+        elsif e=exp(lex, context, {}) and semi = semicolon(lex, context)
           ECMA262::StThrow.new(e)
         else
-          lex.debug_lit
-          raise ParseError.new("throw_statement", lex)
+          if e
+            raise ParseError.new("no semicolon at end of throw statement", lex)
+          else
+            raise ParseError.new("bad throw statement", lex)
+          end
         end
       }
     end

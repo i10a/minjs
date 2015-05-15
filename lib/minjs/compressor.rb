@@ -8,6 +8,7 @@ require 'minjs/expression'
 require 'minjs/func'
 require 'minjs/program'
 require 'minjs/exceptions'
+require 'logger'
 
 module Minjs
   class Compressor
@@ -20,14 +21,17 @@ module Minjs
     attr_reader :prog
 
     def initialize(options = {})
-      @debug = false
-      if options[:debug]
-        @debug = true
+      @logger = options[:logger]
+      if !@logger
+        @logger = Logger.new(STDERR)
+        @logger.level = (options[:debug_level] || Logger::WARN)
+        @logger.formatter = proc{|severity, datetime, progname, message|
+          "#{message}\n"
+        }
       end
     end
 
     def debug
-      #@global_context.debug
       puts @prog.to_js()
     end
 
@@ -36,40 +40,50 @@ module Minjs
     end
 
     def compress(data, options = {})
-      p 'parse' if @debug
+      @logger.info '* parse'
       parse(data)
 
-      p 'reorder_function_decl' if @debug
+      @logger.info '* reorder_function_decl'
       reorder_function_decl
-      p 'simple_replacement' if @debug
+
+      @logger.info '* simple_replacement'
       simple_replacement
-      p 'reorder_var' if @debug
+
+      @logger.info '* reorder_var'
       reorder_var
-      p 'assignment_after_var' if @debug
+
+      @logger.info '* assignment_after_var'
       assignment_after_var
-      p 'grouping_statement' if @debug
+
+      @logger.info '* grouping_statement'
       grouping_statement
-      p 'block_to_statement' if @debug
+
+      @logger.info '* block_to_statement'
       block_to_statement
-      p 'if_to_cond' if @debug
+
+      @logger.info '* if_to_cond'
       if_to_cond
-      p 'compress_var' if @debug
+
+      @logger.info '* compress_var'
       compress_var
-      p 'reduce_exp' if @debug
+
+      @logger.info '* reduce_exp'
       reduce_exp
-      p 'remove_paren' if @debug
+
+      @logger.info '* remove_paren'
       remove_paren
-      p 'return_to_exp' if @debug
+
+      @logger.info '* return_to_exp'
       return_to_exp
+
       @heading_comments.reverse.each do |c|
         @prog.source_elements.source_elements.unshift(c)
       end
-
       to_js(options)
     end
 
     def parse(data)
-      @lex = Minjs::Lex.new(data)
+      @lex = Minjs::Lex.new(data, :logger => @logger)
       @global_context = ECMA262::Context.new
 
       @heading_comments = []
@@ -149,6 +163,7 @@ module Minjs
           st.grouping
         end
       }
+      remove_paren
       self
     end
 

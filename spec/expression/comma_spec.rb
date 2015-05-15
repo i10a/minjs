@@ -9,5 +9,10 @@ a=1,b=a+1,c=b*2
 EOS
       expect(js).to eq "a=1,b=a+1,c=b*2;"
     end
+    it 'cause syntax error' do
+      expect {
+        js = test_parse '1,'
+      }.to raise_error(Minjs::ParseError)
+    end
   end
 end

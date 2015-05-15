@@ -34,8 +34,7 @@ module Minjs
 
     def func_exp(lex, context)
       return nil if lex.match_lit(ECMA262::ID_FUNCTION).nil?
-      STDERR.puts "*** func_exp" if @debug
-      lex.debug_lit if @debug
+      @logger.debug "*** func_exp"
 
       lex.eval_lit {
          id_opt = identifier(lex, context)

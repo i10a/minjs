@@ -4,7 +4,7 @@ require 'spec_helper'
 describe 'Expression' do
   describe 'RemoveParen' do
     it 'remove paren' do
-      c = Minjs::Compressor.new
+      c = test_compressor
       c.parse <<-EOS
 (!0)+a
 EOS
@@ -13,7 +13,7 @@ EOS
     end
 
     it 'remove paren of for statemetns' do
-      c = Minjs::Compressor.new
+      c = test_compressor
       c.parse <<-'EOS'
 for((a,b);(c,d);(e,f))
 ;
@@ -28,7 +28,7 @@ EOS
       expect(js).to eq "for(a,b;c,d;e,f);for(var a=1;c,d;e,f);for(a in a,b);for(var a=1 in a,b);"
     end
     it 'remove paren of switch statements' do
-      c = Minjs::Compressor.new
+      c = test_compressor
       c.parse <<-'EOS'
 switch((1,2)){
 case (1,2):
@@ -40,7 +40,7 @@ EOS
     end
 
     it 'remove paren of statements' do
-      c = Minjs::Compressor.new
+      c = test_compressor
       c.parse <<-'EOS'
 var a=(1),b=(1,2);
 if((1,2));
@@ -55,7 +55,7 @@ EOS
     end
 
     it 'remove paren of primary expression' do
-      c = Minjs::Compressor.new
+      c = test_compressor
       c.parse <<-EOS
 (this);
 (foo);
@@ -76,7 +76,7 @@ EOS
     end
 
     it 'remove paren of left-hand-side operators' do
-      c = Minjs::Compressor.new
+      c = test_compressor
       c.parse <<-EOS
 (a)[0];
 (a).b;
@@ -89,7 +89,7 @@ EOS
     end
 
     it 'remove paren of postfix operators' do
-      c = Minjs::Compressor.new
+      c = test_compressor
       c.parse <<-EOS
 (a)++;
 (b[0])--;
@@ -99,7 +99,7 @@ EOS
     end
 
     it 'remove paren of unary operators' do
-      c = Minjs::Compressor.new
+      c = test_compressor
       c.parse <<-EOS
 +(a*b);
 +(a++);//remove
@@ -112,7 +112,7 @@ EOS
     end
 
     it 'remove paren of multiplicative operators ' do
-      c = Minjs::Compressor.new
+      c = test_compressor
       c.parse <<-EOS
 (a*b)*c;
 a*(b*c);// does not remove
@@ -129,7 +129,7 @@ EOS
     end
 
     it 'remove paren of additive operators ' do
-      c = Minjs::Compressor.new
+      c = test_compressor
       c.parse <<-EOS
 (a+b)+c;
 a+(b+c);// does not remove
@@ -143,7 +143,7 @@ EOS
     end
 
     it 'remove paren of relational operators' do
-      c = Minjs::Compressor.new
+      c = test_compressor
       c.parse <<-EOS
 (a+b)<<(c+d)>>(e+f)>>>(g+h);
 (a<<b)<(c<<d);
@@ -159,7 +159,7 @@ EOS
     end
 
     it 'remove paren of equality operators' do
-      c = Minjs::Compressor.new
+      c = test_compressor
       c.parse <<-EOS
 (a>b)==(c<d);//remove
 (a&b)==(c&d);
@@ -175,7 +175,7 @@ EOS
     end
 
     it 'remove paren of binary bitwise operators' do
-      c = Minjs::Compressor.new
+      c = test_compressor
       c.parse <<-EOS
 (a==b)&(c==d);//remove
 (a^b)&(c^d);
@@ -190,7 +190,7 @@ EOS
     end
 
     it 'remove paren of binary logical operators' do
-      c = Minjs::Compressor.new
+      c = test_compressor
       c.parse <<-EOS
 (a&&b)||(b&&c);//remove
 (a||b)&&(b||c);
@@ -201,7 +201,7 @@ EOS
     end
 
     it 'remove paren of conditional operators' do
-      c = Minjs::Compressor.new
+      c = test_compressor
       c.parse <<-EOS
 (a||b)?(a=1):(b=2);//remove all paren
 (a=b)?(a=1,b=2):(b=2)//remove 3rd paren
@@ -211,7 +211,7 @@ EOS
     end
 
     it 'remove paren for assignment operator' do
-      c = Minjs::Compressor.new
+      c = test_compressor
       c.parse <<-EOS
 a=(b?c:d);//remove
 a=(b,c);
@@ -222,7 +222,7 @@ EOS
     end
 
     it 'does not remove paren which include object literal' do
-      c = Minjs::Compressor.new
+      c = test_compressor
       c.parse <<-EOS
 // ECMA262 say, expression statement cannot start with an opening curly brace
 ({a:'b'})
@@ -232,7 +232,7 @@ EOS
     end
 
     it 'does not remove paren which include function expression' do
-      c = Minjs::Compressor.new
+      c = test_compressor
       c.parse <<-EOS
 // ECMA262 say, expression statement cannot start with the function keyword
 (function(a,b){console.log(a,b)}(1,2))

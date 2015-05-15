@@ -1,8 +1,9 @@
 require 'tilt'
+require 'logger'
 
 module Minjs
   class MinjsCompressor < Tilt::Template
-    DEBUG = false
+    attr_reader :logger
 
     def self.engine_initialized?
       defined?(::Minjs)
@@ -12,12 +13,14 @@ module Minjs
     end
 
     def prepare
+      @logger = Logger.new(STDERR)
+      @logger.level = Logger::WARN
     end
 
     def evaluate(context, locals, &block)
       case context.content_type
       when 'application/javascript'
-        if DEBUG
+        if logger.debug?
           @@c = 0 unless defined?(@@c)
           puts "start: compressing"
           file = "tmp#{@@c}.js"
@@ -30,8 +33,8 @@ module Minjs
           tmp.close
         end
         #TODO
-        t = Minjs::Compressor.new(:debug => false).compress(data)
-        if DEBUG
+        t = Minjs::Compressor.new(:logger => logger).compress(data)
+        if logger.debug?
           tmp = open(output, "w")
           tmp.write(t)
           tmp.close

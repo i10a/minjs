@@ -34,8 +34,10 @@ module Minjs
             end
           end
           #for debug
-          if false and js.match(/;\z/) and !options[:for_args]
-            nl = "\n"
+          if @logger and @logger.debug?
+            if js.match(/;\z/) and !options[:for_args]
+              nl = "\n"
+            end
           end
           js = "#{sep}#{js}#{nl}";
           j.push(js)
@@ -85,9 +87,9 @@ module Minjs
             nsl.push(g[0])
           else
             i = 1
-            t = g[0].to_exp
+            t = ExpParen.new(g[0].to_exp)
             while i < g.length
-              t = ExpComma.new(t, g[i].to_exp)
+              t = ExpComma.new(t, ExpParen.new(g[i].to_exp))
               i += 1
             end
             nsl.push(StExp.new(t))

@@ -14,6 +14,7 @@ module Minjs
     end
 
     def identifier_start?(c)
+      return false if c.nil?
         c == 0x24 || c == 0x5f ||
         (c >= 0x41 && c <= 0x5a) ||
         (c >= 0x61 && c <= 0x7a) ||
@@ -563,6 +564,7 @@ module Minjs
     end
 
     def identifier_part?(c)
+      return false if c.nil?
       identifier_start?(c) ||
         (c >= 0x30 && c <= 0x39) ||
         (c >= 0x5f && c <= 0x5f) ||

@@ -107,8 +107,13 @@ module Minjs
     # ""
     #
     class ExpEmpty < Exp
+      def deep_dup
+        self.class.new
+      end
+
       def traverse(parent, &block)
       end
+
       def to_js(options = {})
         ""
       end
@@ -126,6 +131,10 @@ module Minjs
 
       def priority
         10
+      end
+
+      def deep_dup
+        self.class.new(@val.deep_dup)
       end
 
       def replace(from, to)
@@ -197,9 +206,8 @@ module Minjs
         @val = val
         if val2.kind_of? IdentifierName
           @val2 = ECMA262::ECMA262String.new(val2.val)
-        else
-          #=>deep_dup
-          #raise "internal error: val2 must be kind_of ItentiferName"
+        elsif val2.kind_of? ECMA262String
+          @val2 = val2
         end
       end
 
@@ -237,6 +245,10 @@ module Minjs
 
       def priority
         20
+      end
+
+      def deep_dup
+        self.class.new(@name.deep_dup, @args.collect{|x| x.deep_dup})
       end
 
       def replace(from, to)
@@ -291,6 +303,11 @@ module Minjs
 
       def priority
         20
+      end
+
+      def deep_dup
+        self.class.new(@name,
+                       @args.collect{|x| x.deep_dup})
       end
 
       def replace(from, to)
