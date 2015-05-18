@@ -283,13 +283,18 @@ module Minjs
           if st.else_st.nil? and st.then_st.kind_of? ECMA262::StBlock and st.then_st.to_statement?
             st.replace(st.then_st, st.then_st.to_statement)
           #
-          # if "if" statement has "else" clause, check "then" caluse's
-          # last statement. If last statement is not "if" statement or
-          # has "else" caluase, its block can be removed.
+          # if "if" statement has "else" clause, check "then" branch.
+          # If branch has no "if" statement or
+          # has "if-else" statement, its block can be removed.
           #
           elsif st.else_st and st.then_st.kind_of? ECMA262::StBlock and st.then_st.to_statement?
-            last_st = st.then_st.last_statement[-2]
-            if !last_st.kind_of? ECMA262::StIf or last_st.else_st
+            deblock = true
+            last_st = st.then_st.last_statement.map{|x|
+              if x.kind_of? ECMA262::StIf and x.else_st.nil?
+                deblock = false
+              end
+            }
+            if deblock
               st.replace(st.then_st, st.then_st.to_statement)
             end
           end
