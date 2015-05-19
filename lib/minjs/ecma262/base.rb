@@ -21,22 +21,28 @@ module Minjs
             js = x.to_s
           end
           if prev
-            if prev.match(/[\w\$]\z/) and js.match(/^[\w\$]/)
+            if prev.match(/[\w\$]\z/) and js.match(/\A[\w\$]/)
               sep = ' '
-            elsif prev.match(/;\z/) and js == "}"
-              prev.sub!(/;\z/, "")
-            elsif prev.match(/;\z/) and js == ";" and !options[:for_args]
-              prev.sub!(/;\z/, "")
-            elsif prev.match(/[\-]\z/) and js.match(/^\-/)
+            end
+            #;; means empty statement that must not be deleted
+            if prev.match(/;;\Z/)
+              prev.sub!(/;;\Z/, ";")
+            elsif prev.match(/;\Z/) and js == "}"
+              prev.sub!(/;\Z/, "")
+            elsif prev.match(/;\Z/) and js == ";" and !options[:for_args]
+              prev.sub!(/;\Z/, "")
+            elsif prev.match(/[\-]\Z/) and js.match(/^\-/)
               sep = ' '
-            elsif prev.match(/[\+]\z/) and js.match(/^\+/)
+            elsif prev.match(/[\+]\Z/) and js.match(/^\+/)
               sep = ' '
             end
           end
           #for debug
-          if @logger and @logger.debug?
-            if js.match(/;\z/) and !options[:for_args]
-              nl = "\n"
+          unless options[:no_debug]
+            if @logger and @logger.debug?
+              if js.match(/;\z/) and !options[:for_args]
+                nl = "\n"
+              end
             end
           end
           js = "#{sep}#{js}#{nl}";
@@ -53,18 +59,23 @@ module Minjs
       def deep_dup
         puts "warning: #{self.class}: deep_dup not implement"
       end
+
+      def ==(obj)
+        puts "warning: #{self.class}: == not implement"
+        raise "warning: #{self.class}: == not implement"
+      end
     end
 
     class StatementList < Base
       attr_reader :statement_list
 
       def initialize(statement_list)
-        @statement_list = statement_list
+        @statement_list = statement_list #array
       end
 
       def grouping
         remove_empty_statement
-        nsl = []
+        new_sl = []
         sl = []
         g = []
         @statement_list.each do |st|
@@ -84,7 +95,7 @@ module Minjs
 
         sl.each do |g|
           if g.length == 1
-            nsl.push(g[0])
+            new_sl.push(g[0])
           else
             i = 1
             t = ExpParen.new(g[0].to_exp)
@@ -92,11 +103,29 @@ module Minjs
               t = ExpComma.new(t, ExpParen.new(g[i].to_exp))
               i += 1
             end
-            nsl.push(StExp.new(t))
+            new_sl.push(StExp.new(t))
           end
         end
 
-        @statement_list = nsl
+        if idx = new_sl.index{|x| x.class == StReturn}
+          while idx < new_sl.length - 1
+            new_sl.pop
+          end
+        end
+
+        if self.kind_of? SourceElements
+          if new_sl[-1].kind_of? StReturn and new_sl[-1].exp.nil?
+            new_sl.pop
+          end
+        end
+
+        if new_sl[-1].kind_of? StReturn and new_sl[-2].kind_of? StExp
+          if new_sl[-1].exp
+            new_sl[-2] = StReturn.new(ExpComma.new(new_sl[-2].exp, new_sl[-1].exp))
+            new_sl.pop
+          end
+        end
+        @statement_list = new_sl
       end
 
       def deep_dup
@@ -125,6 +154,10 @@ module Minjs
           st.traverse(self, &block)
         end
         yield self, parent
+      end
+
+      def ==(obj)
+        @statement_list == obj.statement_list
       end
 
       def to_js(options = {})
@@ -162,6 +195,10 @@ module Minjs
         @statement_list[i]
       end
 
+      def []=(i, s)
+        @statement_list[i] = s
+      end
+
       def index(st)
         @statement_list.index(st)
       end
@@ -178,8 +215,13 @@ module Minjs
       def source_elements
         @statement_list
       end
+
       def source_elements=(source_elements)
         @statement_list = source_elements
+      end
+
+      def ==(obj)
+        statement_list == obj.statement_list
       end
     end
 
@@ -198,6 +240,10 @@ module Minjs
       def traverse(parent, &block)
         @source_elements.traverse(self, &block)
         yield self, parent
+      end
+
+      def ==(obj)
+        self.class == obj.class and self.source_elements == obj.source_elements
       end
 
       def to_js(options = {})

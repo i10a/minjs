@@ -8,7 +8,7 @@ describe 'Literal' do
 // singleline
 // singleline (no lt)
 EOS
-      expect(js).to eq (";")
+      expect(js).to eq ("")
     end
 
     it 'is multiline comment literal' do
@@ -18,7 +18,7 @@ EOS
 multiline
 */
 EOS
-      expect(js).to eq (";")
+      expect(js).to eq ("")
     end
 
     it 'is multiline comment and treated as white space' do

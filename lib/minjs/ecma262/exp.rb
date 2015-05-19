@@ -56,6 +56,10 @@ module Minjs
 
         self
       end
+
+      def ==(obj)
+        self.class == obj.class and self.val == obj.val and self.val2 == obj.val2
+      end
     end
 
     module UnaryOperation
@@ -73,6 +77,10 @@ module Minjs
 
         self
       end
+
+      def ==(obj)
+        self.class == obj.class and self.val == obj.val
+      end
     end
 
     module AssignmentOperation
@@ -85,6 +93,7 @@ module Minjs
         end
         self
       end
+
       def add_paren
         if @val.priority > PRIORITY_LEFT_HAND_SIDE
           @val = ExpParen.new(@val)
@@ -93,6 +102,18 @@ module Minjs
           @val2 = ExpParen.new(@val2)
         end
         self
+      end
+
+      def ==(obj)
+        self.class == obj.class and self.val == obj.val and self.val2 == obj.val2
+      end
+
+      def ecma262_typeof
+        if @val2.respond_to? :ecma262_typeof
+          @val2.ecma262_typeof
+        else
+          nil
+        end
       end
     end
 
@@ -108,7 +129,7 @@ module Minjs
       end
 
       def replace(from, to)
-        if @val == from
+        if @val .eql? from
           @val = to
         end
       end
@@ -121,12 +142,6 @@ module Minjs
       def to_js(options = {})
         concat options, sym, @val
       end
-
-#      def reduce(parent)
-#        if @val.kind_of?(Literal) and !@val.kind_of? IdentifierName
-#          #TODO
-#        end
-#      end
     end
 
     class ExpArg2 < Exp
@@ -142,9 +157,9 @@ module Minjs
       end
 
       def replace(from, to)
-        if @val == from
+        if @val .eql? from
           @val = to
-        elsif @val2 == from
+        elsif @val2 .eql? from
           @val2 = to
         end
       end
@@ -158,12 +173,6 @@ module Minjs
       def to_js(options = {})
         concat options, @val, sym, @val2
       end
-
-#      def reduce(parent)
-#        if @val.kind_of?(Literal) and !@val.kind_of? IdentifierName
-#          #TODO
-#        end
-#      end
     end
 
     #
@@ -185,7 +194,7 @@ module Minjs
       end
 
       def replace(from, to)
-        if @val == from
+        if @val .eql? from
           @val = to
         end
       end
@@ -193,6 +202,10 @@ module Minjs
       def traverse(parent, &block)
         @val.traverse(self, &block)
         yield self, parent
+      end
+
+      def ==(obj)
+        self.class == obj.class and @val == obj.val
       end
 
       def to_js(options = {})
@@ -218,6 +231,14 @@ module Minjs
       def add_paren
         self
       end
+
+      def ecma262_typeof
+        if @val.respond_to? :ecma262_typeof
+          @val.ecma262_typeof
+        else
+          nil
+        end
+      end
     end
     #
     # 11.2 Left-Hand-Side Expressions
@@ -235,6 +256,12 @@ module Minjs
         @val.traverse(self, &block)
         @val2.traverse(self, &block)
         yield self, parent
+      end
+
+      def ==(obj)
+        self.class == obj.class and
+          @val == obj.val and
+          @val2 == obj.val2
       end
 
       def to_js(options = {})
@@ -281,6 +308,12 @@ module Minjs
         yield self, parent
       end
 
+      def ==(obj)
+        self.class == obj.class and
+          @val == obj.val and
+          @val2 == obj.val2
+      end
+
       def to_js(options = {})
         "#{@val.to_js(options)}.#{@val2.val}"
       end
@@ -294,7 +327,7 @@ module Minjs
 
       def add_paren
         if @val.priority > PRIORITY_LEFT_HAND_SIDE
-          @val = ExpPare.new(@val)
+          @val = ExpParen.new(@val)
         end
         self
       end
@@ -316,13 +349,14 @@ module Minjs
       end
 
       def deep_dup
-        self.class.new(@name.deep_dup, @args.collect{|x| x.deep_dup})
+        self.class.new(@name.deep_dup,
+                       @args ? @args.collect{|x| x.deep_dup} : nil)
       end
 
       def replace(from, to)
         @args.each_index do |i|
           arg = @args[i]
-          if arg == from
+          if arg .eql? from
             @args[i] = to
             break
           end
@@ -335,6 +369,10 @@ module Minjs
           x.traverse(self, &block)
         end
         yield self, parent
+      end
+
+      def ==(obj)
+        self.class == obj.class and @name == obj.name and @args == obj.args
       end
 
       def to_js(options = {})
@@ -381,22 +419,24 @@ module Minjs
     # new M(a,b,c...)
     #
     class ExpNew < Exp
+      attr_reader :name, :args
+
       def initialize(name, args)
         @name = name
         @args = args
       end
 
       def priority
-        PRIORITY_LEFT_HAND_SIDE
+        PRIORITY_LEFT_HAND_SIDE + ((args && args.length == 0) ? 1 : 0)
       end
 
       def deep_dup
         self.class.new(@name,
-                       @args.collect{|x| x.deep_dup})
+                       @args ? @args.collect{|x| x.deep_dup} : nil)
       end
 
       def replace(from, to)
-        if @name == from
+        if @name .eql? from
           @name = from
         elsif @args and (idx = @args.index(from))
           @args[idx] = to
@@ -413,8 +453,12 @@ module Minjs
         yield self, parent
       end
 
+      def ==(obj)
+        self.class == obj.class and @name == obj.name and @args == obj.args
+      end
+
       def to_js(options = {})
-        if @args
+        if @args and @args.length > 0
           args = @args.collect{|x| x.to_js(options)}.join(",")
           concat options, :new, @name, '(', args, ')'
         else
@@ -538,6 +582,10 @@ module Minjs
       def priority
         PRIORITY_UNARY
       end
+
+      def ecma262_typeof
+        :number
+      end
     end
     class ExpPreDec < ExpArg1
       include UnaryOperation
@@ -547,6 +595,10 @@ module Minjs
 
       def priority
         PRIORITY_UNARY
+      end
+
+      def ecma262_typeof
+        :number
       end
     end
     class ExpPositive < ExpArg1
@@ -703,6 +755,10 @@ module Minjs
         end
 =end
       end
+
+      def ecma262_typeof
+        :number
+      end
     end
 
     #
@@ -726,8 +782,13 @@ module Minjs
       def sym
         "%"
       end
+
       def priority
         PRIORITY_MULTIPLICATIVE
+      end
+
+      def ecma262_typeof
+        :number
       end
     end
 
@@ -763,31 +824,7 @@ module Minjs
         if @val.kind_of? ECMA262Numeric and @val2.kind_of? ECMA262Numeric and @val.integer? and @val2.integer?
           parent.replace(self, ECMA262Numeric.new(@val.to_num + @val2.to_num))
         end
-=begin
-        if @val2.kind_of? ECMA262Numeric and @val2.integer?
-          # ((a + N) + M) or ((N + a) + M)
-          if @val.kind_of? ExpAdd
-            if @val.val2.kind_of? ECMA262Numeric and @val.val2.integer?
-              @val2 = ECMA262Numeric.new(@val.val2.to_num + @val2.to_num)
-              @val = @val.val
-            elsif @val.val.kind_of? ECMA262Numeric and @val.val.integer?
-              @val2 = ECMA262Numeric.new(@val.val.to_num + @val2.to_num)
-              @val = @val.val2
-            end
-          # ((a - N) + M) or ((N - a) + M)
-          elsif @val.kind_of? ExpSub
-            if @val.val2.kind_of? ECMA262Numeric and @val.val2.integer?
-              @val2 = ECMA262Numeric.new(-(@val.val2.to_num - @val2.to_num))
-              @val = @val.val
-            elsif @val.val.kind_of? ECMA262Numeric and @val.val.integer?
-              @val2 = ECMA262Numeric.new(-(@val.val.to_num - @val2.to_num))
-              @val = @val.val2
-            end
-          end
-        end
-=end
       end
-
     end
     #
     # 11.6.2 The Subtraction Operator ( - )
@@ -816,31 +853,11 @@ module Minjs
         if @val.kind_of? ECMA262Numeric and @val2.kind_of? ECMA262Numeric and @val.integer? and @val2.integer?
           parent.replace(self, ECMA262Numeric.new(@val.to_num - @val2.to_num))
         end
-=begin
-        if @val2.kind_of? ECMA262Numeric and @val2.integer?
-          # ((a - N) - M) or ((N - a) - M)
-          if @val.kind_of? ExpSub
-            if @val.val2.kind_of? ECMA262Numeric and @val.val2.integer?
-              @val2 = ECMA262Numeric.new(@val.val2.to_num + @val2.to_num)
-              @val = @val.val
-            elsif @val.val.kind_of? ECMA262Numeric and @val.val.integer?
-              @val2 = ECMA262Numeric.new(@val.val.to_num + @val2.to_num)
-              @val = @val.val2
-            end
-          # ((a + N) - M) or ((N + a) - M)
-          elsif @val.kind_of? ExpAdd
-            if @val.val2.kind_of? ECMA262Numeric and @val.val2.integer?
-              @val2 = ECMA262Numeric.new(-(@val.val2.to_num - @val2.to_num))
-              @val = @val.val
-            elsif @val.val.kind_of? ECMA262Numeric and @val.val.integer?
-              @val2 = ECMA262Numeric.new(-(@val.val.to_num - @val2.to_num))
-              @val = @val.val2
-            end
-          end
-        end
-=end
       end
 
+      def ecma262_typeof
+        :number
+      end
     end
 
     #
@@ -851,8 +868,13 @@ module Minjs
       def sym
         "<<"
       end
+
       def priority
         PRIORITY_SHIFT
+      end
+
+      def ecma262_typeof
+        :number
       end
     end
     #
@@ -863,8 +885,13 @@ module Minjs
       def sym
         ">>"
       end
+
       def priority
         PRIORITY_SHIFT
+      end
+
+      def ecma262_typeof
+        :number
       end
     end
     #
@@ -875,8 +902,13 @@ module Minjs
       def sym
         ">>>"
       end
+
       def priority
         PRIORITY_SHIFT
+      end
+
+      def ecma262_typeof
+        :number
       end
     end
     #
@@ -887,8 +919,13 @@ module Minjs
       def sym
         "<"
       end
+
       def priority
         PRIORITY_RELATIONAL
+      end
+
+      def ecma262_typeof
+        :boolean
       end
     end
 
@@ -900,8 +937,13 @@ module Minjs
       def sym
         ">"
       end
+
       def priority
         PRIORITY_RELATIONAL
+      end
+
+      def ecma262_typeof
+        :boolean
       end
     end
     #
@@ -912,8 +954,13 @@ module Minjs
       def sym
         "<="
       end
+
       def priority
         PRIORITY_RELATIONAL
+      end
+
+      def ecma262_typeof
+        :boolean
       end
     end
     #
@@ -924,8 +971,13 @@ module Minjs
       def sym
         ">="
       end
+
       def priority
         PRIORITY_RELATIONAL
+      end
+
+      def ecma262_typeof
+        :boolean
       end
     end
     #
@@ -936,8 +988,13 @@ module Minjs
       def sym
         "instanceof"
       end
+
       def priority
         PRIORITY_RELATIONAL
+      end
+
+      def ecma262_typeof
+        :boolean
       end
     end
     #
@@ -948,8 +1005,13 @@ module Minjs
       def sym
         "in"
       end
+
       def priority
         PRIORITY_RELATIONAL
+      end
+
+      def ecma262_typeof
+        :boolean
       end
     end
     #
@@ -960,8 +1022,13 @@ module Minjs
       def sym
         "=="
       end
+
       def priority
         PRIORITY_EQUALITY
+      end
+
+      def ecma262_typeof
+        :boolean
       end
     end
     #
@@ -972,8 +1039,13 @@ module Minjs
       def sym
         "!="
       end
+
       def priority
         PRIORITY_EQUALITY
+      end
+
+      def ecma262_typeof
+        :boolean
       end
     end
     #
@@ -991,9 +1063,13 @@ module Minjs
 
       def reduce(parent)
         if @val.respond_to?(:ecma262_typeof) and @val2.respond_to?(:ecma262_typeof) and
-           @val.ecma262_typeof == @val2.ecma262_typeof
+           (t = @val.ecma262_typeof) == @val2.ecma262_typeof and !t.nil?
           parent.replace(self, ExpEq.new(@val, @val2))
         end
+      end
+
+      def ecma262_typeof
+        :boolean
       end
     end
     #
@@ -1011,9 +1087,13 @@ module Minjs
 
       def reduce(parent)
         if @val.respond_to?(:ecma262_typeof) and @val2.respond_to?(:ecma262_typeof) and
-           @val.ecma262_typeof == @val2.ecma262_typeof
+           (t = @val.ecma262_typeof) == @val2.ecma262_typeof and !t.nil?
           parent.replace(self, ExpNotEq.new(@val, @val2))
         end
+      end
+
+      def ecma262_typeof
+        :boolean
       end
     end
     #
@@ -1034,6 +1114,10 @@ module Minjs
         @val = @val2
         @val2 = t
       end
+
+      def ecma262_typeof
+        :number
+      end
     end
     # ^
     class ExpXor < ExpArg2
@@ -1050,6 +1134,10 @@ module Minjs
         t = @val
         @val = @val2
         @val2 = t
+      end
+
+      def ecma262_typeof
+        :number
       end
     end
 
@@ -1069,6 +1157,10 @@ module Minjs
         @val = @val2
         @val2 = t
       end
+
+      def ecma262_typeof
+        :number
+      end
     end
     #
     # 11.11 Binary Logical Operators
@@ -1085,6 +1177,14 @@ module Minjs
         PRIORITY_LOGICAL_AND
       end
 
+      def ecma262_typeof
+        if @val.respond_to? :ecma262_typeof and @val2.respond_to? :ecma262_typeof
+           if @val.ecma262_typeof == @val2.ecma262_typeof
+             return @val.ecma262_typeof
+           end
+        end
+        nil
+      end
     end
     # ||
     class ExpLogicalOr < ExpArg2
@@ -1096,6 +1196,15 @@ module Minjs
       def priority
         PRIORITY_LOGICAL_OR
       end
+
+      def ecma262_typeof
+        if @val.respond_to? :ecma262_typeof and @val2.respond_to? :ecma262_typeof
+          if @val.ecma262_typeof == @val2.ecma262_typeof
+            return @val.ecma262_typeof
+          end
+        end
+        nil
+      end
     end
     #
     # 11.12 Conditional Operator ( ? : )
@@ -1103,6 +1212,8 @@ module Minjs
     # val ? val2 : val3
     #
     class ExpCond < Exp
+      attr_reader :val, :val2, :val3
+
       def initialize(val, val2, val3)
         @val = val
         @val2 = val2
@@ -1144,11 +1255,11 @@ module Minjs
       end
 
       def replace(from, to)
-        if from == @val
+        if from .eql? @val
           @val = to
-        elsif from == @val2
+        elsif from .eql? @val2
           @val2 = to
-        elsif from == @val3
+        elsif from .eql? @val3
           @val3 = to
         end
       end
@@ -1160,8 +1271,24 @@ module Minjs
         yield self, parent
       end
 
+      def ==(obj)
+        self.class == obj.class and
+          @val == obj.val and
+          @val2 == obj.val2 and
+          @val3 == obj.val3
+      end
+
       def to_js(options = {})
         "#{@val.to_js(options)}?#{@val2.to_js(options)}:#{@val3.to_js(options)}"
+      end
+
+      def ecma262_typeof
+        if @val2.respond_to? :ecma262_typeof and @val3.respond_to? :ecma262_typeof
+          if @val2.ecma262_typeof == @val3.ecma262_typeof
+            return @val2.ecma262_typeof
+          end
+        end
+        nil
       end
     end
     #

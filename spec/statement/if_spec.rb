@@ -15,7 +15,7 @@ if(true){
 console.log(true)
 }
 EOS
-      expect(js).to eq "if(true){console.log(true)};"
+      expect(js).to eq "if(true){console.log(true)}"
     end
     it 'is if-then-else statement' do
       js = test_parse <<-EOS
@@ -34,7 +34,7 @@ else{
 console.log(false)
 }
 EOS
-      expect(js).to eq "if(false)console.log(true);else{console.log(false)};"
+      expect(js).to eq "if(false)console.log(true);else{console.log(false)}"
     end
   end
 end

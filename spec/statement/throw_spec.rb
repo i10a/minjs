@@ -11,7 +11,7 @@ catch(e){
 console.log(e)
 }
 EOS
-      expect(js).to eq "try{throw\"a\"}catch(e){console.log(e)};"
+      expect(js).to eq "try{throw\"a\"}catch(e){console.log(e)}"
     end
 
     it 'cause syntax error' do

@@ -13,8 +13,8 @@ module Minjs
         999
       end
 
-      def last_statement
-        puts "warning: #{self.class}: last_statement not implement"
+      def empty?
+        false
       end
     end
 
@@ -24,9 +24,13 @@ module Minjs
     class StBlock < St
       attr_reader :statement_list
 
-      #statement_list:StList
+      #statement_list:StatementList
       def initialize(statement_list)
-        @statement_list = statement_list
+        if statement_list.kind_of? Array
+          @statement_list = StatementList.new(statement_list)
+        else
+          @statement_list = statement_list
+        end
       end
 
       def deep_dup
@@ -36,6 +40,11 @@ module Minjs
       def traverse(parent, &block)
         @statement_list.traverse(self, &block)
         yield self, parent
+      end
+
+      def ==(obj)
+        self.class == obj.class and
+          @statement_list == obj.statement_list
       end
 
       def to_js(options = {})
@@ -50,29 +59,43 @@ module Minjs
       end
 
       def to_exp(options = {})
-        statement_list.remove_empty_statement
-        @statement_list[0].to_exp({})
+        @statement_list.statement_list.select{|s|
+          s.class != StEmpty
+        }[0].to_exp.deep_dup
+
       end
 
       def to_statement?
         t = @statement_list.statement_list.select{|s|
           s.class != StEmpty
         }
-        t.length == 1
+        t.length == 1 || t.length == 0
       end
 
       def to_statement
-        statement_list.remove_empty_statement
-        @statement_list[0]
-      end
-
-      def last_statement
-        list = [self]
         t = @statement_list.statement_list.select{|s|
           s.class != StEmpty
         }
-        return [nil] if t[-1].nil?
-        list.concat(t[-1].last_statement)
+
+        if t[0]
+          t[0].deep_dup
+        else
+          StEmpty.new
+        end
+      end
+
+      def empty?
+        @statement_list.statement_list.select{|s|
+          s.class != StEmpty
+        }.length == 0
+      end
+
+      def [](i)
+        @statement_list[i]
+      end
+
+      def remove_empty_statement
+        statement_list.remove_empty_statement
       end
     end
     #
@@ -99,10 +122,10 @@ module Minjs
 
       def replace(from, to)
         @vars.each do |x|
-          if x[0] == from
+          if x[0] .eql? from
             x[0] = to
             break
-          elsif x[1] and x[1] == from
+          elsif x[1] and x[1] .eql? from
             x[1] = to
             break
           end
@@ -117,6 +140,10 @@ module Minjs
           end
         end
         yield self, parent
+      end
+
+      def ==(obj)
+        self.class == obj.class and @vars == obj.vars
       end
 
       def to_js(options = {})
@@ -164,10 +191,6 @@ module Minjs
         end
         self
       end
-
-      def last_statement
-        [self]
-      end
     end
 
     #12.3 empty
@@ -183,11 +206,16 @@ module Minjs
         yield self, parent
       end
 
-      def to_js(options = {})
-        ";"
+      def ==(obj)
+        self.class == obj.class
       end
-      def last_statement
-        [nil]
+
+      def to_js(options = {})
+        ";;"
+      end
+
+      def empty?
+        true
       end
     end
 
@@ -204,7 +232,7 @@ module Minjs
       end
 
       def replace(from, to)
-        if @exp == from
+        if @exp .eql? from
           @exp = to
         end
       end
@@ -214,12 +242,16 @@ module Minjs
         yield self, parent
       end
 
+      def ==(obj)
+        self.class == obj.class and @exp == obj.exp
+      end
+
       def to_js(options = {})
         concat(options, @exp, ";")
       end
 
       def to_exp(options = {})
-        @exp
+        @exp.deep_dup
       end
 
       def to_exp?
@@ -234,10 +266,6 @@ module Minjs
 
       def add_paren
         self
-      end
-
-      def last_statement
-        [self]
       end
     end
 
@@ -256,11 +284,11 @@ module Minjs
       end
 
       def replace(from, to)
-        if from == @cond
+        if from .eql? @cond
           @cond = to
-        elsif from == @then_st
+        elsif from .eql? @then_st
           @then_st = to
-        elsif from == @else_st
+        elsif from .eql? @else_st
           @else_st = to
         end
       end
@@ -276,6 +304,13 @@ module Minjs
 
       def deep_dup
         self.class.new(@cond.deep_dup, @then_st.deep_dup, @else_st ? @else_st.deep_dup : nil)
+      end
+
+      def ==(obj)
+        self.class == obj.class and
+          @cond == obj.cond and
+          @then_st == obj.then_st and
+          @else_st == obj.else_st
       end
 
       def to_js(options = {})
@@ -295,10 +330,25 @@ module Minjs
       end
 
       def to_return
-        cond = ExpParen.new(@cond)
-        then_exp = ExpParen.new(then_st.exp ? then_st.exp : ExpVoid.new(ExpParen.new(ECMA262Numeric.new(0))))
-        else_exp = ExpParen.new(else_st.exp ? else_st.exp : ExpVoid.new(ExpParen.new(ECMA262Numeric.new(0))))
-        StReturn.new(ExpCond.new(cond, then_exp, else_exp))
+        then_exp = then_st.exp;
+        else_exp = else_st.exp;
+
+        if then_exp.nil?
+          then_exp = ExpVoid.new(ECMA262Numeric.new(0))
+        end
+        if else_exp.nil?
+          else_exp = ExpVoid.new(ECMA262Numeric.new(0))
+        end
+        if @else_st
+          ret = StReturn.new(ExpCond.new(@cond, then_exp, else_exp).add_paren)
+        else
+          ret = StReturn.new(ExpLogicalAnd.new(@cond, then_exp).add_paren)
+        end
+        if ret.to_js.length <= to_js.length
+          ret
+        else
+          self
+        end
       end
 
       def to_exp?
@@ -312,23 +362,23 @@ module Minjs
       end
 
       def to_exp(options = {})
-        return nil if to_exp? == false
+        cond = @cond.deep_dup
         if !@else_st
           then_exp = @then_st.to_exp(options)
-          if @cond.kind_of? ExpLogicalNot
-            return ExpParen.new(ExpLogicalOr.new(ExpParen.new(@cond.val), ExpParen.new(then_exp)))
+          if cond.kind_of? ExpLogicalNot
+            return ExpParen.new(ExpLogicalOr.new(ExpParen.new(cond.val), ExpParen.new(then_exp)))
           else
-            return ExpParen.new(ExpLogicalAnd.new(ExpParen.new(@cond), ExpParen.new(then_exp)))
+            return ExpParen.new(ExpLogicalAnd.new(ExpParen.new(cond), ExpParen.new(then_exp)))
           end
         else
           then_exp = ExpParen.new(@then_st.to_exp(options))
           else_exp = ExpParen.new(@else_st.to_exp(options))
         end
 
-        if @cond.kind_of? ExpLogicalNot
-          ExpCond.new(ExpParen.new(@cond.val), else_exp, then_exp)
+        if cond.kind_of? ExpLogicalNot
+          ExpCond.new(ExpParen.new(cond.val), else_exp, then_exp)
         else
-          ExpCond.new(ExpParen.new(@cond), then_exp, else_exp)
+          ExpCond.new(ExpParen.new(cond), then_exp, else_exp)
         end
       end
 
@@ -343,12 +393,12 @@ module Minjs
         self
       end
 
-      def last_statement
-        list = [self]
-        if @else_st
-          list.concat @else_st.last_statement
-        else
-          list.concat @then_st.last_statement
+      def remove_empty_statement
+        if @then_st.kind_of? StBlock
+          @then_st.remove_empty_statement
+        end
+        if @else_st.kind_of? StBlock
+          @else_st.remove_empty_statement
         end
       end
     end
@@ -366,7 +416,7 @@ module Minjs
       end
 
       def replace(from, to)
-        if from == @statement
+        if from .eql? @statement
           @statement = to
         end
       end
@@ -375,6 +425,12 @@ module Minjs
         @exp.traverse(self, &block)
         @statement.traverse(self, &block)
         yield self, parent
+      end
+
+      def ==(obj)
+        self.class == obj.class and
+          @exp == obj.exp and
+          @statement == obj.statement
       end
 
       def to_js(options = {})
@@ -397,14 +453,11 @@ module Minjs
       def add_paren
         self
       end
-
-      def last_statement
-        list = [self]
-        list.concat @statement.last_statement
-      end
     end
 
     class StDoWhile < St
+      attr_reader :exp, :statement
+
       def initialize(exp, statement)
         @exp, @statement = exp, statement
       end
@@ -414,7 +467,7 @@ module Minjs
       end
 
       def replace(from, to)
-        if from == @statement
+        if from .eql? @statement
           @statement = to
         end
       end
@@ -423,6 +476,12 @@ module Minjs
         @exp.traverse(self, &block)
         @statement.traverse(self, &block)
         yield self, parent
+      end
+
+      def ==(obj)
+        self.class == obj.class and
+          @exp == obj.exp and
+          @statement == obj.statement
       end
 
       def to_js(options = {})
@@ -444,11 +503,6 @@ module Minjs
 
       def add_paren
         self
-      end
-
-      def last_statement
-        list = [self]
-        list.concat @statement.last_statement
       end
     end
 
@@ -473,13 +527,13 @@ module Minjs
       end
 
       def replace(from, to)
-        if from == @exp1
+        if from .eql? @exp1
           @exp1 = to
-        elsif from == @exp2
+        elsif from .eql? @exp2
           @exp2 = to
-        elsif from == @exp3
+        elsif from .eql? @exp3
           @exp3 = to
-        elsif from == @statement
+        elsif from .eql? @statement
           @statement = to
         end
       end
@@ -490,6 +544,14 @@ module Minjs
         @exp3.traverse(self, &block) if @exp3
         @statement.traverse(self, &block)
         yield self, parent
+      end
+
+      def ==(obj)
+        self.class == obj.class and
+          @exp1 == obj.exp1 and
+          @exp2 == obj.exp2 and
+          @exp3 == obj.exp3 and
+          @statement == obj.statement
       end
 
       def to_js(options = {})
@@ -518,11 +580,6 @@ module Minjs
       def add_paren
         self
       end
-
-      def last_statement
-        list = [self]
-        list.concat @statement.last_statement
-      end
     end
 
     #
@@ -530,6 +587,7 @@ module Minjs
     #
     class StForVar < St
       attr_reader :context
+      attr_reader :var_decl_list, :exp2, :exp3, :statement
 
       #
       # var_decl_list
@@ -554,7 +612,7 @@ module Minjs
       end
 
       def replace(from, to)
-        if from == @statement
+        if from .eql? @statement
           @statement = to
         end
       end
@@ -590,6 +648,14 @@ module Minjs
           end
         }
         StFor.new(tt, @exp2, @exp3, @statement)
+      end
+
+      def ==(obj)
+        self.class == obj.class and
+          @var_decl_list == obj.var_decl_list and
+          @exp2 == obj.exp2 and
+          @exp3 == obj.exp3 and
+          @statement == obj.statement
       end
 
       def to_js(options = {})
@@ -628,14 +694,11 @@ module Minjs
       def add_paren
         self
       end
-
-      def last_statement
-        list = [self]
-        list.concat @statement.last_statement
-      end
     end
 
     class StForIn < St
+      attr_reader :exp1, :exp2, :statement
+
       def initialize(exp1, exp2, statement)
         @exp1 = exp1
         @exp2 = exp2
@@ -647,7 +710,7 @@ module Minjs
       end
 
       def replace(from, to)
-        if from == @statement
+        if from .eql? @statement
           @statement = to
         end
       end
@@ -657,6 +720,13 @@ module Minjs
         @exp2.traverse(self, &block)
         @statement.traverse(self, &block)
         yield self, parent
+      end
+
+      def ==(obj)
+        self.class == obj.class and
+          @exp1 == obj.exp1 and
+          @exp2 == obj.exp2 and
+          @statement == obj.statement
       end
 
       def to_js(options = {})
@@ -685,15 +755,11 @@ module Minjs
         end
         self
       end
-
-      def last_statement
-        list = [self]
-        list.concat @statement.last_statement
-      end
     end
 
     class StForInVar < St
       attr_reader :context
+      attr_reader :var_decl, :exp2, :statement
 
       def initialize(context, var_decl, exp2, statement)
         @context = context
@@ -718,7 +784,7 @@ module Minjs
       end
 
       def replace(from, to)
-        if from == @statement
+        if from .eql? @statement
           @statement = to
         end
       end
@@ -730,6 +796,13 @@ module Minjs
           t = @var_decl[0]
         end
         StForIn.new(t, @exp2, @statement)
+      end
+
+      def ==(obj)
+        self.class == obj.class and
+          @var_decl == obj.var_decl and
+          @exp2 == obj.exp2 and
+          @statement == obj.statement
       end
 
       def to_js(options = {})
@@ -761,16 +834,13 @@ module Minjs
       def add_paren
         self
       end
-
-      def last_statement
-        list = [self]
-        list.concat @statement.last_statement
-      end
     end
 
 
     #12.7
     class StContinue < St
+      attr_reader :exp
+
       def initialize(exp = nil)
         @exp = exp
       end
@@ -782,6 +852,11 @@ module Minjs
       def traverse(parent, &block)
         @exp.traverse(self, &block) if @exp
         yield self, parent
+      end
+
+      def ==(obj)
+        self.class == obj.class and
+          @exp == obj.exp
       end
 
       def to_js(options = {})
@@ -791,14 +866,12 @@ module Minjs
           concat options, :continue, ";"
         end
       end
-
-      def last_statement
-        [self]
-      end
     end
 
     #12.8
     class StBreak < St
+      attr_reader :exp
+
       def initialize(exp = nil)
         @exp = exp
       end
@@ -812,16 +885,17 @@ module Minjs
         yield self, parent
       end
 
+      def ==(obj)
+        self.class == obj.class and
+          @exp == obj.exp
+      end
+
       def to_js(options = {})
         if @exp
           concat options, :break, @exp, ";"
         else
           concat options, :break, ";"
         end
-      end
-
-      def last_statement
-        [self]
       end
     end
 
@@ -842,7 +916,7 @@ module Minjs
       end
 
       def replace(from, to)
-        if from == @exp
+        if from .eql? @exp
           @exp = to
         end
       end
@@ -858,6 +932,10 @@ module Minjs
 
       def to_return
         self
+      end
+
+      def ==(obj)
+        self.class == obj.class and @exp == obj.exp
       end
 
       def to_js(options = {})
@@ -878,26 +956,38 @@ module Minjs
       def add_paren
         self
       end
-
-      def last_statement
-        [self]
-      end
     end
     #12.10
     class StWith < St
+      attr_reader :exp, :statement
+
       def initialize(exp, statement)
         @exp = exp
         @statement = statement
       end
 
       def deep_dup
-        self.class.new(@exp)
+        self.class.new(@exp, @statement)
+      end
+
+      def replace(from, to)
+        if @exp .eql? from
+          @exp = to
+        elsif @statement = to
+          @statement = to
+        end
       end
 
       def traverse(parent, &block)
         @exp.traverse(self, &block)
         @statement.traverse(self, &block)
         yield self, parent
+      end
+
+      def ==(obj)
+        self.class == obj.class and
+          @exp == obj.exp and
+          @statement == obj.statement
       end
 
       def to_js(options = {})
@@ -914,14 +1004,11 @@ module Minjs
       def add_paren
         self
       end
-
-      def last_statement
-        list = [self]
-        list.concat @statement.last_statement
-      end
     end
     #12.11
     class StSwitch < St
+      attr_reader :exp, :blocks
+
       #
       # block: [condition, blocks]
       #
@@ -933,14 +1020,17 @@ module Minjs
       def deep_dup
         self.class.new(@exp,
                        @blocks.collect{|x, y|
-                         [x.deep_dup, y.deep_dup]
+                         [
+                           x ? x.deep_dup : nil,
+                           y ? y.deep_dup : nil
+                         ]
                        })
       end
 
       def replace(from, to)
-        if @exp == from
+        if @exp .eql? from
           @exp = to
-        elsif @blocks == from
+        elsif @blocks .eql? from
           @blocks = to
         end
       end
@@ -956,6 +1046,11 @@ module Minjs
         yield self, parent
       end
 
+      def ==(obj)
+        self.class == obj.class and
+          @exp == obj.exp and
+          @blocks == obj.blocks
+      end
       def to_js(options = {})
         t = concat(options, :switch, "(", @exp, ")", "{")
         @blocks.each do |b|
@@ -983,48 +1078,48 @@ module Minjs
       def add_paren
         self
       end
-
-      def last_statement
-        list = [self]
-      end
     end
     #12.12
     class StLabelled < St
-      def initialize(id, statement)
-        @id = id
+      attr_reader :label, :statement
+
+      def initialize(label, statement)
+        @label = label
         @statement = statement
       end
 
       def deep_dup
-        self.class.new(@id, @statement)
+        self.class.new(@label, @statement)
       end
 
       def replace(from, to)
-        if from == @id
-          @id = to
-        elsif from == @statement
+        if from .eql? @label
+          @label = to
+        elsif from .eql? @statement
           @statement = to
         end
       end
 
       def traverse(parent, &block)
-        @id.traverse(self, &block)
+        @label.traverse(self, &block)
         @statement.traverse(self, &block)
         yield self, parent
       end
 
-      def to_js(options = {})
-        concat options, @id, ":", @statement
+      def ==(obj)
+        self.class == obj.class and
+          @label == obj.label and
+          @statement == obj.statement
       end
-
-      def last_statement
-        list = [self]
-        list.concat @statement.last_statement
+      def to_js(options = {})
+        concat options, @label, ":", @statement
       end
     end
 
     #12.13
     class StThrow < St
+      attr_reader :exp
+
       def initialize(exp)
         @exp = exp
       end
@@ -1038,12 +1133,13 @@ module Minjs
         yield self, parent
       end
 
-      def to_js(options = {})
-        concat options, :throw, @exp, ";"
+      def ==(obj)
+        self.class == obj.class and
+          @exp == obj.exp
       end
 
-      def last_statement
-        [self]
+      def to_js(options = {})
+        concat options, :throw, @exp, ";"
       end
     end
 
@@ -1062,17 +1158,17 @@ module Minjs
       end
 
       def deep_dup
-        self.class.new(@try, @catch, @finally)
+        self.class.new(@context, @catch_context, @try, @catch, @finally)
       end
 
       def replace(from, to)
-        if from == @try
+        if from .eql? @try
           @try = to
-        elsif from == @catch[0]
+        elsif from .eql? @catch[0]
           @catch[0] = to
-        elsif from == @catch[1]
+        elsif from .eql? @catch[1]
           @catch[1] = to
-        elsif from == @finally
+        elsif from .eql? @finally
           @finally = to
         end
       end
@@ -1087,6 +1183,13 @@ module Minjs
         yield self, parent
       end
 
+      def ==(obj)
+        self.class == obj.class and
+          self.try == obj.try and
+          self.catch == obj.catch and
+          self.finally == obj.finally
+      end
+
       def to_js(options = {})
         if @catch and @finally
           concat(options, :try, @try, :catch, "(", @catch[0], ")", @catch[1], :finally, @finally)
@@ -1096,9 +1199,6 @@ module Minjs
           concat(options, :try, @try, :finally, @finally)
         end
       end
-      def last_statement
-        [self]
-      end
     end
 
     #12.15
@@ -1107,14 +1207,16 @@ module Minjs
         self.class.new
       end
 
-      def traverse
+      def traverse(parent, &block)
         yield self, parent
       end
+
+      def ==(obj)
+        self.class == obj.class
+      end
+
       def to_js(options = {})
         concat options, :debugger, ";"
-      end
-      def last_statement
-        [self]
       end
     end
 
@@ -1130,10 +1232,10 @@ module Minjs
       attr_reader :context
 
       def initialize(context, name, args, statements, options = {})
+        @context = context
         @name = name
         @args = args #=> array
         @statements = statements #=> Prog
-        @context = context
         @decl = options[:decl]
         @getter = options[:getter]
         @setter = options[:setter]
@@ -1159,6 +1261,13 @@ module Minjs
         yield self, parent
       end
 
+      def ==(obj)
+        self.class == obj.class and
+          @name == obj.name and
+          @args == obj.args and
+          @statements == obj.statements
+      end
+
       def to_js(options = {})
         _args = @args.collect{|x|x.to_js(options)}.join(",")
         if @getter
@@ -1180,10 +1289,6 @@ module Minjs
 
       def decl?
         @decl
-      end
-
-      def last_statement
-        [self]
       end
     end
   end

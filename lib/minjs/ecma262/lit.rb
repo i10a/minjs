@@ -23,6 +23,10 @@ module Minjs
       def traverse(parent, &block)
       end
 
+      def ==(obj)
+        self.class == obj.class and self.val == obj.val
+      end
+
       def to_js(options = {})
         "??"
       end
@@ -43,6 +47,10 @@ module Minjs
         true
       end
 
+      def ==(obj)
+        self.class == obj.class
+      end
+
       def to_js(options = {})
         " "
       end
@@ -59,6 +67,10 @@ module Minjs
 
       def lt?
         true
+      end
+
+      def ==(obj)
+        self.class == obj.class
       end
 
       def to_js(options = {})
@@ -88,6 +100,10 @@ module Minjs
 
       def to_s
         "null"
+      end
+
+      def ==(obj)
+        self.class == obj.class
       end
 
       def to_js(options = {})
@@ -127,12 +143,29 @@ module Minjs
         yield self, parent
       end
 
+      def ==(obj)
+        self.class == obj.class and
+          @val == obj.val
+      end
+
       def to_js(options = {})
         @val.to_s
       end
 
       def true?
         @val == :true
+      end
+
+      def to_ecma262_boolean
+        if @val == :false
+          false
+        else
+          true
+        end
+      end
+
+      def ecma262_typeof
+        :boolean
       end
 
       @@true = self.new(:true)
@@ -160,6 +193,11 @@ module Minjs
       def traverse(parent)
         yield self, parent
       end
+
+      def ==(obj)
+        self.class == obj.class and @val == obj.val
+      end
+
       def to_js(options = {})
         t = "\""
         @val.to_s.each_codepoint do |c|
@@ -238,6 +276,10 @@ module Minjs
         yield self, parent
       end
 
+      def ==(obj)
+        self.class == obj.class and self.to_ecma262_string == obj.to_ecma262_string
+      end
+
       def to_js(options = {})
         if @nan
           return "NaN"
@@ -289,6 +331,7 @@ module Minjs
         end
         "#{@integer}.#{d}e#{@exp}".to_f
       end
+
       #
       # 9.8.1
       #
@@ -352,6 +395,8 @@ module Minjs
     NUMERIC_NAN = ECMA262Numeric.new(:nan)
 
     class ECMA262RegExp < Literal
+      attr_reader :body, :flags
+
       def initialize(body, flags)
         @body = body
         @flags = flags
@@ -365,6 +410,10 @@ module Minjs
         yield self, parent
       end
 
+      def ==(obj)
+        self.class == obj.class and @body == obj.body and @flags == obj.flags
+      end
+
       def to_js(options = {})
         "/#{@body}/#{@flags}"
       end
@@ -374,6 +423,8 @@ module Minjs
     LITERAL_FALSE = Boolean.new(:false)
 
     class ECMA262Array < Literal
+      attr_reader :val
+
       def initialize(val)
         @val = val # val is Array
       end
@@ -385,9 +436,14 @@ module Minjs
       def traverse(parent, &block)
         yield self, parent
         @val.each do |k|
-          k.traverse(parent, &block)
+          k.traverse(parent, &block) if k
         end
       end
+
+      def ==(obj)
+        self.class == obj.class and @val == obj.val
+      end
+
       def to_js(options = {})
         "[" + @val.collect{|x| x.to_s}.join(",") + "]"
       end
@@ -411,6 +467,8 @@ module Minjs
       end
 
       public
+      attr_reader :val
+
       def initialize(val)
         @val = val
       end
@@ -426,6 +484,11 @@ module Minjs
           v.traverse(parent, &block)
         end
       end
+
+      def ==(obj)
+        self.class == obj.class and @val == obj.val
+      end
+
       def to_js(options = {})
         "{" + @val.collect{|x, y|
           if y.kind_of? StFunc and (y.getter? || y.setter?)
@@ -474,6 +537,11 @@ module Minjs
       def traverse(parent, &block)
       end
 
+      def ==(obj)
+        self.class == obj.class and
+          @comment == obj.comment
+      end
+
       def to_js(options)
         "//#{@comment}"
       end
@@ -484,12 +552,20 @@ module Minjs
     end
 
     class MultiLineComment < Literal
+      attr_reader :comment, :has_lf
+
       def initialize(comment, has_lf)
         @comment = comment
         @has_lf = has_lf
       end
 
       def traverse(parent, &block)
+      end
+
+      def ==(obj)
+        self.class == obj.class and
+          @comment == obj.comment and
+          @has_lf == obj.has_lf
       end
 
       def to_js(options)
@@ -550,12 +626,12 @@ module Minjs
         self.class.new(@context, @val)
       end
 
-      def to_js(options = {})
-        val.to_s
-      end
-
       def ==(obj)
         self.class == obj.class and self.val == obj.val
+      end
+
+      def to_js(options = {})
+        val.to_s
       end
     end
 

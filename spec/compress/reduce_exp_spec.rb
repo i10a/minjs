@@ -6,11 +6,13 @@ describe 'Compression' do
     it 'reduce strict equles operators to non-strict operators' do
       c = test_compressor
       c.parse <<-EOS
-typeof A === "string"
-typeof A !== "string"
+typeof A === "string";
+typeof A !== "string";
++A === 0;
+(a="0") === "0"
 EOS
       js = c.reduce_exp.to_js
-      expect(js).to eq "typeof A==\"string\";typeof A!=\"string\";"
+      expect(js).to eq "typeof A==\"string\";typeof A!=\"string\";+A==0;(a=\"0\")==\"0\";"
     end
     it 'reduce to assignment expression' do
       c = test_compressor

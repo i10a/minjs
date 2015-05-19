@@ -8,7 +8,7 @@ function a(){
 return
 }
 EOS
-      expect(js).to eq "function a(){return};"
+      expect(js).to eq "function a(){return}"
     end
 
     it 'is return statement with value' do
@@ -17,7 +17,7 @@ function a(){
 return 1
 }
 EOS
-      expect(js).to eq "function a(){return 1};"
+      expect(js).to eq "function a(){return 1}"
     end
 
     it 'is return statement without automatic semicolon insertion' do
@@ -27,7 +27,7 @@ return 1
 +2
 }
 EOS
-      expect(js).to eq "function a(){return 1+2};"
+      expect(js).to eq "function a(){return 1+2}"
     end
 
     it 'is return statement with automatic semicolon insertion' do
@@ -37,7 +37,7 @@ return
 1+2
 }
 EOS
-      expect(js).to eq "function a(){return;1+2};"
+      expect(js).to eq "function a(){return;1+2}"
     end
   end
 end

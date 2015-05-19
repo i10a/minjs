@@ -12,7 +12,7 @@ while(true){break}
 try{'try'}catch(e){'catch'}finally{'fin'}
 EOS
       js = c.block_to_statement.to_js
-      expect(js).to eq "if(true)a=1;while(true)break;try{\"try\"}catch(e){\"catch\"}finally{\"fin\"};"
+      expect(js).to eq "if(true)a=1;while(true)break;try{\"try\"}catch(e){\"catch\"}finally{\"fin\"}"
     end
 
     it 'does not convert block to statement' do

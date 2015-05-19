@@ -30,6 +30,10 @@ module Minjs
       def to_s
         val.to_s
       end
+
+      def ==(obj)
+        self.class == obj.class and self.val == obj.val
+      end
     end
     PUNC_CONDIF = Punctuator.get('?')
     PUNC_CONDELSE = Punctuator.get(':')

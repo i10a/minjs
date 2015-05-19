@@ -14,6 +14,14 @@ EOS
       js = c.if_to_cond.to_js
       expect(js).to eq "a?b:c;a&&b;a?c:b;a||b;"
     end
+    it 'convert if statement to return statement' do
+      c = test_compressor
+      c.parse <<-EOS
+if(a)return b;else return c;
+EOS
+      js = c.if_to_cond.to_js
+      expect(js).to eq "return a?b:c;"
+    end
   end
 end
 

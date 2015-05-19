@@ -40,7 +40,7 @@ for(i=0;i<10;){
   ++i
 }
 EOS
-      expect(js).to eq  "for(i=0;i<10;++i)console.log(i);for(;i<10;++i)console.log(i);for(i=0;;++i){if(i<10)break;console.log(i)}for(i=0;i<10;){console.log(i);++i};"
+      expect(js).to eq  "for(i=0;i<10;++i)console.log(i);for(;i<10;++i)console.log(i);for(i=0;;++i){if(i<10)break;console.log(i)}for(i=0;i<10;){console.log(i);++i}"
     end
 
     it 'is for_var statement' do
@@ -58,7 +58,7 @@ for(var i=0,j=0;i<10;){
   ++i
 }
 EOS
-      expect(js).to eq "for(var i=0;i<10;++i)console.log(i);for(var i=0;;++i){if(i<10)break;console.log(i)}for(var i=0,j=0;i<10;){console.log(i);++i};"
+      expect(js).to eq "for(var i=0;i<10;++i)console.log(i);for(var i=0;;++i){if(i<10)break;console.log(i)}for(var i=0,j=0;i<10;){console.log(i);++i}"
     end
 
     it 'is for-in statement' do

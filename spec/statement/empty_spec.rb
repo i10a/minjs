@@ -6,7 +6,7 @@ describe 'Statement' do
       js = test_parse <<-EOS
 ;
 EOS
-      expect(js).to eq ";"
+      expect(js).to eq ""
     end
   end
 end

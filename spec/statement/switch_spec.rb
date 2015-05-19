@@ -20,7 +20,7 @@ switch($)
         break;
 }
 EOS
-      expect(js).to eq "$=0;switch($){case 0:console.log(0);break;case 1:console.log(1);break;default:console.log(\"default\");break};";
+      expect(js).to eq "$=0;switch($){case 0:console.log(0);break;case 1:console.log(1);break;default:console.log(\"default\");break}";
     end
   end
 end

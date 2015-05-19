@@ -28,9 +28,9 @@ function xxxx()
 EOS
       js = c.compress_var.to_js
 
-      expect(js).to eq "function xxxx(){var l,m;function s(){var c,d,a,b}function r(c,d){var g,h,a,b}function q(c,d){var e,f}function p(c,d){l,m;function i(){}l:while(true)}};"
+      expect(js).to eq "function xxxx(){var e,f;function h(){var c,d,e,f}function g(e,f){var h,i,j,k}function j(a,b){var g,h}function k(a,b){e,f;function g(){}e:while(true);}}"
     end
-    it 'compress var name' do
+    it 'compress try-catch var name' do
       c = test_compressor
       c.parse <<-EOS
 function zzz(){
@@ -39,13 +39,44 @@ try{
 }
 catch(aaaa){
 var bbb;
+console.log(aaaa);
 }
 finally{
 }
 }
 EOS
       js = c.compress_var.to_js
-      expect(js).to eq "function zzz(){var b;try{}catch(a){var c}finally{}};"
+      expect(js).to eq "function zzz(){var a;try{}catch(a){var b;console.log(a)}finally{}}"
+    end
+
+    it 'compress var name' do
+      c = test_compressor
+      c.parse <<-EOS
+function x()
+{
+    var a;
+    function b(xxx,yyy,zzz){
+	var b;
+    }
+}
+EOS
+      js = c.compress_var.to_js
+      expect(js).to eq "function x(){var d;function c(e,d,b){var a}}"
+    end
+
+    it 'compress var name' do
+      c = test_compressor
+      c.parse <<-EOS
+function zz()
+{
+    var a = function b(){
+	console.log(b);
+    }
+    console.log(b);
+}
+EOS
+      js = c.compress_var.to_js
+      expect(js).to eq "function zz(){var c=function a(){console.log(a)};console.log(b)}"
     end
   end
 end

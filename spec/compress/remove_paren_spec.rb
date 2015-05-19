@@ -36,7 +36,7 @@ case (1,2):
 }
 EOS
       js = c.remove_paren.to_js
-      expect(js).to eq "switch(1,2){case 1,2:};"
+      expect(js).to eq "switch(1,2){case 1,2:}"
     end
 
     it 'remove paren of statements' do
@@ -51,7 +51,7 @@ with((1,2)){};
 throw (1,2);
 EOS
       js = c.remove_paren.to_js
-      expect(js).to eq "var a=1,b=(1,2);if(1,2);do{}while(1,2);while(1,2){};return 1,2;with(1,2){};throw(1,2);";
+      expect(js).to eq "var a=1,b=(1,2);if(1,2);do{}while(1,2);while(1,2){}return 1,2;with(1,2){}throw(1,2);";
     end
 
     it 'remove paren of primary expression' do
