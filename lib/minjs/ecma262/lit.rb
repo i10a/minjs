@@ -454,7 +454,13 @@ module Minjs
 
     class ECMA262Object < Literal
       include Ctype
-      private
+      attr_reader :val
+
+      #val is tupple [[k,v],[k,v],...]
+      def initialize(val)
+        @val = val
+      end
+
       def idname?(name)
         return false if name.length == 0
         s = name.codepoints
@@ -464,13 +470,6 @@ module Minjs
           return false unless identifier_part?(code)
         end
         return true
-      end
-
-      public
-      attr_reader :val
-
-      def initialize(val)
-        @val = val
       end
 
       def deep_dup
@@ -632,6 +631,24 @@ module Minjs
 
       def to_js(options = {})
         val.to_s
+      end
+
+      def binding_env(type = :var)
+        return nil if context.nil?
+        if type == :var
+          v = context.var_env
+        else
+          v = context.lex_env
+        end
+
+        while v
+          if v.record.binding[val]
+            return v
+          else
+            v = v.outer
+          end
+        end
+        nil
       end
     end
 

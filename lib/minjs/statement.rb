@@ -101,6 +101,8 @@ module Minjs
             dn = v[0]
             context.var_env.record.create_mutable_binding(dn, nil)
             context.var_env.record.set_mutable_binding(dn, :undefined, nil)
+            context.lex_env.record.create_mutable_binding(dn, nil)
+            context.lex_env.record.set_mutable_binding(dn, :undefined, nil)
           end
           ECMA262::StVar.new(context, vl)
         else
@@ -146,17 +148,22 @@ module Minjs
     #
     def empty_statement(lex, context)
       lex.eval_lit{
-        a = lex.fwd_lit(:nolt => true)
+        a = lex.fwd_lit
         if a == ECMA262::PUNC_SEMICOLON
-          ECMA262::StEmpty.new
-        elsif a == ECMA262::LIT_LINE_FEED
-          ECMA262::StEmpty.new
-        elsif a.lt?
           ECMA262::StEmpty.new
         else
           nil
         end
-      }
+      }# || lex.eval_lit {
+#        a = lex.fwd_lit(:nolt => true)
+#        if a == ECMA262::LIT_LINE_FEED
+#          ECMA262::StEmpty.new
+#        elsif a.lt?
+#          ECMA262::StEmpty.new
+#        else
+#          nil
+#        end
+#      }
     end
     #
     #12.4
@@ -226,6 +233,8 @@ module Minjs
           #10.5
           context.var_env.record.create_mutable_binding(v[0], nil)
           context.var_env.record.set_mutable_binding(v[0], :undefined, nil)
+          context.lex_env.record.create_mutable_binding(v[0], nil)
+          context.lex_env.record.set_mutable_binding(v[0], :undefined, nil)
           ECMA262::StForInVar.new(context, v, e, s)
         else
           nil
@@ -241,6 +250,8 @@ module Minjs
             dn = v[0]
             context.var_env.record.create_mutable_binding(dn, nil)
             context.var_env.record.set_mutable_binding(dn, :undefined, nil)
+            context.lex_env.record.create_mutable_binding(dn, nil)
+            context.lex_env.record.set_mutable_binding(dn, :undefined, nil)
           end
           ECMA262::StForVar.new(context, vl, e, e2, s)
         else
@@ -404,7 +415,10 @@ module Minjs
       return nil unless lex.match_lit(ECMA262::ID_TRY)
       lex.eval_lit {
         catch_context = ECMA262::Context.new
-        catch_env = context.lex_env.new_declarative_env()
+        #
+        # catch context must be executable lexical environment
+        #
+        catch_env = context.var_env.new_declarative_env()
         catch_context.lex_env = catch_env
         catch_context.var_env = context.var_env
 
@@ -416,11 +430,11 @@ module Minjs
           break nil unless c
 
           f = try_finally(lex, context)
-          ECMA262::StTry.new(context, catch_context, t, c, f)
+          ECMA262::StTry.new(context, t, c, f)
         } || lex.eval_lit{
           f = try_finally(lex, context)
           break nil unless f
-          ECMA262::StTry.new(context, catch_context, t, nil, f)
+          ECMA262::StTry.new(context, t, nil, f)
         }
       }
     end
@@ -429,7 +443,11 @@ module Minjs
 
       if lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and i=identifier(lex, catch_context) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and b=block(lex, catch_context)
         catch_context.lex_env.record.create_mutable_binding(i, nil)
-        catch_context.lex_env.record.set_mutable_binding(i, :undefined, nil)
+        catch_context.lex_env.record.set_mutable_binding(i, :undefined, nil, {:_parameter_list => true})
+        catch_context.var_env.record.create_mutable_binding(i, nil)
+        catch_context.var_env.record.set_mutable_binding(i, :undefined, nil, {:_parameter_list => true})
+        catch_context.var_env.record.binding.each do|k, v|
+        end
         [i, b]
       else
         nil

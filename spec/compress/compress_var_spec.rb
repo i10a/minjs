@@ -8,18 +8,18 @@ describe 'Compression' do
       c.parse <<-EOS
 function xxxx()
 {
-    var aaaa, bbbb;// => j,k
-    function yyyy(){
-	var cccc, dddd, a, b; // => c,d,a,b
+    var aaaa, bbbb;// => a,b
+    function yyyy(){//=>d
+	var cccc, dddd, a, b; // => a,b,c,e
     }
-    function wwww(c, d){
-	var cccc, dddd, a, b; // => g,h,a,b
+    function wwww(c, d){//=>d(a,b)
+	var cccc, dddd, a, b; // => c,d,e,f
     }
-    function eeee(c, d){
-	var aaaa, bbbb; // => e,f
+    function eeee(c, d){//=>e(a,b)
+	var aaaa, bbbb; // => c,d
     }
-    function rrrr(c, d){
-	aaaa, bbbb; // => j,k
+    function rrrr(c, d){//=>f(c,d)
+	aaaa, bbbb; // => a,b
 	function i(){
 	}
 	aaaa:while(true);
@@ -28,7 +28,7 @@ function xxxx()
 EOS
       js = c.compress_var.to_js
 
-      expect(js).to eq "function xxxx(){var e,f;function h(){var c,d,e,f}function g(e,f){var h,i,j,k}function j(a,b){var g,h}function k(a,b){e,f;function g(){}e:while(true);}}"
+      expect(js).to eq "function xxxx(){var a,b;function d(){var a,b,c,e}function c(a,b){var d,e,f,g}function e(a,b){var c,d}function f(c,d){a,b;function e(){}a:while(true);}}"
     end
     it 'compress try-catch var name' do
       c = test_compressor
@@ -61,7 +61,7 @@ function x()
 }
 EOS
       js = c.compress_var.to_js
-      expect(js).to eq "function x(){var d;function c(e,d,b){var a}}"
+      expect(js).to eq "function x(){var c;function d(a,c,e){var f}}"
     end
 
     it 'compress var name' do

@@ -25,6 +25,12 @@ module Minjs
       end
     end
 
+    class DeclarativeEnvRecord < EnvRecord
+    end
+
+    class ObjectEnvRecord < EnvRecord
+    end
+
     class ExObject
       def initialize(options = {})
         @attr = options[:attr] || {}
@@ -35,14 +41,30 @@ module Minjs
     class LexEnv
       attr_reader :record
       attr_reader :outer
+      attr_reader :type
 
       def initialize(options = {})
         @outer = options[:outer]
-        @record = EnvRecord.new
+        if options[:type] == :object
+          @record = ObjectEnvRecord.new
+        else #if options[:type] == :declarative
+          @record = DeclarativeEnvRecord.new
+        end
       end
 
       def new_declarative_env(outer = nil)
-        LexEnv.new(outer: (outer || self))
+        e = LexEnv.new(outer: (outer || self), type: :declarative)
+      end
+
+      def new_object_env(object, outer = nil)#TODO
+        raise 'TODO'
+        e = LexEnv.new(outer: (outer || self), type: :object)
+        object.val.each do |k, v|
+          if k.id_name?
+            e.create_mutable_binding(k)
+            e.set_mutable_binding(k, v)
+          end
+        end
       end
 
       def debug
@@ -58,6 +80,7 @@ module Minjs
       def initialize(options = {})
         @var_env = LexEnv.new(options)
         @lex_env = LexEnv.new(options)
+        #TODO
         @this_binding = ExObject.new(
           {
             attr: {
@@ -73,9 +96,6 @@ module Minjs
         @var_env.debug
       end
 
-      def inspect
-        @var_env.record.binding.to_s
-      end
     end
   end
 end

@@ -728,8 +728,8 @@ module Minjs
         pos0 = pos
         pos = 0
       end
-      if col and col > 2
-        pos0 = col - 2;
+      if col and col >= 1
+        pos0 = col - 1;
       end
       t = ''
       t << @codes[pos..(pos+80)].pack("U*")
@@ -782,13 +782,13 @@ module Minjs
         break if _pos >= pos
         if line_terminator?(code)
           row += 1
-          row = 0
+          col = 0
         else
           col += 1
         end
         _pos += 1
       end
-      return [row+1, col]
+      return [row+1, col+1]
     end
   end
 end

@@ -427,7 +427,7 @@ module Minjs
       end
 
       def priority
-        PRIORITY_LEFT_HAND_SIDE + ((args && args.length == 0) ? 1 : 0)
+        PRIORITY_LEFT_HAND_SIDE + ((args == nil) ? 1 : 0)
       end
 
       def deep_dup
@@ -438,6 +438,8 @@ module Minjs
       def replace(from, to)
         if @name .eql? from
           @name = from
+        elsif @args .eql? from
+          @args = to
         elsif @args and (idx = @args.index(from))
           @args[idx] = to
         end
@@ -458,7 +460,8 @@ module Minjs
       end
 
       def to_js(options = {})
-        if @args and @args.length > 0
+        #TODO => simple_replacement
+        if @args# and @args.length > 0
           args = @args.collect{|x| x.to_js(options)}.join(",")
           concat options, :new, @name, '(', args, ')'
         else

@@ -8,5 +8,15 @@ describe 'Statement' do
 EOS
       expect(js).to eq ""
     end
+    it 'is empty statement' do
+      js = test_parse <<-EOS
+while(a)
+  if(a)
+    ;
+  else
+    ;
+EOS
+      expect(js).to eq "while(a)if(a);else;"
+    end
   end
 end

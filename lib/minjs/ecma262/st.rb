@@ -1146,19 +1146,17 @@ module Minjs
     #12.14
     class StTry < St
       attr_reader :context
-      attr_reader :catch_context
       attr_reader :try, :catch, :finally
 
-      def initialize(context, catch_context, try, catch, finally)
+      def initialize(context, try, catch, finally)
         @context = context
-        @catch_context = catch_context
         @try = try
         @catch = catch
         @finally = finally
       end
 
       def deep_dup
-        self.class.new(@context, @catch_context, @try, @catch, @finally)
+        self.class.new(@context, @try, @catch, @finally)
       end
 
       def replace(from, to)

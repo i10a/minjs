@@ -53,49 +53,34 @@ module Minjs
       @logger.info '* parse'
       parse(data)
 
-      @logger.info '* reorder_function_decl'
-      reorder_function_decl
+      if options[:only_parse]
+        return
+      end
 
-      @logger.info '* simple_replacement'
-      simple_replacement
-
-      @logger.info '* reorder_var'
-      reorder_var
-
-      @logger.info '* assignment_after_var'
-      assignment_after_var
-
-      @logger.info '* grouping_statement'
-      grouping_statement
-
-      @logger.info '* reduce_if'
-      reduce_if
-
-      @logger.info '* block_to_statement'
-      block_to_statement
-
-      @logger.info '* if_to_cond'
-      if_to_cond
-
-      @logger.info '* optimize_if_return'
-      optimize_if_return
-
-      @logger.info '* compress_var'
-      compress_var(@prog, :longer => true)
-      compress_var
-
-      @logger.info '* reduce_exp'
-      reduce_exp
-
-      grouping_statement
-      block_to_statement
-      if_to_cond
-
-      #feature
-      optimize_if_return2
-
-      @logger.info '* remove_paren'
-      remove_paren
+      algo = [
+        :reorder_function_decl,
+        :simple_replacement,
+        :reorder_var,
+        :assignment_after_var,
+        :grouping_statement,
+        :reduce_if,
+        :block_to_statement,
+        :if_to_cond,
+        :optimize_if_return,
+        :compress_var,
+        :reduce_exp,
+        :grouping_statement,
+        :block_to_statement,
+        :if_to_cond,
+        :optimize_if_return2,
+        :remove_paren,
+      ]
+      algo.each do |a|
+        if (options.empty? || options[:all] || options[a]) && !options[("no_" + a.to_s).to_sym]
+          @logger.info "* #{a}"
+          __send__(a, @prog)
+        end
+      end
 
       @heading_comments.reverse.each do |c|
         @prog.source_elements.source_elements.unshift(c)
@@ -106,7 +91,6 @@ module Minjs
     def parse(data)
       @lex = Minjs::Lex.new(data, :logger => @logger)
       @global_context = ECMA262::Context.new
-
       @heading_comments = []
       @lex.eval_lit{
         while a = @lex.ws_lit
@@ -191,14 +175,18 @@ module Minjs
     end
 
     def reorder_function_decl(node = @prog)
+      flist = []
       node.traverse(nil) {|st, parent|
         if st.kind_of? ECMA262::StFunc and parent.kind_of? ECMA262::StatementList and st.decl?
           if parent.index(st)
-            parent.remove(st)
-            parent.source_elements.unshift(st)
+            flist.push([st, parent])
           end
         end
       }
+      flist.reverse.each do |st, parent|
+        parent.remove(st)
+        parent.statement_list.unshift(st)
+      end
       self
     end
 
@@ -254,13 +242,18 @@ module Minjs
 
             idx = 0
             elems.each do |e|
+              next if e.kind_of? ECMA262::StFunc and e.decl?
               found = false
-              e.traverse(nil){|ee, pp|
-                if ee.kind_of? ECMA262::IdentifierName and var_vars[ee.val.to_sym]
-                  found = true
-                  break
-                end
-              }
+              if e.kind_of? ECMA262::StFunc and e.decl?
+                ;
+              else
+                e.traverse(nil){|ee, pp|
+                  if ee.kind_of? ECMA262::IdentifierName and var_vars[ee.val.to_sym]
+                    found = true
+                    break
+                  end
+                }
+              end
               break if found
               idx += 1
             end
@@ -275,35 +268,6 @@ module Minjs
         end
         self
       }
-=begin
-            st.traverse(parent) {|st2, parent2|
-              #
-              #if var statment has initializer,
-              #
-              #
-              if st2.kind_of? ECMA262::StVar and st2.context.var_env == @context.var_env
-                st2.instance_eval{
-                  blk = []
-                  @vars.each do |vl|
-                    if vl[1]
-                      blk.push(ECMA262::StExp.new(ECMA262::ExpAssign.new(vl[0], vl[1])))
-                    else
-                    end
-                  end
-                  parent2.replace(st2, ECMA262::StBlock.new(ECMA262::StatementList.new(blk)))
-                }
-              elsif st2.kind_of? ECMA262::StForVar and st2.context.var_env == @context.var_env
-                parent2.replace(st2, st2.to_st_for)
-              elsif st2.kind_of? ECMA262::StForInVar and st2.context.var_env == @context.var_env
-                parent2.replace(st2, st2.to_st_for_in)
-              end
-            }
-
-          }
-        end
-      }
-      remove_block_in_block
-=end
       self
     end
 
@@ -509,76 +473,93 @@ module Minjs
       self
     end
 
-    def compress_var(node = @prog, options = {})
-      if options[:longer]
-        var_sym = :aaaaaaaaaa
-      end
+    def compress_var(node = @prog)
+      #compress_var_sub(@prog, :longer => true)
+      compress_var_sub
+    end
 
+    def compress_var_sub(node = @prog, options = {})
       #
       #traverse all statemtns and expression
       #
       scopes = []
       node.traverse(nil) {|st, parent|
-        if st.kind_of? ECMA262::StTry and st.catch
-          _context = st.catch_context
-          _parent = st
-          _st = st.catch[1]
-        elsif st.kind_of? ECMA262::StFunc
+        if st.kind_of? ECMA262::StFunc
           _context = st.context
           _parent = parent
           _st = st
-        else
-          _parent = nil
-          _context = nil
-          _st = nil
-        end
-        if _parent and _context and _st
           scopes.push([st, parent, _parent, _context, _st])
         end
       }
-      #node.traverse(nil) {|st, parent|
-      scopes.reverse.each {|st, parent, _parent, _context, _st|
-        #p "*#{st.name.to_js}"
-        if !options[:longer]
-          var_sym = :a
-        end
+      scopes.reverse!
+      scopes.each {|st, parent, _parent, _context, _st|
+        var_sym = :a
         if _parent and _context and _st
           #
           # collect and counting all variables under this function/catch
+          # collect and counting all var-variables under this function/catch
           #
-          vars = {}
-          if st.kind_of? ECMA262::StTry
-            vars[st.catch[0].val.to_sym] = 1
-          end
+          all_vars = {}
+          var_vars = {}
+          var_vars_list = []
+          outer_vars = {}
+          nesting_vars = {}
+          nesting_vars_list = []
+
           _st.traverse(_parent) {|st2|
+            #
+            # In this function,
+            #
+            # 1. outer_vars:
+            #    Variables which locate out of this function(or global variable)
+            #    Them name cannot be renamed
+            # 2. nesting_vars:
+            #    Variables which locate in the function of this function.
+            #    Them name cannot be renamed
+            # 3. var_vars:
+            #    Variables which have same scope in this function.
+            #    Them name can be renamed under the following conditions
+            #
+            #   a. If the new name is not used, the name can be renamed to it.
+            #   b. If the new name belongs to var_vars, the name cannot be renamed.
+            #   c. If the new name belongs to outer_vars the name cannot be renamed.
+            #   d. If the new name belongs to nesting_vars, the name can be rename
+            #      to it after rename nesting_vars's name to another name.
+            #
             if st2.kind_of? ECMA262::IdentifierName
-              vars[st2.val.to_sym] ||= 0
-              vars[st2.val.to_sym] += 1
+              var_name = st2.val.to_sym
+              st2_env = st2.binding_env
+              all_vars[var_name] ||= 0
+              all_vars[var_name] += 1
+              if st2_env == nil #global
+                outer_vars[var_name] ||= 0
+                outer_vars[var_name] += 1
+              elsif st2_env == @global_context.var_env #global
+                outer_vars[var_name] ||= 0
+                outer_vars[var_name] += 1
+              elsif st2_env == st.context.var_env
+                var_vars[var_name] ||= 0
+                var_vars[var_name] += 1
+                var_vars_list.push(st2)
+              else
+                e = st2.binding_env
+                while e
+                  e = e.outer
+                  if e == st.context.var_env
+                    nesting_vars[var_name] ||= 0
+                    nesting_vars[var_name] += 1
+                    nesting_vars_list.push(st2)
+                    break
+                  end
+                  if e.nil?
+                    outer_vars[var_name] ||= 0
+                    outer_vars[var_name] += 1
+                    break
+                  end
+                end
+              end
             end
           }
-          #
-          # collect all var variables under this function
-          #
-          var_vars = {}
-          if st.kind_of? ECMA262::StFunc
-            _context.var_env.record.binding.each do|k, v|
-              var_vars[k] = (vars[k] || 1)
-            end
-          end
-          #
-          # collect all lexical variables under this catch clause
-          #
-          # currently, only catch's args is lex_var
-          #
-          lex_vars = {}
-          if st.kind_of? ECMA262::StTry
-            _context.lex_env.record.binding.each do|k, v|
-              lex_vars[k] = (vars[k] || 1)
-            end
-          end
-          #
-          # check `eval' function is exist under this function/catch
-          #
           unless var_vars[:eval]
             eval_flag = false
             _st.traverse(_parent) {|st2|
@@ -594,96 +575,82 @@ module Minjs
           #
           # sort var_vars
           #
-          var_vars = var_vars.sort {|(k1,v1), (k2,v2)| v2 <=> v1}
-          #p var_vars
+          var_vars_array = var_vars.sort {|(k1,v1), (k2,v2)| v2 <=> v1}
           #
-          # check var_vars
+          # create renaming table
           #
-          var_vars.each {|name, count|
+          rename_table = {}
+          var_vars_array.each {|name, count|
             if name.nil?
-              next
+              next #bug?
             end
-            while(vars[var_sym])
+            while outer_vars[var_sym] or var_vars[var_sym]
               var_sym = next_sym(var_sym)
             end
-            if (!options[:longer] && name.to_s.bytesize >= var_sym.to_s.bytesize) or
-              (options[:longer] && name.to_s.bytesize <= var_sym.to_s.bytesize)
-              #
-              # rename `name' to `var_sym'
-              #
-              func_name = nil
-              if _st.kind_of? ECMA262::StFunc and _st.decl?
-                func_name = _st.name
+            #rename nesting_vars
+            if nesting_vars[var_sym]
+              nesting_vars_list.each do |x|
+                raise 'error' if x.binding_env(:var).nil?
+                raise 'error' if x.binding_env(:lex).nil?
               end
-              _st.traverse(_parent){|st2|
-                if st2.kind_of? ECMA262::IdentifierName and st2.context.nil?
-                  ;# this
-                elsif st2.kind_of? ECMA262::IdentifierName and st2.context.var_env.outer == nil # global scope
-                  ;
-                elsif st2.kind_of? ECMA262::IdentifierName and st2.val == name
-                  # scope of function's name is outer
-                  if st2.eql?(func_name)
-                  else
-                    st2.instance_eval{
-                      @val = var_sym
-                    }
-                  end
-                elsif st2.kind_of? ECMA262::StFunc
-                  if st2.context.var_env.record.binding[name]
-                    st2.context.var_env.record.binding[var_sym] = st2.context.var_env.record.binding[name]
-                    st2.context.var_env.record.binding.delete(name)
-                  end
-                elsif st2.kind_of? ECMA262::StTry
-                  if st2.catch_context.lex_env.record.binding[name]
-                    st2.catch_context.lex_env.record.binding[var_sym] = st2.catch_context.lex_env.record.binding[name]
-                    st2.catch_context.lex_env.record.binding.delete(name)
-                  end
+
+              var_sym2 = "abc#{var_sym.to_s}".to_sym
+              while all_vars[var_sym2]
+                var_sym2 = next_sym(var_sym2)
+              end
+              rl = {}
+              nesting_vars_list.each do |x|
+                if x.val.to_sym == var_sym
+                  _var_env = x.binding_env(:var)
+                  _lex_env = x.binding_env(:lex)
+                  rl[_var_env] = true
+                  rl[_lex_env] = true
                 end
-              }
+              end
+              rl.keys.each do |_env|
+                if _env && _env.record.binding[var_sym]
+                  _env.record.binding[var_sym2] = _env.record.binding[var_sym]
+                  _env.record.binding.delete var_sym
+                end
+              end
+
+              nesting_vars_list.each do |x|
+                if x.val.to_sym == var_sym
+                  x.instance_eval{
+                    @val = var_sym2
+                  }
+                end
+                raise 'error' if x.binding_env(:var).nil?
+                raise 'error' if x.binding_env(:lex).nil?
+              end
             end
+            rename_table[name] = var_sym
             var_sym = next_sym(var_sym)
           }
-          lex_vars.each {|name, count|
-            if name.nil?
-              next
-            end
-            while(vars[var_sym])
-              var_sym = next_sym(var_sym)
-            end
-            if name.to_s.bytesize > var_sym.to_s.bytesize
-              #
-              # rename `name' to `var_sym'
-              #
-              _st.traverse(_parent){|st2|
-                if st2.kind_of? ECMA262::IdentifierName and st2.context.nil?
-                  ;# TODO, currently special identifier such as 'this' has no context
-                elsif st2.kind_of? ECMA262::IdentifierName and st2.context.lex_env.outer == nil # global scope
-                  ;
-                elsif st2.kind_of? ECMA262::IdentifierName and st2.val == name
-                  st2.instance_eval{
-                    @val = var_sym
-                  }
-                end
-              }
-              if st.kind_of? ECMA262::StTry
-                if st.catch[0].kind_of? ECMA262::IdentifierName
-                  st.catch[0].instance_eval{
-                    @val = var_sym
-                  }
-                elsif st2.kind_of? ECMA262::StFunc
-                  if st2.context.var_env.record.binding[name]
-                    st2.context.var_env.record.binding[var_sym] = st2.context.var_env.record.binding[name]
-                    st2.context.var_env.record.binding.delete(name)
-                  end
-                elsif st2.kind_of? ECMA262::StTry
-                  if st2.catch_context.lex_env.record.binding[name]
-                    st2.catch_context.lex_env.record.binding[var_sym] = st2.catch_context.lex_env.record.binding[name]
-                    st2.catch_context.lex_env.record.binding.delete(name)
-                  end
-                end
+          var_vars_list.each {|st2|
+            raise 'error' if st2.binding_env(:var).nil?
+            raise 'error' if st2.binding_env(:lex).nil?
+          }
+
+          rename_table.each do |name, new_name|
+            if name != new_name
+              if st.context.var_env.record.binding[name]
+                st.context.var_env.record.binding[new_name] = st.context.var_env.record.binding[name]
+                st.context.var_env.record.binding.delete(name)
+              end
+              if st.context.lex_env.record.binding[name]
+                st.context.lex_env.record.binding[new_name] = st.context.lex_env.record.binding[name]
+                st.context.lex_env.record.binding.delete(name)
               end
             end
-            var_sym = next_sym(var_sym)
+          end
+
+          var_vars_list.each {|st2|
+            st2.instance_eval{
+              @val = rename_table[@val]
+            }
+            raise 'error' if st2.binding_env(:var).nil?
+            raise 'error' if st2.binding_env(:lex).nil?
           }
         end
       }
@@ -700,6 +667,7 @@ module Minjs
     end
 
     def simple_replacement(node = @prog)
+      retry_flag = false
       node.traverse(nil) {|st, parent|
         #
         #true => !0
@@ -715,20 +683,7 @@ module Minjs
         #if(true){<then>}else{<else>} => then
         #
         elsif st.kind_of? ECMA262::StIf
-          #if(a)z;else;
-          #if(a)z;else{}
-          # => {if(a)z;}
-          if st.else_st and st.else_st.empty?
-            st.replace(st.else_st, nil)
-            parent.replace(st, ECMA262::StBlock.new([st]))
-          end
-          #if(a);
-          # => a
-          #if(a){}
-          # => a
-          if st.then_st.empty? and st.else_st.nil?
-            parent.replace(st, ECMA262::StExp.new(st.cond))
-          elsif st.cond.respond_to? :to_ecma262_boolean
+          if st.cond.respond_to? :to_ecma262_boolean
             if st.cond.to_ecma262_boolean
               parent.replace(st, st.then_st)
             elsif st.else_st
@@ -747,6 +702,12 @@ module Minjs
           else
             parent.replace(st, ECMA262::StEmpty.new)
           end
+        #
+        # new A() => (new A)
+        #
+        elsif st.kind_of? ECMA262::ExpNew and st.args and st.args.length == 0
+          st.replace(st.args, nil)
+          parent.add_paren.remove_paren
         end
       }
       self
@@ -755,27 +716,54 @@ module Minjs
     #
     # reduce_if
     #
-    # 1) rewrite nested "if" statemet such as:
-    # if(a)
-    #   if(b) ...;
-    #
-    # to:
-    #
-    # if(a && b) ...;
-    #
-    # NOTE:
-    # both if must not have "else" clause
-    #
     def reduce_if(node = @prog)
-      node.traverse(nil) {|st, parent|
-        if st.kind_of? ECMA262::StIf
-          if st.else_st.nil? and
-            st.then_st.kind_of? ECMA262::StIf and st.then_st.else_st.nil?
-            st.replace(st.cond, ECMA262::ExpLogicalAnd.new(st.cond, st.then_st.cond))
-            st.replace(st.then_st, st.then_st.then_st)
+      retry_flag = true
+      while(retry_flag)
+        retry_flag = false
+        node.traverse(nil) {|st, parent|
+          if st.kind_of? ECMA262::StIf
+            # if(a)
+            #   if(b) ...;
+            # if(a && b) ...;
+            #
+            if st.else_st.nil? and
+              st.then_st.kind_of? ECMA262::StIf and st.then_st.else_st.nil?
+              st.replace(st.cond, ECMA262::ExpLogicalAnd.new(st.cond, st.then_st.cond))
+              st.replace(st.then_st, st.then_st.then_st)
+            end
+            #if(a);
+            # => a
+            #if(a){}
+            # => a
+            if st.then_st.empty? and st.else_st.nil?
+              parent.replace(st, ECMA262::StExp.new(st.cond))
+              retry_flag = true
+            end
+            #if(a)z;else;
+            #if(a)z;else{}
+            # => {if(a)z;}
+            if st.else_st and st.else_st.empty?
+              st.replace(st.else_st, nil)
+              parent.replace(st, ECMA262::StBlock.new([st]))
+              retry_flag = true
+            end
+
+            #if(a);else z;
+            #=>if(!a)z;
+            #if(a){}else z;
+            #=>if(!a)z;
+            if st.then_st.empty? and st.else_st
+              st.replace(st.cond, ECMA262::ExpLogicalNot.new(st.cond));
+              else_st = st.else_st
+              st.replace(st.else_st, nil)
+              st.replace(st.then_st, else_st)
+              parent.replace(st, ECMA262::StBlock.new([st]))
+              retry_flag = true
+            end
           end
-        end
-      }
+        }
+        block_to_statement if retry_flag
+      end
       self
     end
 
@@ -858,10 +846,16 @@ end
 if $0 == __FILE__
   argv = ARGV.dup
   f = []
+  options = {}
   argv.each do |x|
-    f.push(open(x.to_s).read())
+    if x.match(/^--?/)
+      opt = $'.gsub(/-/, '_').to_sym
+      options[opt] = true
+    else
+      f.push(open(x.to_s).read())
+    end
   end
   comp = Minjs::Compressor.new(:debug => false)
-  comp.compress(f.join("\n"))
-  puts comp.to_js({})
+  comp.compress(f.join("\n"), options)
+  puts comp.to_js(options)
 end

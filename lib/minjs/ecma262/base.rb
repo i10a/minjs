@@ -39,8 +39,11 @@ module Minjs
           end
           #for debug
           unless options[:no_debug]
-            if @logger and @logger.debug?
+            if (@logger and @logger.debug?) || options[:debug]
               if js.match(/;\z/) and !options[:for_args]
+                nl = "\n"
+              end
+              if js.match(/}\z/) and !options[:for_args]
                 nl = "\n"
               end
             end

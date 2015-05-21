@@ -8,11 +8,12 @@ describe 'Compression' do
       c.parse <<-EOS
 foo;
 var a=function aa(){} // => is expression.
-var b=function (){} // => is expression.
 function cc(){} // => is declaration, move to top.
+var b=function (){} // => is expression.
+function dd(){} // => is declaration, move to top too.
 EOS
       js = c.reorder_function_decl.to_js
-      expect(js).to eq "function cc(){}foo;var a=function aa(){};var b=function(){};"
+      expect(js).to eq "function cc(){}function dd(){}foo;var a=function aa(){};var b=function(){};"
     end
   end
 end

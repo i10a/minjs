@@ -6,10 +6,9 @@ module Minjs
     def func_declaration(lex, context)
       return nil if lex.match_lit(ECMA262::ID_FUNCTION).nil?
       lex.eval_lit {
-        new_env = context.lex_env.new_declarative_env()
         new_context = ECMA262::Context.new
-        new_context.lex_env = new_env
-        new_context.var_env = new_env
+        new_context.lex_env = context.lex_env.new_declarative_env()
+        new_context.var_env = context.var_env.new_declarative_env()
 
         if id=identifier(lex, context) and
           lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and
@@ -39,11 +38,10 @@ module Minjs
       @logger.debug "*** func_exp"
 
       lex.eval_lit {
-         id_opt = identifier(lex, context)
-         new_env = context.lex_env.new_declarative_env()
-         new_context = ECMA262::Context.new
-         new_context.lex_env = new_env
-         new_context.var_env = new_env
+        id_opt = identifier(lex, context)
+        new_context = ECMA262::Context.new
+        new_context.lex_env = context.lex_env.new_declarative_env()
+        new_context.var_env = context.var_env.new_declarative_env()
 
          if lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and
            args = formal_parameter_list(lex, new_context) and
