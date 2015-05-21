@@ -721,7 +721,6 @@ module Minjs
           if st.else_st and st.else_st.empty?
             st.replace(st.else_st, nil)
             parent.replace(st, ECMA262::StBlock.new([st]))
-            puts parent.to_js
           end
           #if(a);
           # => a
