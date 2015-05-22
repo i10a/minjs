@@ -622,11 +622,12 @@ module Minjs
         # octal
         # Annex B
         if octal?(@codes[@pos])
-          oct = 0
-          while octal?(@codes[@pos])
+          oct = (@codes[@pos] - 0x30)
+          2.times do
+            break unless octal?(@codes[@pos+1])
+            @pos += 1
             oct *= 8
             oct += (@codes[@pos] - 0x30)
-            @pos += 1
           end
           [oct].pack("U*")
         else
