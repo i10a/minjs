@@ -181,7 +181,12 @@ module Minjs
       }
       flist.reverse.each do |st, parent|
         parent.remove(st)
-        parent.statement_list.unshift(st)
+        sl = parent.statement_list
+        if sl[0].kind_of? ECMA262::StExp and sl[0].exp.kind_of? ECMA262::ECMA262String and sl[0].exp.val == "use strict"
+          sl[1,0] = st
+        else
+          sl.unshift(st)
+        end
       end
       self
     end
@@ -238,9 +243,10 @@ module Minjs
 
             idx = 0
             elems.each do |e|
-              next if e.kind_of? ECMA262::StFunc and e.decl?
               found = false
               if e.kind_of? ECMA262::StFunc and e.decl?
+                ;
+              elsif e.kind_of? ECMA262::StExp and e.exp.kind_of? ECMA262::ECMA262String and e.exp.val == "use strict"
                 ;
               else
                 e.traverse(nil){|ee, pp|
@@ -515,12 +521,17 @@ module Minjs
             # 3. var_vars:
             #    Variables which have same scope in this function.
             #    Them name can be renamed under the following conditions
+            # 4. all_vars:
+            #    All variables under this function.
             #
             #   a. If the new name is not used, the name can be renamed to it.
             #   b. If the new name belongs to var_vars, the name cannot be renamed.
-            #   c. If the new name belongs to outer_vars the name cannot be renamed.
-            #   d. If the new name belongs to nesting_vars, the name can be rename
-            #      to it after rename nesting_vars's name to another name.
+            #   c. If the new name belongs to outer_vars and it belongs to all_vars,
+            #      the name cannot be renamed.
+            #   d. If the new name belongs to outer_vars but it does not belong to all_vars,
+            #      the name can be renamed to it.
+            #   e. If the new name belongs to nesting_vars, the name can be rename
+            #      to it after renaming nesting_vars's name to another name.
             #
             if st2.kind_of? ECMA262::IdentifierName
               var_name = st2.val.to_sym
@@ -580,7 +591,16 @@ module Minjs
             if name.nil?
               next #bug?
             end
-            while outer_vars[var_sym] or var_vars[var_sym]
+            while true
+              #condition b
+              if var_vars[var_sym]
+                ;
+              #condigion c
+              elsif outer_vars[var_sym] and all_vars[var_sym]
+                ;
+              else #condition a&d&e
+                break
+              end
               var_sym = next_sym(var_sym)
             end
             #rename nesting_vars

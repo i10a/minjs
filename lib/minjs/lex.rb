@@ -194,7 +194,8 @@ module Minjs
           chars.push(@codes[@pos])
           @pos += 1
         else
-          return ECMA262::IdentifierName.new(nil, chars.pack("U*").to_sym)
+          name = chars.pack("U*").to_sym
+          return ECMA262::IdentifierName.new(nil, name)
         end
       end
     end

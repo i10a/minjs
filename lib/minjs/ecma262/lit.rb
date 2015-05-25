@@ -1,4 +1,5 @@
 # coding: utf-8
+require 'set'
 module Minjs
   module ECMA262
     class Literal < Base
@@ -612,7 +613,7 @@ module Minjs
         @@sym[val] ||= self.new(context, val)
       end
 
-      RESERVED_WORD = [
+      RESERVED_WORD = Set.new [
         :break, :do, :instanceof, :typeof, :case, :else,
         :new, :var, :catch, :finally, :return, :void, :continue,
         :for, :switch, :while,:debugger, :function, :this, :with,
@@ -623,11 +624,11 @@ module Minjs
         :null, :false, :true
       ]
       def reserved?
-        RESERVED_WORD.index(val)
+        RESERVED_WORD.include?(val)
       end
 
       def self.reserved?(val)
-        RESERVED_WORD.index(val)
+        RESERVED_WORD.include?(val)
       end
 
       def traverse(parent)
