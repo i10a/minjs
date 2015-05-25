@@ -73,6 +73,7 @@ module Minjs
         :block_to_statement,
         :if_to_cond,
         :optimize_if_return2,
+        :optimize_if_return3,
         :remove_paren,
       ]
       algo.each do |a|
@@ -474,13 +475,33 @@ module Minjs
       }
       self
     end
-
-    def compress_var(node = @prog)
-      #compress_var_sub(@prog, :longer => true)
-      compress_var_sub
+    #
+    # feature
+    #
+    # if(a)b;else return c;
+    # =>
+    # if(!a)return c;b;
+    #
+    def optimize_if_return3(node = @prog)
+      node.traverse(nil) {|st, parent|
+        if st.kind_of? ECMA262::StIf and st.else_st and parent.kind_of? ECMA262::StatementList
+          st.remove_empty_statement
+          if (st.else_st.kind_of? ECMA262::StBlock and st.else_st[-1].kind_of? ECMA262::StReturn) or
+             st.else_st.kind_of? ECMA262::StReturn
+            idx = parent.index(st)
+            parent[idx+1..0] = st.then_st
+            st.instance_eval{
+              @then_st = @else_st
+              @else_st = nil
+              @cond = ECMA262::ExpLogicalNot.new(@cond)
+            }
+          end
+        end
+      }
+      self
     end
 
-    def compress_var_sub(node = @prog, options = {})
+    def compress_var(node = @prog, options = {})
       #
       #traverse all statemtns and expression
       #
@@ -696,16 +717,19 @@ module Minjs
             parent.replace(st, ECMA262::ExpParen.new(ECMA262::ExpLogicalNot.new(ECMA262::ECMA262Numeric.new(1))))
           end
         #
-        #if(true){<then>}else{<else>} => then
+        #if(true){<then>}else{<else>} => <then>
+        #if(false){<then>}else{<else>} => <else>
         #
         elsif st.kind_of? ECMA262::StIf
           if st.cond.respond_to? :to_ecma262_boolean
-            if st.cond.to_ecma262_boolean
+            if st.cond.to_ecma262_boolean.nil?
+              ;
+            elsif st.cond.to_ecma262_boolean == true
               parent.replace(st, st.then_st)
-            elsif st.else_st
+            elsif st.cond.to_ecma262_boolean == false and st.else_st
               parent.replace(st, st.else_st)
-            else
-              parent.replace(st, ECMA262::StEmpty.new())
+            elsif st.cond.to_ecma262_boolean == false
+              parent.replace(st, ECMA262::StEmpty.new)
             end
           end
         #
@@ -713,7 +737,9 @@ module Minjs
         # while(false) => remove
         #
         elsif st.kind_of? ECMA262::StWhile and st.exp.respond_to? :to_ecma262_boolean
-          if st.exp.to_ecma262_boolean
+          if st.exp.to_ecma262_boolean.nil?
+            ;
+          elsif st.exp.to_ecma262_boolean
             parent.replace(st, ECMA262::StFor.new(nil,nil,nil, st.statement))
           else
             parent.replace(st, ECMA262::StEmpty.new)
@@ -776,6 +802,35 @@ module Minjs
               parent.replace(st, ECMA262::StBlock.new([st]))
               retry_flag = true
             end
+=begin
+#feature
+            #
+            #if(!(a&&b))
+            #=>
+            #if(!a||!b)
+            #
+            #if(!(a||b))
+            #=>
+            #if(!a&&!b)
+            #
+            if st.cond.kind_of? ECMA262::ExpLogicalNot and st.cond.val.kind_of? ECMA262::ExpParen and
+              st.cond.val.val.kind_of? ECMA262::ExpLogicalAnd
+              a = ECMA262::ExpLogicalNot.new(st.cond.val.val.val)
+              b = ECMA262::ExpLogicalNot.new(st.cond.val.val.val2)
+              r = ECMA262::ExpLogicalOr.new(a,b).add_paren.remove_paren
+              if r.to_js.length < st.cond.to_js.length
+                st.replace(st.cond, r)
+              end
+            elsif st.cond.kind_of? ECMA262::ExpLogicalNot and st.cond.val.kind_of? ECMA262::ExpParen and
+              st.cond.val.val.kind_of? ECMA262::ExpLogicalOr
+              a = ECMA262::ExpLogicalNot.new(st.cond.val.val.val)
+              b = ECMA262::ExpLogicalNot.new(st.cond.val.val.val2)
+              r = ECMA262::ExpLogicalAnd.new(a,b).add_paren.remove_paren
+              if r.to_js.length < st.cond.to_js.length
+                st.replace(st.cond, r)
+              end
+            end
+=end
           end
         }
         block_to_statement if retry_flag

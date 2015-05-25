@@ -232,6 +232,12 @@ module Minjs
         self
       end
 
+      def to_ecma262_boolean
+        return nil unless @val.respond_to? :to_ecma262_boolean
+        return nil if @val.to_ecma262_boolean.nil?
+        @val.to_ecma262_boolean
+      end
+
       def ecma262_typeof
         if @val.respond_to? :ecma262_typeof
           @val.ecma262_typeof
@@ -676,7 +682,6 @@ module Minjs
         PRIORITY_UNARY
       end
 
-      #feature
       def reduce(parent)
         if @val.kind_of? ECMA262Numeric and (@val.to_js == "0" || @val.to_js == "1")
           return
@@ -693,6 +698,12 @@ module Minjs
            @val.val.ecma262_typeof == :boolean
             parent.replace(self, @val.val)
         end
+      end
+
+      def to_ecma262_boolean
+        return nil unless @val.respond_to? :to_ecma262_boolean
+        return nil if @val.to_ecma262_boolean.nil?
+        !@val.to_ecma262_boolean
       end
 
       def ecma262_eval(type)
@@ -1180,6 +1191,19 @@ module Minjs
         PRIORITY_LOGICAL_AND
       end
 
+      def to_ecma262_boolean
+        if @val.respond_to? :to_ecma262_boolean and @val2.respond_to? :to_ecma262_boolean
+          return nil if @val.to_ecma262_boolean == nil or @val2.to_ecma262_boolean == nil
+          if @val.to_ecma262_boolean and @val2.to_ecma262_boolean
+            true
+          else
+            false
+          end
+        else
+          nil
+        end
+      end
+
       def ecma262_typeof
         if @val.respond_to? :ecma262_typeof and @val2.respond_to? :ecma262_typeof
            if @val.ecma262_typeof == @val2.ecma262_typeof
@@ -1198,6 +1222,19 @@ module Minjs
 
       def priority
         PRIORITY_LOGICAL_OR
+      end
+
+      def to_ecma262_boolean
+        if @val.respond_to? :to_ecma262_boolean and @val2.respond_to? :to_ecma262_boolean
+          return nil if @val.to_ecma262_boolean == nil or @val2.to_ecma262_boolean == nil
+          if @val.to_ecma262_boolean or @val2.to_ecma262_boolean
+            true
+          else
+            false
+          end
+        else
+          nil
+        end
       end
 
       def ecma262_typeof

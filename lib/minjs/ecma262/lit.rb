@@ -424,6 +424,10 @@ module Minjs
         yield self, parent
       end
 
+      def to_ecma262_boolean
+        true
+      end
+
       def ==(obj)
         self.class == obj.class and @body == obj.body and @flags == obj.flags
       end

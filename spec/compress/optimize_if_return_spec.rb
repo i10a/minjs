@@ -12,13 +12,22 @@ EOS
       expect(js).to eq "if(a)return b;else return c;"
     end
 
-    it 'remove else block' do
+    it 'remove else clause' do
       c = test_compressor
       c.parse <<-EOS
 if(a)return b;else c;
 EOS
       js = c.optimize_if_return2.to_js
       expect(js).to eq "if(a)return b;c;"
+    end
+
+    it 'remove then clause' do
+      c = test_compressor
+      c.parse <<-EOS
+if(a)b;else return c;
+EOS
+      js = c.optimize_if_return3.to_js
+      expect(js).to eq "if(!a)return c;b;"
     end
   end
 end

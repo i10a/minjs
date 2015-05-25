@@ -14,6 +14,7 @@ EOS
       js = c.reduce_exp.to_js
       expect(js).to eq "typeof A==\"string\";typeof A!=\"string\";+A==0;(a=\"0\")==\"0\";"
     end
+
     it 'reduce to assignment expression' do
       c = test_compressor
       c.parse <<-EOS
@@ -32,6 +33,7 @@ EOS
       js = c.reduce_exp.to_js
       expect(js).to eq "(a/=2);(a*=2);(a%=2);(a+=2);(a-=2);(a<<=2);(a>>=2);(a>>>=2);(a&=2);(a|=2);(a^=2);"
     end
+
     it 'reduce logical not expression' do
       c = test_compressor
       c.parse "! ! ! !a; ! ! ! ! 0; ! ! ! 1234;! ! ! ! !{}"
