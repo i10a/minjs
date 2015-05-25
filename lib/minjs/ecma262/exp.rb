@@ -744,30 +744,18 @@ module Minjs
       end
 
       def reduce(parent)
-        # a * 1 => a
-        if @val.kind_of? ECMA262Numeric and @val2.kind_of? ECMA262Numeric and @val.to_num == 1
-          parent.replace(self, @val2)
-        end
-        # 1 * b => b
-        if @val.kind_of? ECMA262Numeric and @val2.kind_of? ECMA262Numeric and @val2.to_num == 1
-          parent.replace(self, @val)
-        end
-        # N * M => (N * M)
-        if @val.kind_of? ECMA262Numeric and @val2.kind_of? ECMA262Numeric and @val.integer? and @val2.integer?
-          parent.replace(self, ECMA262Numeric.new(@val.to_num * @val2.to_num))
-        end
-=begin
-        # ((a * N) * M) or ((N * a) * M)
-        if @val2.kind_of? ECMA262Numeric and @val2.integer? and @val.kind_of? ExpMul
-          if @val.val2.kind_of? ECMA262Numeric and @val.val2.integer?
-            @val2 = ECMA262Numeric.new(@val.val2.to_num * @val2.to_num)
-            @val = @val.val
-          elsif @val.val.kind_of? ECMA262Numeric and @val.val.integer?
-            @val2 = ECMA262Numeric.new(@val.val.to_num * @val2.to_num)
-            @val = @val.val2
+        if @val.kind_of? ECMA262Numeric and @val2.kind_of? ECMA262Numeric
+          # a * 1 => a
+          if @val.to_f == 1
+            parent.replace(self, @val2)
+          # 1 * b => b
+          elsif @val2.to_f == 1
+            parent.replace(self, @val)
+          # N * M => (N * M)
+          else
+            parent.replace(self, ECMA262Numeric.new(@val.to_f * @val2.to_f))
           end
         end
-=end
       end
 
       def ecma262_typeof
@@ -826,17 +814,31 @@ module Minjs
       end
 
       def reduce(parent)
+        #
+        # Integer+
         # a + 0 => a
-        if @val.kind_of? ECMA262Numeric and @val2.kind_of? ECMA262Numeric and @val.to_num == 0
-          parent.replace(self, @val2)
-        end
-        # 0 + b => b
-        if @val.kind_of? ECMA262Numeric and @val2.kind_of? ECMA262Numeric and @val2.to_num == 0
-          parent.replace(self, @val)
-        end
-        # N + M => (N + M)
-        if @val.kind_of? ECMA262Numeric and @val2.kind_of? ECMA262Numeric and @val.integer? and @val2.integer?
-          parent.replace(self, ECMA262Numeric.new(@val.to_num + @val2.to_num))
+        if @val.kind_of? ECMA262Numeric and @val2.kind_of? ECMA262Numeric
+          if @val.to_f == 0
+            parent.replace(self, @val2)
+          elsif @val2.to_f  == 0
+            parent.replace(self, @val)
+          #
+          #11.6.3 Applying the Additive Operators to Numbers(TODO)
+          #
+          # N + M => (N + M)
+          elsif @val.nan? or @val2.nan?
+            #TODO;
+          elsif @val.infinity? or @val2.infinity?
+            #TODO;
+          else
+            parent.replace(self, ECMA262Numeric.new(@val.to_f + @val2.to_f))
+          end
+        #
+        # String+
+        # a + b = a.concat(b)
+        elsif @val.kind_of? ECMA262String and @val2.kind_of? ECMA262String
+          new_str = ECMA262String.new(@val.val.to_s + @val2.val.to_s)
+          parent.replace(self, new_str)
         end
       end
     end
@@ -856,16 +858,16 @@ module Minjs
 
       def reduce(parent)
         # a - 0 => a
-        if @val.kind_of? ECMA262Numeric and @val2.kind_of? ECMA262Numeric and @val.to_num == 0
-          parent.replace(self, @val2)
-        end
-        # 0 - b => b
-        if @val2.kind_of? ECMA262Numeric and @val.kind_of? ECMA262Numeric and @val2.to_num == 0
-          parent.replace(self, @val)
-        end
-        # N - M => (N - M)
-        if @val.kind_of? ECMA262Numeric and @val2.kind_of? ECMA262Numeric and @val.integer? and @val2.integer?
-          parent.replace(self, ECMA262Numeric.new(@val.to_num - @val2.to_num))
+        if @val.kind_of? ECMA262Numeric and @val2.kind_of? ECMA262Numeric
+          if @val.to_num == 0
+            parent.replace(self, @val2)
+          # 0 - b => b
+          elsif @val2.to_num == 0
+            parent.replace(self, @val)
+          # N - M => (N - M)
+          else
+            parent.replace(self, ECMA262Numeric.new(@val.to_f - @val2.to_f))
+          end
         end
       end
 

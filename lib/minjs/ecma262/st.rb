@@ -279,10 +279,6 @@ module Minjs
         @else_st = else_st
       end
 
-      def deep_dup
-        self.class.new(@cond.deep_dup, @then_st.deep_dup, @else_st.deep_dup)
-      end
-
       def replace(from, to)
         if from .eql? @cond
           @cond = to

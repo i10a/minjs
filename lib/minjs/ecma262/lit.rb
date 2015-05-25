@@ -269,7 +269,7 @@ module Minjs
           @infinity = true
         elsif integer.kind_of? Float
           @integer, @decimal = integer.to_i.to_s
-          @decimal = (integer - @integer).to_s.sub(/^.*0\./, '')
+          @decimal = (integer - @integer.to_f).to_s.sub(/^.*0\./, '')
         else
           @integer = integer.to_s
           if decimal
@@ -298,6 +298,7 @@ module Minjs
         if @nan
           return "NaN"
         end
+        t0 = to_ecma262_string
         t = @integer.dup.to_s
 
         if @decimal
@@ -315,20 +316,20 @@ module Minjs
           len = $&.length
           t.sub!(/0+$/, "e#{len}")
         end
-        t
+        t.length <= t0.length ? t : t0
       end
 
-      def integer?
-        @decimal.nil?
-      end
+#      def integer?
+#        @decimal.nil?
+#      end
 
-      def to_num
-        if @decimal
-          to_f
-        else
-          to_i
-        end
-      end
+#      def to_num
+#        if @decimal
+#          to_f
+#        else
+#          to_i
+#        end
+#      end
 
       def to_i
         if @exp
@@ -344,6 +345,14 @@ module Minjs
           d = '0'
         end
         "#{@integer}.#{d}e#{@exp}".to_f
+      end
+
+      def nan?
+        @nan
+      end
+
+      def infinity?
+        @infinity
       end
 
       #

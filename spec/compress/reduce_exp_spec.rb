@@ -40,6 +40,20 @@ EOS
       js = c.reduce_exp.to_js
       expect(js).to eq "!!a;!1;!1;!{};"
     end
+
+    it 'reduce add expression' do
+      c = test_compressor
+      c.parse <<-EOS
+1+0;
+0+2;
+1+3;
+1.4+3.5;
+"a"+"b"
+EOS
+      js = c.reduce_exp.to_js
+      expect(js).to eq "1;2;4;4.9;\"ab\";"
+    end
+
   end
 end
 
