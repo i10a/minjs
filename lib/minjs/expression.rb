@@ -31,7 +31,9 @@ module Minjs
       } || lex.eval_lit {
         object_literal(lex, context, options)
       }
-      @logger.debug "*** primary_exp => #{t ? t.to_js : t}"
+      @logger.debug {
+        "*** primary_exp => #{t ? t.to_js : t}"
+      }
       t
     end
 
@@ -162,7 +164,9 @@ module Minjs
       } || lex.eval_lit{
         new_exp(lex, context, options)
       }
-      @logger.debug "*** left_hand_side_exp => #{t ? t.to_js: t}"
+      @logger.debug{
+        "*** left_hand_side_exp => #{t ? t.to_js: t}"
+      }
       t
     end
 
@@ -696,7 +700,9 @@ module Minjs
             raise ParseError.new("unexpceted token", lex)
           end
         else
-          @logger.debug "*** assignment_exp => #{t ? t.to_js : t}"
+          @logger.debug {
+            "*** assignment_exp => #{t ? t.to_js : t}"
+          }
           t
         end
       }
@@ -716,7 +722,9 @@ module Minjs
             raise ParseError.new("unexpceted token", lex)
           end
         end
-        @logger.debug "*** expression => #{t ? t.to_js : t}"
+        @logger.debug{
+          "*** expression => #{t ? t.to_js : t}"
+        }
         t
       }
     end

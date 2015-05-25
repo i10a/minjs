@@ -618,10 +618,12 @@ module Minjs
         @pos += 4
         t
       else
-        #
+        # line continuation
+        if line_terminator?(@codes[@pos])
+          ""
         # octal
         # Annex B
-        if octal?(@codes[@pos])
+        elsif octal?(@codes[@pos])
           oct = (@codes[@pos] - 0x30)
           2.times do
             break unless octal?(@codes[@pos+1])

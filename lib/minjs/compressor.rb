@@ -85,7 +85,7 @@ module Minjs
       @heading_comments.reverse.each do |c|
         @prog.source_elements.source_elements.unshift(c)
       end
-      to_js(options)
+      self
     end
 
     def parse(data)
@@ -100,11 +100,7 @@ module Minjs
       }
       @prog = source_elements(@lex, @global_context)
 
-      #a = @prog.deep_dup
-      #a == @prog
-
       remove_empty_statement
-      #@prog
       self
     end
 

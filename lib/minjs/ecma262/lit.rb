@@ -199,12 +199,21 @@ module Minjs
       end
 
       def to_js(options = {})
-        t = "\""
+        dq = @val.to_s.each_codepoint.select{|x| x == 0x22}.length
+        sq = @val.to_s.each_codepoint.select{|x| x == 0x27}.length
+        if dq <= sq
+          t = "\""
+        else
+          t = "\'"
+        end
+
         @val.to_s.each_codepoint do |c|
           if c == 0x5c
             t << ('\\\\')
-          elsif c == 0x22
+          elsif c == 0x22 and dq <= sq
             t << ('\"')
+          elsif c == 0x27 and dq > sq
+            t << ('\\\'')
           elsif c >= 0x20 and c <= 0x7f
             t << ("%c" % c)
           elsif c == 8
@@ -227,7 +236,11 @@ module Minjs
             t << [c].pack("U*")
           end
         end
-        t << "\""
+        if dq <= sq
+          t << "\""
+        else
+          t << "\'"
+        end
       end
 
       def to_ecma262_boolean
