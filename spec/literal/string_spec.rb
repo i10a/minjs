@@ -13,7 +13,17 @@ a="a\x42c"
 a="a\102c"
 a="あいうえお"
 EOS
-      expect(js).to eq('a="";a="abc";a="a\nbc";a="aBc";a="aBc";a="aB";a="あいうえお";')
+      expect(js).to eq('a="";a="abc";a="a\nbc";a="aBc";a="aBc";a="aBc";a="あいうえお";')
+    end
+
+    it 'handles octal literals correctly' do
+      js = test_parse <<-'EOS'
+a = '\0'
+a = "\10"
+a = "\100"
+a = "\1000"
+EOS
+      expect(js).to eq("a=\"\\0\";a=\"\\b\";a=\"@\";a=\"@0\";")
     end
   end
 end
