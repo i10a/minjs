@@ -68,7 +68,7 @@ module Minjs
       end
 
       def debug
-        STDERR.puts @record.binding
+        STDERR.puts @record.binding.keys.join(", ")
       end
     end
 

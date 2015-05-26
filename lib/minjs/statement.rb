@@ -414,13 +414,14 @@ module Minjs
     def try_statement(lex, context)
       return nil unless lex.match_lit(ECMA262::ID_TRY)
       lex.eval_lit {
-        catch_context = ECMA262::Context.new
         #
-        # catch context must be executable lexical environment
+        # The catch argument context must be executable lexical environment.
+        # See compress_var
         #
-        catch_env = context.var_env.new_declarative_env()
-        catch_context.lex_env = catch_env
-        catch_context.var_env = context.var_env
+        #catch_context = ECMA262::Context.new
+        #catch_context.lex_env = context.lex_env
+        #catch_context.var_env = context.var_env
+        catch_context = context
 
         t = block(lex, context)
         break nil unless t
@@ -442,12 +443,12 @@ module Minjs
       return nil unless lex.match_lit(ECMA262::ID_CATCH)
 
       if lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and i=identifier(lex, catch_context) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and b=block(lex, catch_context)
-        catch_context.lex_env.record.create_mutable_binding(i, nil)
-        catch_context.lex_env.record.set_mutable_binding(i, :undefined, nil, {:_parameter_list => true})
-        catch_context.var_env.record.create_mutable_binding(i, nil)
-        catch_context.var_env.record.set_mutable_binding(i, :undefined, nil, {:_parameter_list => true})
-        catch_context.var_env.record.binding.each do|k, v|
-        end
+#        catch_context.lex_env.record.create_mutable_binding(i, nil)
+#        catch_context.lex_env.record.set_mutable_binding(i, :undefined, nil, {:_parameter_list => true})
+#        catch_context.var_env.record.create_mutable_binding(i, nil)
+#        catch_context.var_env.record.set_mutable_binding(i, :undefined, nil, {:_parameter_list => true})
+#        catch_context.var_env.record.binding.each do|k, v|
+#        end
         [i, b]
       else
         nil

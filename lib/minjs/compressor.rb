@@ -502,194 +502,221 @@ module Minjs
     end
 
     def compress_var(node = @prog, options = {})
-      #
-      #traverse all statemtns and expression
-      #
-      scopes = []
+      func_scopes = []
+      catch_scopes = []
       node.traverse(nil) {|st, parent|
         if st.kind_of? ECMA262::StFunc
-          _context = st.context
-          _parent = parent
-          _st = st
-          scopes.push([st, parent, _parent, _context, _st])
+          func_scopes.push([st, parent])
+        elsif st.kind_of? ECMA262::StTry
+          catch_scopes.push([st, parent])
+        elsif st.kind_of? ECMA262::StWith
+          #TODO
         end
       }
-      scopes.reverse!
-      scopes.each {|st, parent, _parent, _context, _st|
-        var_sym = :a
-        if _parent and _context and _st
-          #
-          # collect and counting all variables under this function/catch
-          # collect and counting all var-variables under this function/catch
-          #
-          all_vars = {}
-          var_vars = {}
-          var_vars_list = []
-          outer_vars = {}
-          nesting_vars = {}
-          nesting_vars_list = []
+      #10.2
+      #
+      # Catch clause of a TryStatement and a new Lexical Environment is
+      # created each time such code is evaluated.
+      #
+      catch_scopes.each{|st, parent|
+        catch_context = ECMA262::Context.new
+        catch_context.lex_env = st.context.lex_env.new_declarative_env()
+        catch_context.var_env = st.context.var_env
+        catch_context.lex_env.record.create_mutable_binding(st.catch[0], nil)
+        catch_context.lex_env.record.set_mutable_binding(st.catch[0], :undefined, nil)
+        st.catch[0].context = catch_context
 
-          _st.traverse(_parent) {|st2|
-            #
-            # In this function,
-            #
-            # 1. outer_vars:
-            #    Variables which locate out of this function(or global variable)
-            #    Them name cannot be renamed
-            # 2. nesting_vars:
-            #    Variables which locate in the function of this function.
-            #    Them name cannot be renamed
-            # 3. var_vars:
-            #    Variables which have same scope in this function.
-            #    Them name can be renamed under the following conditions
-            # 4. all_vars:
-            #    All variables under this function.
-            #
-            #   a. If the new name is not used, the name can be renamed to it.
-            #   b. If the new name belongs to var_vars, the name cannot be renamed.
-            #   c. If the new name belongs to outer_vars and it belongs to all_vars,
-            #      the name cannot be renamed.
-            #   d. If the new name belongs to outer_vars but it does not belong to all_vars,
-            #      the name can be renamed to it.
-            #   e. If the new name belongs to nesting_vars, the name can be rename
-            #      to it after renaming nesting_vars's name to another name.
-            #
-            if st2.kind_of? ECMA262::IdentifierName
-              var_name = st2.val.to_sym
-              st2_env = st2.binding_env
-              all_vars[var_name] ||= 0
-              all_vars[var_name] += 1
-              if st2_env == nil #global
-                outer_vars[var_name] ||= 0
-                outer_vars[var_name] += 1
-              elsif st2_env == @global_context.var_env #global
-                outer_vars[var_name] ||= 0
-                outer_vars[var_name] += 1
-              elsif st2_env == st.context.var_env
-                var_vars[var_name] ||= 0
-                var_vars[var_name] += 1
-                var_vars_list.push(st2)
-              else
-                e = st2.binding_env
-                while e
-                  e = e.outer
-                  if e == st.context.var_env
-                    nesting_vars[var_name] ||= 0
-                    nesting_vars[var_name] += 1
-                    nesting_vars_list.push(st2)
-                    break
-                  end
-                  if e.nil?
-                    outer_vars[var_name] ||= 0
-                    outer_vars[var_name] += 1
-                    break
-                  end
-                end
-              end
-            end
-          }
-          unless var_vars[:eval]
-            eval_flag = false
-            _st.traverse(_parent) {|st2|
-              if st2.kind_of? ECMA262::ExpCall and st2.name.to_js({}) == "eval"
-                eval_flag = true
-                break
-              end
-            }
-            if eval_flag
-              next
-            end
+        st.catch[1].traverse(parent){|st2|
+          if st2.kind_of? ECMA262::IdentifierName and st2 == st.catch[0] and
+            st2.binding_env == st.catch[0].binding_env
+            st2.context = catch_context
           end
-          #
-          # sort var_vars
-          #
-          var_vars_array = var_vars.sort {|(k1,v1), (k2,v2)| v2 <=> v1}
-          #
-          # create renaming table
-          #
-          rename_table = {}
-          var_vars_array.each {|name, count|
-            if name.nil?
-              next #bug?
-            end
-            while true
-              #condition b
-              if var_vars[var_sym]
-                ;
-              #condigion c
-              elsif outer_vars[var_sym] and all_vars[var_sym]
-                ;
-              else #condition a&d&e
-                break
-              end
-              var_sym = next_sym(var_sym)
-            end
-            #rename nesting_vars
-            if nesting_vars[var_sym]
-              nesting_vars_list.each do |x|
-                raise 'error' if x.binding_env(:var).nil?
-                raise 'error' if x.binding_env(:lex).nil?
-              end
-
-              var_sym2 = "abc#{var_sym.to_s}".to_sym
-              while all_vars[var_sym2]
-                var_sym2 = next_sym(var_sym2)
-              end
-              rl = {}
-              nesting_vars_list.each do |x|
-                if x.val.to_sym == var_sym
-                  _var_env = x.binding_env(:var)
-                  _lex_env = x.binding_env(:lex)
-                  rl[_var_env] = true
-                  rl[_lex_env] = true
-                end
-              end
-              rl.keys.each do |_env|
-                if _env && _env.record.binding[var_sym]
-                  _env.record.binding[var_sym2] = _env.record.binding[var_sym]
-                  _env.record.binding.delete var_sym
-                end
-              end
-
-              nesting_vars_list.each do |x|
-                if x.val.to_sym == var_sym
-                  x.instance_eval{
-                    @val = var_sym2
-                  }
-                end
-                raise 'error' if x.binding_env(:var).nil?
-                raise 'error' if x.binding_env(:lex).nil?
-              end
-            end
-            rename_table[name] = var_sym
-            var_sym = next_sym(var_sym)
-          }
-          var_vars_list.each {|st2|
-            raise 'error' if st2.binding_env(:var).nil?
-            raise 'error' if st2.binding_env(:lex).nil?
-          }
-
-          rename_table.each do |name, new_name|
-            if name != new_name
-              if st.context.var_env.record.binding[name]
-                st.context.var_env.record.binding[new_name] = st.context.var_env.record.binding[name]
-                st.context.var_env.record.binding.delete(name)
-              end
-              if st.context.lex_env.record.binding[name]
-                st.context.lex_env.record.binding[new_name] = st.context.lex_env.record.binding[name]
-                st.context.lex_env.record.binding.delete(name)
-              end
-            end
-          end
-
-          var_vars_list.each {|st2|
-            st2.instance_eval{
-              @val = rename_table[@val]
-            }
-            raise 'error' if st2.binding_env(:var).nil?
-            raise 'error' if st2.binding_env(:lex).nil?
-          }
+        }
+        func_scopes.unshift([st, parent])
+      }
+      func_scopes.reverse!
+      func_scopes.each {|st, parent|
+        if st.kind_of? ECMA262::StFunc
+          context = st.context
+        elsif st.kind_of? ECMA262::StTry
+          context = st.catch[0].context
         end
+        var_sym = :a
+        #
+        # collect and counting all variables under this function
+        #
+        all_vars = {}
+        var_vars = {}
+        var_vars_list = []
+        outer_vars = {}
+        nesting_vars = {}
+        nesting_vars_list = []
+
+        st.traverse(parent) {|st2|
+          #
+          # Next, tring to rename var_vars(see bellow) to
+          # new name.
+          #
+          # 1. outer_vars:
+          #    Variables which locate out of this function(or global variable)
+          #    Them name cannot be renamed
+          # 2. nesting_vars:
+          #    Variables which locate in the function of this function.
+          #    Them name cannot be renamed
+          # 3. var_vars:
+          #    Variables which have same scope in this function.
+          # 4. all_vars:
+          #    All variables under this function.
+          #
+          #   a. If the new name is not in all_vars, the name can be renamed to it.
+          #   b. If the new name belongs to var_vars, the name cannot be renamed.
+          #   c. If the new name belongs to outer_vars the name cannot be renamed.
+          #   d. If the new name belongs to nesting_vars, the name can be rename
+          #      to it after renaming nesting_vars's name to another name.
+          #
+          if st2.kind_of? ECMA262::IdentifierName
+            var_name = st2.val.to_sym
+            #st2_var_env = st2.binding_env
+            st2_lex_env = st2.binding_env(:lex)
+            all_vars[var_name] ||= 0
+            all_vars[var_name] += 1
+            if st2_lex_env == nil #global
+              outer_vars[var_name] ||= 0
+              outer_vars[var_name] += 1
+            elsif st2_lex_env == @global_context.lex_env #global
+              outer_vars[var_name] ||= 0
+              outer_vars[var_name] += 1
+#            elsif st2_lex_env == context.lex_env and st2_lex_env != context.lex_env
+#              nesting_vars[var_name] ||= 0
+#              nesting_vars[var_name] += 1
+#              nesting_vars_list.push(st2)
+            elsif st2_lex_env == context.lex_env
+              var_vars[var_name] ||= 0
+              var_vars[var_name] += 1
+              var_vars_list.push(st2)
+            else
+              e = st2.binding_env(:lex)
+              while e
+                e = e.outer
+                if e == context.lex_env
+                  nesting_vars[var_name] ||= 0
+                  nesting_vars[var_name] += 1
+                  nesting_vars_list.push(st2)
+                  break
+                end
+                if e.nil?
+                  outer_vars[var_name] ||= 0
+                  outer_vars[var_name] += 1
+                  break
+                end
+              end
+            end
+          end
+        }
+        unless var_vars[:eval]
+          eval_flag = false
+          st.traverse(parent) {|st2|
+            if st2.kind_of? ECMA262::ExpCall and st2.name.to_js({}) == "eval"
+              eval_flag = true
+              break
+            end
+          }
+          if eval_flag
+            next
+          end
+        end
+        #
+        # sort var_vars
+        #
+        var_vars_array = var_vars.sort {|(k1,v1), (k2,v2)| v2 <=> v1}
+        #
+        # create renaming table
+        #
+        rename_table = {}
+        var_vars_array.each {|name, count|
+          if name.nil?
+            next #bug?
+          end
+          #STDERR.puts "trying to rename #{name}"
+          while true
+            #condition b
+            if var_vars[var_sym]
+              #STDERR.puts "var_vars has #{var_sym}"
+            #condigion c
+            elsif outer_vars[var_sym]
+              #STDERR.puts "outer_vars has #{var_sym}"
+            else #condition a&d
+              #STDERR.puts "->#{var_sym}"
+              break
+            end
+            var_sym = next_sym(var_sym)
+          end
+          #rename nesting_vars
+          if nesting_vars[var_sym]
+            #STDERR.puts "nesting_vars has #{var_sym}"
+            nesting_vars_list.each do |x|
+              #raise 'error' if x.binding_env(:var).nil?
+              raise 'error' if x.binding_env(:lex).nil?
+            end
+
+            var_sym2 = "XXX#{var_sym.to_s}".to_sym
+            while all_vars[var_sym2]
+              var_sym2 = next_sym(var_sym2)
+            end
+            #STDERR.puts "#{var_sym}->#{var_sym2}"
+            rl = {}
+            nesting_vars_list.each do |x|
+              if x.val.to_sym == var_sym
+                _var_env = x.binding_env(:var)
+                _lex_env = x.binding_env(:lex)
+                rl[_var_env] = true
+                rl[_lex_env] = true
+              end
+            end
+            rl.keys.each do |_env|
+              if _env && _env.record.binding[var_sym]
+                _env.record.binding[var_sym2] = _env.record.binding[var_sym]
+                _env.record.binding.delete var_sym
+              end
+            end
+
+            nesting_vars_list.each do |x|
+              if x.val.to_sym == var_sym
+                x.instance_eval{
+                  @val = var_sym2
+                }
+              end
+              #raise 'error' if x.binding_env(:var).nil?
+              raise 'error' if x.binding_env(:lex).nil?
+            end
+          end
+          rename_table[name] = var_sym
+          var_sym = next_sym(var_sym)
+        }
+        var_vars_list.each {|st2|
+          raise st2.to_js if st2.binding_env(:lex).nil?
+        }
+
+        rename_table.each do |name, new_name|
+          if name != new_name
+            if context.var_env.record.binding[name]
+              context.var_env.record.binding[new_name] = context.var_env.record.binding[name]
+              context.var_env.record.binding.delete(name)
+            end
+            if context.lex_env.record.binding[name]
+              context.lex_env.record.binding[new_name] = context.lex_env.record.binding[name]
+              context.lex_env.record.binding.delete(name)
+            end
+          end
+        end
+
+        var_vars_list.each {|st2|
+          st2.instance_eval{
+            @val = rename_table[@val]
+          }
+          #raise 'error' if st2.binding_env(:var).nil?
+          raise 'error' if st2.binding_env(:lex).nil?
+        }
       }
       self
     end

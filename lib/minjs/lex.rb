@@ -59,14 +59,6 @@ module Minjs
         @error_pos = @pos
         return ret
       else
-        #        p pos0
-        #        p @pos
-        #@error_pos = @pos
-        #debug_lit
-        #raise 'no hint'
-        #regexp_literal
-        #div_punctuator
-        #nil #unknown
         ECMA262::LIT_DIV_OR_REGEXP_LITERAL
       end
     end
