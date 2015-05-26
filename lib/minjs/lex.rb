@@ -489,7 +489,7 @@ module Minjs
           raise ParseError.new("The source character immediately following a NumericLiteral must not be an IdentifierStart or DecimalDigit", self)
         end
 
-        return ECMA262::ECMA262Numeric.new(0, f, e)
+        return ECMA262::ECMA262Numeric.new('0', f, e)
       end
 
       if code >= 0x30 and code <= 0x39

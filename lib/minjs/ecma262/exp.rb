@@ -706,6 +706,14 @@ module Minjs
         !@val.to_ecma262_boolean
       end
 
+      def to_ecma262_number
+        if @val.respond_to? :to_ecma262_number
+          v = @val.to_ecma262_number
+          return nil if v.nil?
+          v == 0 ? 1 : 0
+        end
+      end
+
       def ecma262_eval(type)
         if @val.respond_to? :ecma262_eval
           e = @val.ecma262_eval(type)
@@ -744,16 +752,12 @@ module Minjs
       end
 
       def reduce(parent)
-        if @val.kind_of? ECMA262Numeric and @val2.kind_of? ECMA262Numeric
-          # a * 1 => a
-          if @val.to_f == 1
-            parent.replace(self, @val2)
-          # 1 * b => b
-          elsif @val2.to_f == 1
-            parent.replace(self, @val)
-          # N * M => (N * M)
-          else
-            parent.replace(self, ECMA262Numeric.new(@val.to_f * @val2.to_f))
+        # A * B
+        if @val.respond_to? :to_ecma262_number and @val2.respond_to? :to_ecma262_number
+          v = @val.to_ecma262_number
+          v2 = @val2.to_ecma262_number
+          if !v.nil? and !v2.nil?
+            parent.replace(self, ECMA262Numeric.new(v * v2))
           end
         end
       end
@@ -815,30 +819,30 @@ module Minjs
 
       def reduce(parent)
         #
-        # Integer+
-        # a + 0 => a
-        if @val.kind_of? ECMA262Numeric and @val2.kind_of? ECMA262Numeric
-          if @val.to_f == 0
-            parent.replace(self, @val2)
-          elsif @val2.to_f  == 0
-            parent.replace(self, @val)
+        # String + String/
+        # a + b = a.concat(b)
+        if @val.kind_of? ECMA262String or @val2.kind_of? ECMA262String
+          if @val.respond_to? :to_ecma262_string and @val2.respond_to? :to_ecma262_string
+            v = @val.to_ecma262_string
+            v2 = @val2.to_ecma262_string
+            if !v.nil? and !v2.nil?
+              new_str = ECMA262String.new(v + v2)
+              parent.replace(self, new_str)
+            end
+          end
+        #
+        # Numeric + Numeric
+        #
+        elsif @val.respond_to? :to_ecma262_number and @val2.respond_to? :to_ecma262_number
           #
           #11.6.3 Applying the Additive Operators to Numbers(TODO)
           #
           # N + M => (N + M)
-          elsif @val.nan? or @val2.nan?
-            #TODO;
-          elsif @val.infinity? or @val2.infinity?
-            #TODO;
-          else
-            parent.replace(self, ECMA262Numeric.new(@val.to_f + @val2.to_f))
+          v = @val.to_ecma262_number
+          v2 = @val2.to_ecma262_number
+          if !v.nil? and !v2.nil?
+            parent.replace(self, ECMA262Numeric.new(v + v2))
           end
-        #
-        # String+
-        # a + b = a.concat(b)
-        elsif @val.kind_of? ECMA262String and @val2.kind_of? ECMA262String
-          new_str = ECMA262String.new(@val.val.to_s + @val2.val.to_s)
-          parent.replace(self, new_str)
         end
       end
     end
@@ -857,16 +861,12 @@ module Minjs
       end
 
       def reduce(parent)
-        # a - 0 => a
-        if @val.kind_of? ECMA262Numeric and @val2.kind_of? ECMA262Numeric
-          if @val.to_num == 0
-            parent.replace(self, @val2)
-          # 0 - b => b
-          elsif @val2.to_num == 0
-            parent.replace(self, @val)
-          # N - M => (N - M)
-          else
-            parent.replace(self, ECMA262Numeric.new(@val.to_f - @val2.to_f))
+        # A - B
+        if @val.respond_to? :to_ecma262_number and @val2.respond_to? :to_ecma262_number
+          v = @val.to_ecma262_number
+          v2 = @val2.to_ecma262_number
+          if !v.nil? and !v2.nil?
+            parent.replace(self, ECMA262Numeric.new(v - v2))
           end
         end
       end

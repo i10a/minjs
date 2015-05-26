@@ -120,6 +120,14 @@ module Minjs
         false
       end
 
+      def to_ecma262_string
+        "null"
+      end
+
+      def to_ecma262_number
+        0
+      end
+
       def ecma262_typeof
         :boolean
       end
@@ -157,11 +165,27 @@ module Minjs
         @val == :true
       end
 
+      def to_ecma262_string
+        if @val == :false
+          "false"
+        else
+          "true"
+        end
+      end
+
       def to_ecma262_boolean
         if @val == :false
           false
         else
           true
+        end
+      end
+
+      def to_ecma262_number
+        if @val == :false
+          0
+        else
+          1
         end
       end
 
@@ -181,6 +205,7 @@ module Minjs
     end
 
     class ECMA262String < Literal
+      include Ctype
       attr_reader :val
 
       def initialize(val)
@@ -252,38 +277,209 @@ module Minjs
         end
       end
 
+      def to_ecma262_string
+        @val.dup
+      end
+      # 9.3.1 ToNumber Applied to the String Type
+      def to_ecma262_number
+        begin
+          pos1 = pos0 = pos = 0
+          v = @val.codepoints
+          while true
+            return 0 if v[pos].nil? # ToInteger(empty string) => 0
+            if white_space?(v[pos]) or line_terminator?(v[pos])
+              pos += 1
+            else
+              break
+            end
+          end
+          #hex
+          if v[pos] == 0x30 and (v[pos+1] == 0x78 || v[pos+1] == 0x58) and hex_number?(v[pos+2])
+            base = 16
+            pos += 2
+            pos0 = pos
+            while true
+              break if v[pos].nil?
+              if hex_number?(v[pos])
+                pos += 1
+              else
+                break
+              end
+            end
+          #decimal
+          else
+            base = 10
+            sign = 1
+            pos0 = pos
+            if v[pos].nil?
+              raise :error
+            elsif v[pos] == 0x2b #+
+              pos += 1
+            elsif v[pos] == 0x2d #-
+              sign = -1
+              pos += 1
+            end
+            has_decimal = false
+            has_exp = false
+
+            while true
+              break if v[pos].nil?
+              if v[pos] >= 0x30 and v[pos] <= 0x39
+                pos += 1
+              elsif v[pos] == 0x2e #.
+                pos += 1
+                has_decimal = true
+                break;
+              else
+                break
+              end
+            end
+            if has_decimal
+              while true
+                break if v[pos].nil?
+                if v[pos] >= 0x30 and v[pos] <= 0x39
+                  pos += 1
+                elsif v[pos] == 0x45 or v[pos] == 0x65 #E/e
+                  pos += 1
+                  has_exp = true
+                  break;
+                else
+                  break
+                end
+              end
+            end
+            if has_exp
+              if v[pos] == 0x2b #+
+                pos += 1
+              else v[pos] == 0x2d #-
+                pos += 1
+              end
+              while true
+                break if v[pos].nil?
+                if v[pos] >= 0x30 and v[pos] <= 0x39
+                  pos += 1
+                else
+                  break
+                end
+              end
+            end
+          end
+          pos1 = pos
+          while white_space?(v[pos]) or line_terminator?(v[pos])
+            raise :error if v[pos].nil?
+            pos += 1
+          end
+          raise :error unless v[pos].nil?
+          if base == 16
+            ret = v[pos0...pos1].pack("U*").to_i(base)
+          else
+            ret = v[pos0...pos1].pack("U*").to_f
+          end
+        rescue => e
+          ret = nil #Float::NAN
+        end
+        ret
+      end
+
       def ecma262_typeof
         :string
       end
     end
 
+    #
+    # 8.5 The Number Type
+    #
+    # ECMA262 say:
+    #
+    # The Number type has exactly 18437736874454810627
+    # (that is, 264−253+3) values, representing the
+    # double-precision 64-bit format IEEE 754 values
+    # as specified in the IEEE Standard for Binary
+    # Floating-Point Arithmetic
+    #
+    # To simplify the implementation,
+    # Minjs assumes that ruby has IEEE754 dobule precision.
+    #
     class ECMA262Numeric < Literal
-      attr_reader :integer, :decimal, :exp
+      attr_reader :integer, :decimal, :exp, :number
+
+      if Float::DIG != 15
+        if defined?(@logger)
+          @logger.warn{
+            "minjs assumes that ruby has IEEE754 dobule precision."
+          }
+        end
+      end
 
       def initialize(integer, decimal = nil, exp = nil)
-        if integer == :nan
-          integer = nil
-          @nan = true
-        elsif integer == :infinity
-          integer = nil
-          @infinity = true
-        elsif integer.kind_of? Float
-          @integer, @decimal = integer.to_i.to_s
-          @decimal = (integer - @integer.to_f).to_s.sub(/^.*0\./, '')
+        if integer == :nan or integer == "NaN"
+          @number = Float::NAN
+          @integer = "NaN"
+          @decimal = nil
+          @exp = nil
+        elsif integer == :infinity or integer == Float::INFINITY or integer == "Infinity"
+          @number = Float::INFINITY
+          @integer = "Infinity"
+          @decimal = nil
+          @exp = nil
+        elsif integer == -Float::INFINITY or integer == "-Infinity"
+          @number = -Float::INFINITY
+          @integer = "-Infinity"
+          @decimal = nil
+          @exp = nil
+        elsif integer.kind_of? String
+          @integer = integer.to_s #String
+          @decimal = decimal.to_s #String
+          @exp = exp ? exp.to_i : nil
+          if @decimal == ""
+            d = ""
+          else
+            d = ".#{@decimal}"
+          end
+          if @exp
+            @number = "#{integer}#{d}e#{exp}".to_f
+          else
+            @number = "#{integer}#{d}".to_f
+          end
+          if @number.kind_of? Float and @number.nan?
+            @integer = "NaN"
+            @decimal = nil
+            @exp = nil
+          elsif @number == Float::INFINITY
+            @integer = "Infinity"
+            @decimal = nil
+            @exp = nil
+          elsif @number == -Float::INFINITY
+            @integer = "-Infinity"
+            @decimal = nil
+            @exp = nil
+          end
+        elsif integer.kind_of? Numeric
+          if integer.kind_of? Float and integer.nan?
+            @number = Float::NAN
+            @decimal = nil
+            @exp = nil
+          elsif integer == Float::INFINITY
+            @number = Float::INFINITY
+            @decimal = nil
+            @exp = nil
+          elsif integer == -Float::INFINITY
+            @number = -Float::INFINITY
+            @decimal = nil
+            @exp = nil
+          else
+            @number = integer
+            @integer = @number.to_i.to_s
+            @decimal = (@number - @integer.to_i).to_s.sub(/0\.?/, '')
+            @exp = nil
+          end
         else
-          @integer = integer.to_s
-          if decimal
-            @decimal = decimal.to_s
-          end
-          if exp
-            @exp = exp.to_i
-          end
+          raise 'internal error'
         end
-        @decimal = nil if @decimal == 0
       end
 
       def deep_dup
-        self.class.new(@integer, @decimal, @exp)
+        self.class.new(@number)
       end
 
       def traverse(parent, &block)
@@ -295,78 +491,75 @@ module Minjs
       end
 
       def to_js(options = {})
-        if @nan
+        if nan?
           return "NaN"
+        elsif @number == Float::INFINITY
+          return "Infinity"
+        elsif @number == -Float::INFINITY
+          return "-Infinity"
         end
         t0 = to_ecma262_string
-        t = @integer.dup.to_s
+        t = @integer.nil? ? "" : @integer.dup.to_s
 
-        if @decimal
+        d = @decimal.to_s
+        if d == '0'
+          d = ''
+        end
+        if d.length > 0
           if @integer == '0'
-            t = ".#{@decimal}"
+            t = ".#{d}"
           else
-            t << ".#{@decimal}"
+            t << ".#{d}"
           end
         end
         if @exp
           t << "e#{@exp}"
         end
 
-        if @decimal.nil? and @exp.nil? and t.match(/0{3,}$/)
+        if !t.match(/e/) and !t.match(/\./) and t.match(/0{3,}$/)
           len = $&.length
           t.sub!(/0+$/, "e#{len}")
         end
+        t.sub!(/e\+/, 'e')
+        t0.sub!(/e\+/, 'e')
+
         t.length <= t0.length ? t : t0
       end
 
-#      def integer?
-#        @decimal.nil?
-#      end
-
-#      def to_num
-#        if @decimal
-#          to_f
-#        else
-#          to_i
-#        end
-#      end
-
       def to_i
-        if @exp
-          @integer.to_i * (10 ** @exp.to_i)
-        else
-          @integer.to_i
-        end
+        to_ecma262_string.to_i
       end
 
       def to_f
-        d = @decimal
-        if d.to_s == ''
-          d = '0'
-        end
-        "#{@integer}.#{d}e#{@exp}".to_f
+        to_ecma262_string.to_f
       end
 
       def nan?
-        @nan
+        @number.kind_of? Float and @number.nan?
       end
 
       def infinity?
-        @infinity
+        @number == Float::INFINITY || @number == -Float::INFINITY
+      end
+
+      def number?
+        !nan? and !infinity?
       end
 
       #
       # 9.8.1
       #
       def to_ecma262_string
-        if @nan
+        if nan?
           "NaN"
+        elsif @number == Float::INFINITY
+          "Infinity"
+        elsif @number == -Float::INFINITY
+          "-Infinity"
         elsif @integer == '0' and @decimal.nil? and @exp.nil?
           "0"
-        elsif @intinify
-          "Infinity"
         else
-          f = to_f.to_s
+          f = @number.to_f.to_s
           _n, _e = f.split('e')
           _i, _d = _n.split('.')
 
@@ -399,6 +592,18 @@ module Minjs
           false
         else
           true
+        end
+      end
+
+      def to_ecma262_number
+        if nan?
+          nil
+        elsif @number == Float::INFINITY
+          nil
+        elsif @number == -Float::INFINITY
+          nil
+        else
+          @number
         end
       end
 
@@ -526,12 +731,7 @@ module Minjs
           else
             if x.kind_of? ECMA262Numeric
               a = "#{x.to_ecma262_string}"
-              b = "#{x.to_js}"
-              if a.length <= b.length || a == "Infinity"
-                t = a
-              else
-                t = b
-              end
+              t = a
             elsif idname?(x.val.to_s)
               t = "#{x.val.to_s}"
             else
