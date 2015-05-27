@@ -8,6 +8,7 @@ require 'minjs/expression'
 require 'minjs/func'
 require 'minjs/program'
 require 'minjs/exceptions'
+require 'minjs/version'
 require 'logger'
 
 module Minjs
@@ -1010,7 +1011,10 @@ if $0 == __FILE__
   f = []
   options = {}
   argv.each do |x|
-    if x.match(/^--?/)
+    if x.match(/^--?version/)
+      puts Minjs::VERSION
+      exit(0)
+    elsif x.match(/^--?/)
       opt = $'.gsub(/-/, '_').to_sym
       options[opt] = true
     else
