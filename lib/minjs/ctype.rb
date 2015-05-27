@@ -863,5 +863,16 @@ module Minjs
         return true
       end
     end
+
+    def idname?(name)
+      return false if name.length == 0
+      s = name.codepoints
+      return false unless identifier_start?(s[0])
+      s.unshift
+      s.each do |code|
+        return false unless identifier_part?(code)
+      end
+      return true
+    end
   end
 end

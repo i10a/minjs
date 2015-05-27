@@ -31,6 +31,21 @@ EOS
       js = c.block_to_statement.to_js
       expect(js).to eq "if(a){while(true)if(b)d()}else c();"
     end
+
+    it 'convert block to statement' do
+      c = test_compressor
+      c.parse <<-EOS
+if(a) //<- add block here
+    while(b){ // <- remove block here
+        if(c)
+            break d;
+    }
+else
+    e;
+EOS
+      js = c.block_to_statement.to_js
+      expect(js).to eq "if(a){while(b)if(c)break d}else e;"
+    end
   end
 end
 

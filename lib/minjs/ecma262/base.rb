@@ -68,7 +68,7 @@ module Minjs
         raise "warning: #{self.class}: == not implement"
       end
 
-      def add_remove_paren(node)
+      def add_remove_paren(node = self)
         node.traverse(nil) {|st, parent|
           if st.respond_to? :remove_paren
             st.add_paren
@@ -171,6 +171,7 @@ module Minjs
       end
 
       def traverse(parent, &block)
+        _self = self
         @statement_list.each do|st|
           st.traverse(self, &block)
         end
@@ -258,6 +259,13 @@ module Minjs
       def deep_dup
         self.class.new(context, source_elements.deep_dup)
       end
+
+      def replace(from, to)
+        if from == @source_elements
+          @source_elements = to
+        end
+      end
+
       def traverse(parent, &block)
         @source_elements.traverse(self, &block)
         yield self, parent

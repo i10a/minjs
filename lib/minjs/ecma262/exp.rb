@@ -360,11 +360,15 @@ module Minjs
       end
 
       def replace(from, to)
-        @args.each_index do |i|
-          arg = @args[i]
-          if arg .eql? from
-            @args[i] = to
-            break
+        if @name .eql? from
+          @name = to
+        else
+          @args.each_index do |i|
+            arg = @args[i]
+            if arg .eql? from
+              @args[i] = to
+              break
+            end
           end
         end
       end

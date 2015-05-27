@@ -693,16 +693,17 @@ module Minjs
         @val = val
       end
 
-      def idname?(name)
-        return false if name.length == 0
-        s = name.codepoints
-        return false unless identifier_start?(s[0])
-        s.unshift
-        s.each do |code|
-          return false unless identifier_part?(code)
-        end
-        return true
-      end
+#=>Ctype
+#      def idname?(name)
+#        return false if name.length == 0
+#        s = name.codepoints
+#        return false unless identifier_start?(s[0])
+#        s.unshift
+#        s.each do |code|
+#          return false unless identifier_part?(code)
+#        end
+#        return true
+#      end
 
       def deep_dup
         self.class.new(@val.collect{|x, y| [x.deep_dup, y ? y.deep_dup : y]})

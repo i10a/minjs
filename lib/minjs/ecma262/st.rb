@@ -37,6 +37,12 @@ module Minjs
         self.class.new(@statement_list.deep_dup)
       end
 
+      def replace(from, to)
+        if from == @statement_list
+          @statement_list = to
+        end
+      end
+
       def traverse(parent, &block)
         @statement_list.traverse(self, &block)
         yield self, parent
@@ -82,6 +88,14 @@ module Minjs
         else
           StEmpty.new
         end
+      end
+
+      def to_return?
+        to_statement? and to_statement.to_return?
+      end
+
+      def to_return
+        to_statement.to_return
       end
 
       def empty?
@@ -850,7 +864,7 @@ module Minjs
       end
 
       def deep_dup
-        self.class.new(@exp)
+        self.class.new(@exp ? @exp.deep_dup : nil)
       end
 
       def traverse(parent, &block)
@@ -881,7 +895,7 @@ module Minjs
       end
 
       def deep_dup
-        self.class.new(@exp)
+        self.class.new(@exp ? @exp.deep_dup : nil)
       end
 
       def traverse(parent, &block)
@@ -909,10 +923,6 @@ module Minjs
 
       def initialize(exp = nil)
         @exp = exp
-      end
-
-      def deep_dup
-        self.class.new(@exp)
       end
 
       def deep_dup
@@ -963,15 +973,16 @@ module Minjs
     end
     #12.10
     class StWith < St
-      attr_reader :exp, :statement
+      attr_reader :exp, :statement, :context
 
-      def initialize(exp, statement)
+      def initialize(context, exp, statement)
+        @context = context
         @exp = exp
         @statement = statement
       end
 
       def deep_dup
-        self.class.new(@exp, @statement)
+        self.class.new(@context, @exp.deep_dup, @statement.deep_dup)
       end
 
       def replace(from, to)
@@ -1022,7 +1033,7 @@ module Minjs
       end
 
       def deep_dup
-        self.class.new(@exp,
+        self.class.new(@exp.deep_dup,
                        @blocks.collect{|x, y|
                          [
                            x ? x.deep_dup : nil,
@@ -1093,7 +1104,7 @@ module Minjs
       end
 
       def deep_dup
-        self.class.new(@label, @statement)
+        self.class.new(@label.deep_dup, @statement.deep_dup)
       end
 
       def replace(from, to)
@@ -1129,7 +1140,7 @@ module Minjs
       end
 
       def deep_dup
-        self.class.new(@exp)
+        self.class.new(@exp.deep_dup)
       end
 
       def traverse(parent, &block)
@@ -1160,7 +1171,10 @@ module Minjs
       end
 
       def deep_dup
-        self.class.new(@context, @try, @catch, @finally)
+        self.class.new(@context,
+                       @try.deep_dup,
+                       @catch ? [@catch[0].deep_dup, @catch[1].deep_dup] : nil,
+                       @finally ? @finally.deep_dup : nil)
       end
 
       def replace(from, to)

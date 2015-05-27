@@ -21,14 +21,6 @@ EOS
       expect(js).to eq "return a=1,b=2,c=3,a;"
     end
 
-    it 'convert sequence of statement to single expression statement' do
-      c = test_compressor
-      c.parse <<-EOS
-if(a)return b;return c;
-EOS
-      js = c.optimize_if_return.to_js
-      expect(js).to eq "if(a)return b;else return c;"
-    end
   end
 end
 

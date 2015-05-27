@@ -338,7 +338,7 @@ module Minjs
       return nil unless lex.match_lit(ECMA262::ID_WITH)
       lex.eval_lit {
         if lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and e=exp(lex, context, {}) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
-          ECMA262::StWith.new(e, s)
+          ECMA262::StWith.new(context, e, s)
         else
           raise ParseError.new("switch_statement", lex)
         end

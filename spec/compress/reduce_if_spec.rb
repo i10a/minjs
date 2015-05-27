@@ -42,5 +42,14 @@ EOS
       js = c.reduce_if.to_js
       expect(js).to eq "if(!a)aaa;if(!a)aaa;"
     end
+    it 'reduce if' do
+      c = test_compressor
+      c.parse <<-EOS
+if((a))z;
+if(!!a)z;
+EOS
+      js = c.reduce_if.to_js
+      expect(js).to eq "if(a)z;if(a)z;"
+    end
   end
 end
