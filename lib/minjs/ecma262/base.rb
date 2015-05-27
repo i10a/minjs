@@ -67,6 +67,16 @@ module Minjs
         puts "warning: #{self.class}: == not implement"
         raise "warning: #{self.class}: == not implement"
       end
+
+      def add_remove_paren(node)
+        node.traverse(nil) {|st, parent|
+          if st.respond_to? :remove_paren
+            st.add_paren
+            st.remove_paren
+          end
+        }
+        node
+      end
     end
 
     class StatementList < Base
@@ -111,8 +121,16 @@ module Minjs
         end
 
         if idx = new_sl.index{|x| x.class == StReturn}
-          while idx < new_sl.length - 1
-            new_sl.pop
+          idx += 1
+          while idx < new_sl.length
+            if new_sl[idx].kind_of? StVar
+              ;
+            elsif new_sl[idx].kind_of? StFunc
+              ;
+            else
+              new_sl[idx] = StEmpty.new
+            end
+            idx += 1
           end
         end
 

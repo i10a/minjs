@@ -22,6 +22,14 @@ EOS
       js = c.if_to_cond.to_js
       expect(js).to eq "return a?b:c;"
     end
+    it 'prefer conditonal operator than logical and/or' do
+      c = test_compressor
+      c.parse <<-EOS
+if(x)a=b?c=d:e=f;
+EOS
+      js = c.if_to_cond.to_js
+      expect(js).to eq "x?a=b?c=d:e=f:0;"
+    end
   end
 end
 

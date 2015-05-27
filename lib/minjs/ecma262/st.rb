@@ -181,6 +181,7 @@ module Minjs
             x[1] = x[1].val
           end
         end
+        self
       end
 
       def add_paren
@@ -262,6 +263,7 @@ module Minjs
         if @exp.kind_of? ExpParen
           @exp = @exp.val if @exp.remove_paren?
         end
+        self
       end
 
       def add_paren
@@ -327,24 +329,22 @@ module Minjs
 
       def to_return
         then_exp = then_st.exp;
-        else_exp = else_st.exp;
+        if @else_st
+          else_exp = else_st.exp;
+        end
 
         if then_exp.nil?
           then_exp = ExpVoid.new(ECMA262Numeric.new(0))
         end
-        if else_exp.nil?
+        if @else_st and else_exp.nil?
           else_exp = ExpVoid.new(ECMA262Numeric.new(0))
         end
         if @else_st
-          ret = StReturn.new(ExpCond.new(@cond, then_exp, else_exp).add_paren)
+          ret = add_remove_paren StReturn.new(ExpCond.new(@cond, then_exp, else_exp))
         else
-          ret = StReturn.new(ExpLogicalAnd.new(@cond, then_exp).add_paren)
+          ret = add_remove_paren StReturn.new(ExpLogicalAnd.new(@cond, then_exp))
         end
-        if ret.to_js.length <= to_js.length
-          ret
-        else
-          self
-        end
+        ret
       end
 
       def to_exp?
@@ -361,20 +361,28 @@ module Minjs
         cond = @cond.deep_dup
         if !@else_st
           then_exp = @then_st.to_exp(options)
-          if cond.kind_of? ExpLogicalNot
-            return ExpParen.new(ExpLogicalOr.new(ExpParen.new(cond.val), ExpParen.new(then_exp)))
+          if(options[:cond])
+            if cond.kind_of? ExpLogicalNot
+              add_remove_paren ExpCond.new(cond.val, ECMA262Numeric.new(0), then_exp)
+            else
+              add_remove_paren ExpCond.new(cond, then_exp, ECMA262Numeric.new(0))
+            end
           else
-            return ExpParen.new(ExpLogicalAnd.new(ExpParen.new(cond), ExpParen.new(then_exp)))
+            if cond.kind_of? ExpLogicalNot
+              add_remove_paren ExpLogicalOr.new(cond.val, then_exp)
+            else
+              add_remove_paren ExpLogicalAnd.new(cond, then_exp)
+            end
           end
         else
-          then_exp = ExpParen.new(@then_st.to_exp(options))
-          else_exp = ExpParen.new(@else_st.to_exp(options))
-        end
+          then_exp = @then_st.to_exp(options)
+          else_exp = @else_st.to_exp(options)
 
-        if cond.kind_of? ExpLogicalNot
-          ExpCond.new(ExpParen.new(cond.val), else_exp, then_exp)
-        else
-          ExpCond.new(ExpParen.new(cond), then_exp, else_exp)
+          if cond.kind_of? ExpLogicalNot
+            add_remove_paren ExpCond.new(cond.val, else_exp, then_exp)
+          else
+            add_remove_paren ExpCond.new(cond, then_exp, else_exp)
+          end
         end
       end
 

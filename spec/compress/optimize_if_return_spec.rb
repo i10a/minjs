@@ -26,7 +26,7 @@ EOS
       c.parse <<-EOS
 if(a)b;else return c;
 EOS
-      js = c.optimize_if_return3.to_js
+      js = c.optimize_if_return2.to_js
       expect(js).to eq "if(!a)return c;b;"
     end
   end

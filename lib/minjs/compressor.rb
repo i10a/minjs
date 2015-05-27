@@ -73,7 +73,6 @@ module Minjs
         :block_to_statement,
         :if_to_cond,
         :optimize_if_return2,
-        :optimize_if_return3,
         :remove_paren,
       ]
       algo.each do |a|
@@ -303,6 +302,7 @@ module Minjs
     end
 
     def block_to_statement(node = @prog)
+      remove_empty_statement
       node.traverse(nil) {|st, parent|
         if st.kind_of? ECMA262::StBlock and !parent.kind_of?(ECMA262::StTry) and !parent.kind_of?(ECMA262::StIf)
             if st.to_statement?
@@ -370,14 +370,23 @@ module Minjs
     #
     # if(a)b
     # =>
-    # a&&b;
+    # a&&b; or a?b:0;
+    #
+    # NOTE:
+    # Sometimes, "conditional operator" will be shorter than
+    # "logical and operator", because "conditional operator"'s
+    # priority is lower than almost all other expressions.
     #
     def if_to_cond(node = @prog)
       node.traverse(nil) {|st, parent|
         if st.kind_of? ECMA262::StIf
           if st.to_exp?
             t = ECMA262::StExp.new(st.to_exp({}))
-            remove_paren(t)
+            t2 = ECMA262::StExp.new(st.to_exp({cond: true}))
+            if t2.to_js.length < t.to_js.length
+              t = t2
+            end
+
             if t.to_js.length <= st.to_js.length
               parent.replace(st, t)
             end
@@ -470,23 +479,7 @@ module Minjs
             idx = parent.index(st)
             parent[idx+1..0] = st.else_st
             st.replace(st.else_st, nil)
-          end
-        end
-      }
-      self
-    end
-    #
-    # feature
-    #
-    # if(a)b;else return c;
-    # =>
-    # if(!a)return c;b;
-    #
-    def optimize_if_return3(node = @prog)
-      node.traverse(nil) {|st, parent|
-        if st.kind_of? ECMA262::StIf and st.else_st and parent.kind_of? ECMA262::StatementList
-          st.remove_empty_statement
-          if (st.else_st.kind_of? ECMA262::StBlock and st.else_st[-1].kind_of? ECMA262::StReturn) or
+          elsif (st.else_st.kind_of? ECMA262::StBlock and st.else_st[-1].kind_of? ECMA262::StReturn) or
              st.else_st.kind_of? ECMA262::StReturn
             idx = parent.index(st)
             parent[idx+1..0] = st.then_st
@@ -504,6 +497,15 @@ module Minjs
     def compress_var(node = @prog, options = {})
       func_scopes = []
       catch_scopes = []
+      #
+      # ECMA262 10.2:
+      #
+      #  Usually a Lexical Environment is associated with some
+      #  specific syntactic structure of ECMAScript code such as a
+      #  FunctionDeclaration, a WithStatement, or a Catch clause of a
+      #  TryStatement and a new Lexical Environment is created each
+      #  time such code is evaluated.
+      #
       node.traverse(nil) {|st, parent|
         if st.kind_of? ECMA262::StFunc
           func_scopes.push([st, parent])
@@ -513,11 +515,47 @@ module Minjs
           #TODO
         end
       }
-      #10.2
       #
-      # Catch clause of a TryStatement and a new Lexical Environment is
-      # created each time such code is evaluated.
+      # 10.2, 12.14
       #
+      #eee = 'global';
+      #function test()
+      #{
+      #  /*
+      #    "eee" is local variable(belongs to this function)
+      #    because var declaration is exist in this function.
+      #    (see also catch's scope comment)
+      #    So, global variable 'eee' is not changed.
+      #  */
+      #  eee = 'function';
+      #  try{
+      #    console.log(eee);	//=>function
+      #    throw "exception";
+      #  }
+      #  catch(eee){
+      #  /*
+      #    The catch's variable scope will be created at execution time.
+      #    so next var declaration should belong to "test" function.
+      #  */
+      #    var eee;
+      #  /*
+      #    In execution time, "eee" belongs to this 
+      #    catch-clause's scope.
+      #  */
+      #    console.log(eee);	//=>exception
+      #  /*
+      #    Next function has its own scope and 'eee' belongs to its.
+      #  */
+      #    (function(){
+      #      var eee;
+      #      console.log(eee);	//=>undefined
+      #    })();
+      #  }
+      #}
+      #console.log(eee); 	//=>global
+      #test();
+      #
+
       catch_scopes.each{|st, parent|
         catch_context = ECMA262::Context.new
         catch_context.lex_env = st.context.lex_env.new_declarative_env()
@@ -586,10 +624,6 @@ module Minjs
             elsif st2_lex_env == @global_context.lex_env #global
               outer_vars[var_name] ||= 0
               outer_vars[var_name] += 1
-#            elsif st2_lex_env == context.lex_env and st2_lex_env != context.lex_env
-#              nesting_vars[var_name] ||= 0
-#              nesting_vars[var_name] += 1
-#              nesting_vars_list.push(st2)
             elsif st2_lex_env == context.lex_env
               var_vars[var_name] ||= 0
               var_vars[var_name] += 1
@@ -637,14 +671,18 @@ module Minjs
           if name.nil?
             next #bug?
           end
-          #STDERR.puts "trying to rename #{name}"
+          if name.length == 1
+            #STDERR.puts "#{name}=>#{count}"
+            next
+          end
+          #STDERR.puts "trying to rename #{name}(#{count})"
           while true
             #condition b
-            if var_vars[var_sym]
-              #STDERR.puts "var_vars has #{var_sym}"
-            #condigion c
-            elsif outer_vars[var_sym]
+            if outer_vars[var_sym]
               #STDERR.puts "outer_vars has #{var_sym}"
+            elsif var_vars[var_sym]
+              #STDERR.puts "var_vars has #{var_sym}(#{var_vars[var_sym]})"
+            #condigion c
             else #condition a&d
               #STDERR.puts "->#{var_sym}"
               break
@@ -687,7 +725,7 @@ module Minjs
                 }
               end
               #raise 'error' if x.binding_env(:var).nil?
-              raise 'error' if x.binding_env(:lex).nil?
+              raise x.to_js if x.binding_env(:lex).nil?
             end
           end
           rename_table[name] = var_sym
@@ -711,11 +749,13 @@ module Minjs
         end
 
         var_vars_list.each {|st2|
-          st2.instance_eval{
-            @val = rename_table[@val]
-          }
-          #raise 'error' if st2.binding_env(:var).nil?
-          raise 'error' if st2.binding_env(:lex).nil?
+            st2.instance_eval{
+              if rename_table[@val]
+                @val = rename_table[@val]
+                #raise 'error' if st2.binding_env(:var).nil?
+                raise st2.to_js if st2.binding_env(:lex).nil?
+              end
+            }
         }
       }
       self
@@ -777,6 +817,30 @@ module Minjs
         elsif st.kind_of? ECMA262::ExpNew and st.args and st.args.length == 0
           st.replace(st.args, nil)
           parent.add_paren.remove_paren
+        #
+        # true?a:b => a
+        # false?a:b => b
+        #
+        elsif st.kind_of? ECMA262::ExpCond
+          if st.val.kind_of? ECMA262::ExpLogicalNot
+            st.instance_eval{
+              @val = @val.val
+              t = @val2
+              @val2 = @val3
+              @val3 = t
+            }
+            simple_replacement(st)
+          end
+
+          if st.val.respond_to? :to_ecma262_boolean
+            if st.val.to_ecma262_boolean.nil?
+              ;
+            elsif st.val.to_ecma262_boolean
+              parent.replace(st, st.val2)
+            else
+              parent.replace(st, st.val3)
+            end
+          end
         end
       }
       self

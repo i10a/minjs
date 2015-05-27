@@ -466,8 +466,7 @@ module Minjs
       end
 
       def to_js(options = {})
-        #TODO => simple_replacement
-        if @args# and @args.length > 0
+        if @args
           args = @args.collect{|x| x.to_js(options)}.join(",")
           concat options, :new, @name, '(', args, ')'
         else
@@ -1194,16 +1193,13 @@ module Minjs
       end
 
       def to_ecma262_boolean
-        if @val.respond_to? :to_ecma262_boolean and @val2.respond_to? :to_ecma262_boolean
-          return nil if @val.to_ecma262_boolean == nil or @val2.to_ecma262_boolean == nil
-          if @val.to_ecma262_boolean and @val2.to_ecma262_boolean
-            true
-          else
-            false
-          end
-        else
-          nil
-        end
+        return nil if !(@val.respond_to? :to_ecma262_boolean)
+        return nil if @val.to_ecma262_boolean == nil
+        return false if @val.to_ecma262_boolean == false
+        return nil if !(@val2.respond_to? :to_ecma262_boolean)
+        return nil if @val2.to_ecma262_boolean == nil
+        return false if @val2.to_ecma262_boolean == false
+        true
       end
 
       def ecma262_typeof
@@ -1227,16 +1223,13 @@ module Minjs
       end
 
       def to_ecma262_boolean
-        if @val.respond_to? :to_ecma262_boolean and @val2.respond_to? :to_ecma262_boolean
-          return nil if @val.to_ecma262_boolean == nil or @val2.to_ecma262_boolean == nil
-          if @val.to_ecma262_boolean or @val2.to_ecma262_boolean
-            true
-          else
-            false
-          end
-        else
-          nil
-        end
+        return nil if !(@val.respond_to? :to_ecma262_boolean)
+        return nil if @val.to_ecma262_boolean == nil
+        return true if @val.to_ecma262_boolean == true
+        return nil if !(@val2.respond_to? :to_ecma262_boolean)
+        return nil if @val2.to_ecma262_boolean == nil
+        return true if @val2.to_ecma262_boolean == true
+        false
       end
 
       def ecma262_typeof
@@ -1255,6 +1248,7 @@ module Minjs
     #
     class ExpCond < Exp
       attr_reader :val, :val2, :val3
+      alias :cond :val
 
       def initialize(val, val2, val3)
         @val = val
