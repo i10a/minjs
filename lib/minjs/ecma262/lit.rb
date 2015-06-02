@@ -693,18 +693,6 @@ module Minjs
         @val = val
       end
 
-#=>Ctype
-#      def idname?(name)
-#        return false if name.length == 0
-#        s = name.codepoints
-#        return false unless identifier_start?(s[0])
-#        s.unshift
-#        s.each do |code|
-#          return false unless identifier_part?(code)
-#        end
-#        return true
-#      end
-
       def deep_dup
         self.class.new(@val.collect{|x, y| [x.deep_dup, y ? y.deep_dup : y]})
       end
@@ -824,7 +812,11 @@ module Minjs
       end
 
       def self.get(context, val)
-        @@sym[val] ||= self.new(context, val)
+        if reserved?(val)
+          @@sym[val] ||= self.new(context, val)
+        else
+          self.new(context, val)
+        end
       end
 
       RESERVED_WORD = Set.new [
@@ -907,10 +899,11 @@ module Minjs
     ID_CATCH = IdentifierName.get(nil, :catch)
     ID_FINALLY = IdentifierName.get(nil, :finally)
     ID_DEBUGGER = IdentifierName.get(nil, :debugger)
-    ID_GET = IdentifierName.get(nil, :get)
-    ID_SET = IdentifierName.get(nil, :set)
     ID_CASE = IdentifierName.get(nil, :case)
     ID_DEFAULT = IdentifierName.get(nil, :default)
+    # Note: get and set are not reserved word
+    ID_GET = IdentifierName.get(nil, :get)
+    ID_SET = IdentifierName.get(nil, :set)
 
   end
 end

@@ -96,7 +96,7 @@ module Minjs
       @global_context = ECMA262::Context.new
       @heading_comments = []
       @lex.eval_lit{
-        while a = @lex.ws_lit
+        while a = @lex.next_input_element(nil) and (a.ws? or a.lt?)
           @heading_comments.push(a)
         end
         nil

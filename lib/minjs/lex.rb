@@ -11,15 +11,17 @@ module Minjs
     def initialize(str = "", options = {})
       str = str.gsub(/\r\n/, "\n")
       @codes = str.codepoints
+      if !str.match(/\n\z/)
+        @codes.push(10)
+      end
       @pos = 0
       @lit_cache = []
       @lit_nextpos = []
       @logger = options[:logger]
     end
 
-    def next_input_element(options = {})
-      if @lit_cache[@pos]
-        ret = @lit_cache[@pos]
+    def next_input_element(options)
+      if ret = @lit_cache[@pos]
         @pos = @lit_nextpos[@pos]
         @error_pos = @pos
         return ret
@@ -34,15 +36,16 @@ module Minjs
         return ret
       end
       #
-      # ECMA262 say:
+      # ECMA262 says:
       #
       # There are no syntactic grammar contexts where both a leading division
       # or division-assignment, and a leading RegularExpressionLiteral are permitted.
       # This is not affected by semicolon insertion (see 7.9); in examples such as the following:
       # To determine `/' is regular expression or not
       #
-      #
-      if options[:hint] == :div
+      if options.nil?
+        ECMA262::LIT_DIV_OR_REGEXP_LITERAL
+      elsif options[:hint] == :div
         ret = div_punctuator
         if ret
           @lit_cache[pos0] = ret
@@ -187,7 +190,7 @@ module Minjs
           @pos += 1
         else
           name = chars.pack("U*").to_sym
-          return ECMA262::IdentifierName.new(nil, name)
+          return ECMA262::IdentifierName.get(nil, name)
         end
       end
     end
@@ -197,148 +200,167 @@ module Minjs
       code1 = @codes[@pos+1]
       code2 = @codes[@pos+2]
       code3 = @codes[@pos+3]
-      if false
-      elsif (code0 == 0x3e and code1 == 0x3e and code2 == 0x3e and code3 == 0x3d)
-        @pos += 4
-        return ECMA262::Punctuator.get('>>>=')
-      elsif (code0 == 0x3d and code1 == 0x3d and code2 == 0x3d)
-        @pos += 3
-        return ECMA262::Punctuator.get('===')
-      elsif (code0 == 0x21 and code1 == 0x3d and code2 == 0x3d)
-        @pos += 3
-        return ECMA262::Punctuator.get('!==')
-      elsif (code0 == 0x3e and code1 == 0x3e and code2 == 0x3e)
-        @pos += 3
-        return ECMA262::Punctuator.get('>>>')
-      elsif (code0 == 0x3c and code1 == 0x3c and code2 == 0x3d)
-        @pos += 3
-        return ECMA262::Punctuator.get('<<=')
-      elsif (code0 == 0x3e and code1 == 0x3e and code2 == 0x3d)
-        @pos += 3
-        return ECMA262::Punctuator.get('>>=')
-      elsif (code0 == 0x3e and code1 == 0x3e)
-        @pos += 2
-        return ECMA262::Punctuator.get('>>')
-      elsif (code0 == 0x3c and code1 == 0x3d)
-        @pos += 2
-        return ECMA262::Punctuator.get('<=')
-      elsif (code0 == 0x3e and code1 == 0x3d)
-        @pos += 2
-        return ECMA262::Punctuator.get('>=')
-      elsif (code0 == 0x3d and code1 == 0x3d)
-        @pos += 2
-        return ECMA262::Punctuator.get('==')
-      elsif (code0 == 0x21 and code1 == 0x3d)
-        @pos += 2
-        return ECMA262::Punctuator.get('!=')
-      elsif (code0 == 0x2b and code1 == 0x2b)
-        @pos += 2
-        return ECMA262::Punctuator.get('++')
-      elsif (code0 == 0x2d and code1 == 0x2d)
-        @pos += 2
-        return ECMA262::Punctuator.get('--')
-      elsif (code0 == 0x3c and code1 == 0x3c)
-        @pos += 2
-        return ECMA262::Punctuator.get('<<')
-      elsif (code0 == 0x3e and code1 == 0x3e)
-        @pos += 2
-        return ECMA262::Punctuator.get('>>')
-      elsif (code0 == 0x26 and code1 == 0x26)
-        @pos += 2
-        return ECMA262::Punctuator.get('&&')
-      elsif (code0 == 0x7c and code1 == 0x7c)
-        @pos += 2
-        return ECMA262::Punctuator.get('||')
-      elsif (code0 == 0x2b and code1 == 0x3d)
-        @pos += 2
-        return ECMA262::Punctuator.get('+=')
-      elsif (code0 == 0x2d and code1 == 0x3d)
-        @pos += 2
-        return ECMA262::Punctuator.get('-=')
-      elsif (code0 == 0x2a and code1 == 0x3d)
-        @pos += 2
-        return ECMA262::Punctuator.get('*=')
-      elsif (code0 == 0x25 and code1 == 0x3d)
-        @pos += 2
-        return ECMA262::Punctuator.get('%=')
-      elsif (code0 == 0x26 and code1 == 0x3d)
-        @pos += 2
-        return ECMA262::Punctuator.get('&=')
-      elsif (code0 == 0x7c and code1 == 0x3d)
-        @pos += 2
-        return ECMA262::Punctuator.get('|=')
-      elsif (code0 == 0x5e and code1 == 0x3d)
-        @pos += 2
-        return ECMA262::Punctuator.get('^=')
-      elsif (code0 == 0x7b)
-        @pos += 1
-        return ECMA262::Punctuator.get('{')
-      elsif (code0 == 0x7d)
-        @pos += 1
-        return ECMA262::Punctuator.get('}')
-      elsif (code0 == 0x28)
-        @pos += 1
-        return ECMA262::Punctuator.get('(')
-      elsif (code0 == 0x29)
-        @pos += 1
-        return ECMA262::Punctuator.get(')')
-      elsif (code0 == 0x5b)
-        @pos += 1
-        return ECMA262::Punctuator.get('[')
-      elsif (code0 == 0x5d)
-        @pos += 1
-        return ECMA262::Punctuator.get(']')
-      elsif (code0 == 0x2e)
-        @pos += 1
-        return ECMA262::Punctuator.get('.')
-      elsif (code0 == 0x3b)
-        @pos += 1
-        return ECMA262::Punctuator.get(';')
-      elsif (code0 == 0x2c)
-        @pos += 1
-        return ECMA262::Punctuator.get(',')
-      elsif (code0 == 0x3c)
-        @pos += 1
-        return ECMA262::Punctuator.get('<')
-      elsif (code0 == 0x3e)
-        @pos += 1
-        return ECMA262::Punctuator.get('>')
-      elsif (code0 == 0x2b)
-        @pos += 1
-        return ECMA262::Punctuator.get('+')
-      elsif (code0 == 0x2d)
-        @pos += 1
-        return ECMA262::Punctuator.get('-')
-      elsif (code0 == 0x2a)
-        @pos += 1
-        return ECMA262::Punctuator.get('*')
-      elsif (code0 == 0x25)
-        @pos += 1
-        return ECMA262::Punctuator.get('%')
-      elsif (code0 == 0x26)
-        @pos += 1
-        return ECMA262::Punctuator.get('&')
-      elsif (code0 == 0x7c)
-        @pos += 1
-        return ECMA262::Punctuator.get('|')
-      elsif (code0 == 0x5e)
-        @pos += 1
-        return ECMA262::Punctuator.get('^')
-      elsif (code0 == 0x21)
-        @pos += 1
-        return ECMA262::Punctuator.get('!')
-      elsif (code0 == 0x7e)
-        @pos += 1
-        return ECMA262::Punctuator.get('~')
-      elsif (code0 == 0x3f)
-        @pos += 1
-        return ECMA262::Punctuator.get('?')
-      elsif (code0 == 0x3a)
-        @pos += 1
-        return ECMA262::Punctuator.get(':')
-      elsif (code0 == 0x3d)
-        @pos += 1
-        return ECMA262::Punctuator.get('=')
+      if code0 == 0x21 # !
+        if code1 == 0x3d and code2 == 0x3d # !==
+          @pos += 3
+          return ECMA262::PUNC_SNEQ
+        end
+        if code1 == 0x3d # !=
+          @pos += 2
+          return ECMA262::PUNC_NEQ
+        end
+        @pos += 1 # !
+        return ECMA262::PUNC_LNOT
+      elsif code0 == 0x25 # %
+        if code1 == 0x3d # %=
+          @pos += 2
+          return ECMA262::PUNC_MODLET
+        end
+        @pos += 1 # %
+        return ECMA262::PUNC_MOD
+      elsif code0 == 0x26 # &
+        if code1 == 0x3d # &=
+          @pos += 2
+          return ECMA262::PUNC_ANDLET
+        end
+        if code1 == 0x26 # &&
+          @pos += 2
+          return ECMA262::PUNC_LAND
+        end
+        @pos += 1 # &
+        return ECMA262::PUNC_AND
+      elsif code0 == 0x28 # (
+        @pos += 1 # (
+        return ECMA262::PUNC_LPARENTHESIS
+      elsif code0 == 0x29 # )
+        @pos += 1 # )
+        return ECMA262::PUNC_RPARENTHESIS
+      elsif code0 == 0x2a # *
+        if code1 == 0x3d # *=
+          @pos += 2
+          return ECMA262::PUNC_MULLET
+        end
+        @pos += 1 # *
+        return ECMA262::PUNC_MUL
+      elsif code0 == 0x2b # +
+        if code1 == 0x3d # +=
+          @pos += 2
+          return ECMA262::PUNC_ADDLET
+        end
+        if code1 == 0x2b # ++
+          @pos += 2
+          return ECMA262::PUNC_INC
+        end
+        @pos += 1 # +
+        return ECMA262::PUNC_ADD
+      elsif code0 == 0x2c # ,
+        @pos += 1 # ,
+        return ECMA262::PUNC_COMMA
+      elsif code0 == 0x2d # -
+        if code1 == 0x3d # -=
+          @pos += 2
+          return ECMA262::PUNC_SUBLET
+        end
+        if code1 == 0x2d # --
+          @pos += 2
+          return ECMA262::PUNC_DEC
+        end
+        @pos += 1 # -
+        return ECMA262::PUNC_SUB
+      elsif code0 == 0x2e # .
+        @pos += 1 # .
+        return ECMA262::PUNC_PERIOD
+      elsif code0 == 0x3a # :
+        @pos += 1 # :
+        return ECMA262::PUNC_COLON
+      elsif code0 == 0x3b # ;
+        @pos += 1 # ;
+        return ECMA262::PUNC_SEMICOLON
+      elsif code0 == 0x3c # <
+        if code1 == 0x3d # <=
+          @pos += 2
+          return ECMA262::PUNC_LTEQ
+        end
+        if code1 == 0x3c and code2 == 0x3d # <<=
+          @pos += 3
+          return ECMA262::PUNC_LSHIFTLET
+        end
+        if code1 == 0x3c # <<
+          @pos += 2
+          return ECMA262::PUNC_LSHIFT
+        end
+        @pos += 1 # <
+        return ECMA262::PUNC_LT
+      elsif code0 == 0x3d # =
+        if code1 == 0x3d and code2 == 0x3d # ===
+          @pos += 3
+          return ECMA262::PUNC_SEQ
+        end
+        if code1 == 0x3d # ==
+          @pos += 2
+          return ECMA262::PUNC_EQ
+        end
+        @pos += 1 # =
+        return ECMA262::PUNC_LET
+      elsif code0 == 0x3e # >
+        if code1 == 0x3e and code2 == 0x3e and code3 == 0x3d # >>>=
+          @pos += 4
+          return ECMA262::PUNC_URSHIFTLET
+        end
+        if code1 == 0x3e and code2 == 0x3e # >>>
+          @pos += 3
+          return ECMA262::PUNC_URSHIFT
+        end
+        if code1 == 0x3e and code2 == 0x3d # >>=
+          @pos += 3
+          return ECMA262::PUNC_RSHIFTLET
+        end
+        if code1 == 0x3e # >>
+          @pos += 2
+          return ECMA262::PUNC_RSHIFT
+        end
+        if code1 == 0x3d # >=
+          @pos += 2
+          return ECMA262::PUNC_GTEQ
+        end
+        @pos += 1 # >
+        return ECMA262::PUNC_GT
+      elsif code0 == 0x3f # ?
+        @pos += 1 # ?
+        return ECMA262::PUNC_CONDIF
+      elsif code0 == 0x5b # [
+        @pos += 1 # [
+        return ECMA262::PUNC_LSQBRAC
+      elsif code0 == 0x5d # ]
+        @pos += 1 # ]
+        return ECMA262::PUNC_RSQBRAC
+      elsif code0 == 0x5e # ^
+        if code1 == 0x3d # ^=
+          @pos += 2
+          return ECMA262::PUNC_XORLET
+        end
+        @pos += 1 # ^
+        return ECMA262::PUNC_XOR
+      elsif code0 == 0x7b # {
+        @pos += 1 # {
+        return ECMA262::PUNC_LCURLYBRAC
+      elsif code0 == 0x7c # |
+        if code1 == 0x7c # ||
+          @pos += 2
+          return ECMA262::PUNC_LOR
+        end
+        if code1 == 0x3d # |=
+          @pos += 2
+          return ECMA262::PUNC_ORLET
+        end
+        @pos += 1 # |
+        return ECMA262::PUNC_OR
+      elsif code0 == 0x7d # }
+        @pos += 1 # }
+        return ECMA262::PUNC_RCURLYBRAC
+      elsif code0 == 0x7e # ~
+        @pos += 1 # ~
+        return ECMA262::PUNC_NOT
       end
       nil
     end
@@ -633,74 +655,142 @@ module Minjs
 
     def eof?(pos = nil)
       if pos.nil?
-        pos = @pos
+        @codes[@pos].nil?
+      else
+        @codes[pos].nil?
       end
-      @codes[pos].nil?
     end
 
     #
-    # check next literal is 'l' or not
+    # check next literal is strictly equal to 'l' or not.
+    # white spaces and line terminators are skipped and ignored.
+    #
     # if next literal is not 'l', position is not forwarded
     # if next literal is 'l', position is forwarded
     #
-    def match_lit(l, options = {})
-      eval_lit {
-        t = fwd_lit(options)
-        t == l ? t : nil
-      }
+    def eql_lit?(l, options = nil)
+      pos0 = @pos
+      while lit = next_input_element(options) and (lit.ws? or lit.lt?)
+      end
+
+      if lit.eql? l
+        lit
+      else
+        @pos = pos0
+        nil
+      end
     end
 
-    def next_lit(options = {})
-      lit = nil
+    #
+    # check next literal is equal to 'l' or not.
+    # white spaces are skipped and ignored.
+    # line terminators are not ignored.
+    #
+    # if next literal is not 'l', position is not forwarded
+    # if next literal is 'l', position is forwarded
+    #
+    def eql_lit_nolt?(l)
       pos0 = @pos
-      return nil if eof?
-      while lit = next_input_element(options)
-        if lit and (lit.ws? or lit.lt?)
-          ;
-        else
-          break
-        end
+      while lit = next_input_element(nil) and lit.ws?
+      end
+
+      if lit.eql? l
+        lit
+      else
+        @pos = pos0
+        nil
+      end
+    end
+
+    #
+    # check next literal is equal to 'l' or not.
+    # white spaces and line terminators are skipped and ignored.
+    #
+    # if next literal is not 'l', position is not forwarded
+    # if next literal is 'l', position is forwarded
+    #
+    def match_lit?(l, options = nil)
+      pos0 = @pos
+      while lit = next_input_element(options) and (lit.ws? or lit.lt?)
+      end
+
+      if lit == l
+        lit
+      else
+        @pos = pos0
+        nil
+      end
+    end
+
+    #
+    # check next literal is equal to 'l' or not.
+    # white spaces are skipped and ignored.
+    # line terminators are not ignored.
+    #
+    # if next literal is not 'l', position is not forwarded
+    # if next literal is 'l', position is forwarded
+    #
+    def match_lit_nolt?(l)
+      pos0 = @pos
+      while lit = next_input_element(nil) and lit.ws?
+      end
+
+      if lit == l
+        lit
+      else
+        @pos = pos0
+        nil
+      end
+    end
+
+    #
+    # fetch next literal.
+    # position is not forwarded.
+    # white spaces and line terminators are skipped and ignored.
+    #
+    def next_lit(options = nil)
+      pos0 = @pos
+      while lit = next_input_element(options) and (lit.ws? or lit.lt?)
       end
       @pos = pos0
       lit
     end
 
-    def fwd_lit(options = {})
-      lit = nil
-      return nil if eof?
-      if options[:nolt]
-        while lit = next_input_element(options)
-          if lit and lit.ws?
-            ;
-          else
-            break
-          end
-        end
-      else
-        while lit = next_input_element(options)
-          if lit and (lit.ws? or lit.lt?)
-            ;
-          else
-            break
-          end
-        end
+    #
+    # fetch next literal.
+    # position is not forwarded.
+    # white spaces are skipped and ignored.
+    # line terminators are not ignored.
+    #
+    def next_lit_nolt(options)
+      pos0 = @pos
+      while lit = next_input_element(options) and lit.ws?
+      end
+      @pos = pos0
+      lit
+    end
+
+    #
+    # fetch next literal.
+    # position is forwarded.
+    # white spaces and line terminators are skipped and ignored.
+    #
+    def fwd_lit(options)
+      while lit = next_input_element(options) and (lit.ws? or lit.lt?)
       end
       lit
     end
 
-    def ws_lit(options = {})
-      ret = next_input_element(options)
-      if ret and (ret.ws? or ret.lt?)
-        ret
-      else
-        nil
+    #
+    # fetch next literal.
+    # position is forwarded.
+    # white spaces are skipped and ignored.
+    # line terminators are not ignored.
+    #
+    def fwd_lit_nolt(options)
+      while lit = next_input_element(options) and lit.ws?
       end
-    end
-
-    def rewind_pos
-      if @pos > 0
-        @pos -= 1
-      end
+      lit
     end
 
     def debug_code(from, to = nil)

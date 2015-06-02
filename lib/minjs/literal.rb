@@ -22,7 +22,7 @@ module Minjs
     # 7.8.1
     #
     def null_literal(lex, context)
-      if lex.match_lit(ECMA262::ID_NULL)
+      if lex.eql_lit?(ECMA262::ID_NULL)
         ECMA262::Null.get
       else
         nil
@@ -33,9 +33,9 @@ module Minjs
     # 7.8.2
     #
     def boolean_literal(lex, context)
-      if lex.match_lit(ECMA262::ID_TRUE)
+      if lex.eql_lit?(ECMA262::ID_TRUE)
         ECMA262::Boolean.get(:true)
-      elsif lex.match_lit(ECMA262::ID_FALSE)
+      elsif lex.eql_lit?(ECMA262::ID_FALSE)
         ECMA262::Boolean.get(:false)
       else
         nil

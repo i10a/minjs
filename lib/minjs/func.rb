@@ -4,18 +4,18 @@ module Minjs
     #13
     #
     def func_declaration(lex, context)
-      return nil if lex.match_lit(ECMA262::ID_FUNCTION).nil?
+      return nil if lex.eql_lit?(ECMA262::ID_FUNCTION).nil?
       lex.eval_lit {
         new_context = ECMA262::Context.new
         new_context.lex_env = context.lex_env.new_declarative_env()
         new_context.var_env = context.var_env.new_declarative_env()
 
         if id=identifier(lex, context) and
-          lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and
+          lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and
           args = formal_parameter_list(lex, new_context) and
-          lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and
-          lex.match_lit(ECMA262::PUNC_LCURLYBRAC) and
-          b=func_body(lex, new_context) and lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
+          lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and
+          lex.eql_lit?(ECMA262::PUNC_LCURLYBRAC) and
+          b=func_body(lex, new_context) and lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
           f = ECMA262::StFunc.new(new_context, id, args, b, {:decl => true})
 
           context.var_env.record.create_mutable_binding(id, nil)
@@ -34,7 +34,7 @@ module Minjs
     end
 
     def func_exp(lex, context)
-      return nil if lex.match_lit(ECMA262::ID_FUNCTION).nil?
+      return nil if lex.eql_lit?(ECMA262::ID_FUNCTION).nil?
       @logger.debug "*** func_exp"
 
       lex.eval_lit {
@@ -43,11 +43,11 @@ module Minjs
         new_context.lex_env = context.lex_env.new_declarative_env()
         new_context.var_env = context.var_env.new_declarative_env()
 
-         if lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and
+         if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and
            args = formal_parameter_list(lex, new_context) and
-           lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and
-           lex.match_lit(ECMA262::PUNC_LCURLYBRAC) and
-           b = func_body(lex, new_context) and lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
+           lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and
+           lex.eql_lit?(ECMA262::PUNC_LCURLYBRAC) and
+           b = func_body(lex, new_context) and lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
            f = ECMA262::StFunc.new(new_context, id_opt, args, b)
            if id_opt
              new_context.var_env.record.create_mutable_binding(id_opt, nil)
@@ -74,7 +74,7 @@ module Minjs
           a = identifier(lex, context)
           if a
             ret.push(a)
-            break if lex.match_lit(ECMA262::PUNC_COMMA).nil?
+            break if lex.eql_lit?(ECMA262::PUNC_COMMA).nil?
           else
             break
           end

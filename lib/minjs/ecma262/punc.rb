@@ -36,7 +36,7 @@ module Minjs
       end
     end
     PUNC_CONDIF = Punctuator.get('?')
-    PUNC_CONDELSE = Punctuator.get(':')
+    #PUNC_CONDELSE = Punctuator.get(':')
     PUNC_LET = Punctuator.get('=')
     PUNC_DIVLET = Punctuator.get('/=')
     PUNC_MULLET = Punctuator.get('*=')
@@ -81,7 +81,7 @@ module Minjs
     PUNC_LCURLYBRAC = Punctuator.get('{')
     PUNC_RCURLYBRAC = Punctuator.get('}')
     PUNC_COMMA = Punctuator.get(',')
-    PUNC_COLON = Punctuator.get(':')
+    PUNC_COLON = Punctuator.get(':') #= same as PUNC_CONDELSE
     PUNC_SEMICOLON = Punctuator.get(';')
     PUNC_PERIOD = Punctuator.get('.')
   end

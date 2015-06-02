@@ -7,23 +7,39 @@ module Minjs
     # check next literal is ';' or '}' or LT
     #
     def semicolon(lex, context)
-      lex.eval_lit{
-        a = lex.fwd_lit(:nolt => true)
-        if a == ECMA262::PUNC_SEMICOLON
-          a
-        elsif a == ECMA262::PUNC_RCURLYBRAC
-          lex.rewind_pos
-          a
-        elsif a == ECMA262::LIT_LINE_FEED
-          a
-        elsif a.nil?
-          ECMA262::LIT_LINE_FEED
-        elsif a.lt?
-          a
-        else
-          nil
-        end
-      }
+      a = lex.next_lit_nolt(nil)
+      #
+      # ; ?
+      #
+      if a == ECMA262::PUNC_SEMICOLON
+        lex.fwd_lit_nolt(nil)
+        a
+      #
+      # } ?
+      #
+      elsif a == ECMA262::PUNC_RCURLYBRAC
+        a
+      #
+      # line feed?
+      #
+      elsif a == ECMA262::LIT_LINE_FEED
+        lex.fwd_lit_nolt(nil)
+        a
+      #
+      # end of program
+      #
+      elsif a.nil?
+        lex.fwd_lit_nolt(nil)
+        ECMA262::LIT_LINE_FEED
+      #
+      # line terminator?
+      #
+      elsif a.lt?
+        lex.fwd_lit_nolt(nil)
+        a
+      else
+        nil
+      end
     end
 
     #12
@@ -61,12 +77,12 @@ module Minjs
     # block
     def block(lex, context)
       pos0 = lex.pos
-      return nil unless lex.match_lit(ECMA262::PUNC_LCURLYBRAC)
-      if lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
+      return nil unless lex.eql_lit?(ECMA262::PUNC_LCURLYBRAC)
+      if lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
         return ECMA262::StBlock.new(ECMA262::StatementList.new([]))
       end
       lex.eval_lit {
-        if s = statement_list(lex, context) and lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
+        if s = statement_list(lex, context) and lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
           ECMA262::StBlock.new(s)
         else
           raise ParseError.new('no "}" end of block', lex)
@@ -93,7 +109,7 @@ module Minjs
     #
     def var_statement(lex, context)
       raise 'internal error' if context.nil?
-      return nil unless lex.match_lit(ECMA262::ID_VAR)
+      return nil unless lex.eql_lit?(ECMA262::ID_VAR)
       lex.eval_lit {
         if vl = var_decl_list(lex, context, {}) and semicolon(lex, context)
           #10.5
@@ -116,7 +132,7 @@ module Minjs
         a = var_decl(lex, context, options)
         next nil if !a
 
-        if lex.match_lit(ECMA262::PUNC_COMMA) and b = var_decl_list(lex, context, options)
+        if lex.eql_lit?(ECMA262::PUNC_COMMA) and b = var_decl_list(lex, context, options)
           next [a] + b
         else
           next [a]
@@ -137,7 +153,7 @@ module Minjs
     end
 
     def initialiser(lex, context, options)
-      if lex.match_lit(ECMA262::PUNC_LET) and a = assignment_exp(lex, context, options)
+      if lex.eql_lit?(ECMA262::PUNC_LET) and a = assignment_exp(lex, context, options)
         return a
       end
 
@@ -148,7 +164,7 @@ module Minjs
     #
     def empty_statement(lex, context)
       lex.eval_lit{
-        a = lex.fwd_lit
+        a = lex.fwd_lit(nil)
         if a == ECMA262::PUNC_SEMICOLON
           ECMA262::StEmpty.new
         else
@@ -178,12 +194,12 @@ module Minjs
     #12.5
     #
     def if_statement(lex, context)
-      return nil unless lex.match_lit(ECMA262::ID_IF)
+      return nil unless lex.eql_lit?(ECMA262::ID_IF)
       lex.eval_lit {
-        unless lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and cond=exp(lex, context, {}) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
+        unless lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and cond=exp(lex, context, {}) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
           raise ParseError.new("unexpected token", lex)
         end
-        if lex.match_lit(ECMA262::ID_ELSE) and e=statement(lex, context)
+        if lex.eql_lit?(ECMA262::ID_ELSE) and e=statement(lex, context)
           ECMA262::StIf.new(cond, s, e)
         else
           ECMA262::StIf.new(cond, s, nil)
@@ -198,8 +214,8 @@ module Minjs
     end
 
     def while_statement(lex, context)
-      return nil unless lex.match_lit(ECMA262::ID_WHILE)
-      if lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and e=exp(lex, context, {}) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
+      return nil unless lex.eql_lit?(ECMA262::ID_WHILE)
+      if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and e=exp(lex, context, {}) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
         ECMA262::StWhile.new(e, s)
       else
         raise ParseError.new("unexpected token", lex)
@@ -207,8 +223,8 @@ module Minjs
     end
 
     def do_while_statement(lex, context)
-      return nil unless lex.match_lit(ECMA262::ID_DO)
-      if s=statement(lex, context) and lex.match_lit(ECMA262::ID_WHILE) and lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and e=exp(lex, context, {}) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and semicolon(lex, context)
+      return nil unless lex.eql_lit?(ECMA262::ID_DO)
+      if s=statement(lex, context) and lex.eql_lit?(ECMA262::ID_WHILE) and lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and e=exp(lex, context, {}) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and semicolon(lex, context)
         ECMA262::StDoWhile.new(e, s)
       else
         raise ParseError.new("unexpected token", lex)
@@ -216,13 +232,13 @@ module Minjs
     end
 
     def for_statement(lex, context)
-      return nil unless lex.match_lit(ECMA262::ID_FOR)
+      return nil unless lex.eql_lit?(ECMA262::ID_FOR)
       lex.eval_lit{
         # for(var i in a)
-        next nil unless lex.match_lit(ECMA262::PUNC_LPARENTHESIS)
-        if lex.match_lit(ECMA262::ID_VAR)
+        next nil unless lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS)
+        if lex.eql_lit?(ECMA262::ID_VAR)
           lex.eval_lit{
-            if v=var_decl(lex, context, :no_in => true) and _in=lex.match_lit(ECMA262::ID_IN) and e=exp(lex, context, {}) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
+            if v=var_decl(lex, context, :no_in => true) and _in=lex.eql_lit?(ECMA262::ID_IN) and e=exp(lex, context, {}) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
               #10.5
               context.var_env.record.create_mutable_binding(v[0], nil)
               context.var_env.record.set_mutable_binding(v[0], :undefined, nil)
@@ -236,7 +252,7 @@ module Minjs
             end
           } or lex.eval_lit {
             # for(var i ; cond ; exp)
-            if vl=var_decl_list(lex, context, :no_in =>true) and s1=lex.match_lit(ECMA262::PUNC_SEMICOLON) and (e=exp(lex, context, {})||true) and s2=lex.match_lit(ECMA262::PUNC_SEMICOLON) and (e2=exp(lex, context, {})||true) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
+            if vl=var_decl_list(lex, context, :no_in =>true) and s1=lex.eql_lit?(ECMA262::PUNC_SEMICOLON) and (e=exp(lex, context, {})||true) and s2=lex.eql_lit?(ECMA262::PUNC_SEMICOLON) and (e2=exp(lex, context, {})||true) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
               e = nil if e == true
               e2 = nil if e2 == true
               #10.5
@@ -263,8 +279,8 @@ module Minjs
         end
       } or lex.eval_lit{
         # for(i in exp)
-        next nil unless lex.match_lit(ECMA262::PUNC_LPARENTHESIS)
-        if v=left_hand_side_exp(lex, context, {}) and _in = lex.match_lit(ECMA262::ID_IN) and e=exp(lex, context, {}) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
+        next nil unless lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS)
+        if v=left_hand_side_exp(lex, context, {}) and _in = lex.eql_lit?(ECMA262::ID_IN) and e=exp(lex, context, {}) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
           ECMA262::StForIn.new(v, e, s)
         else
           if _in
@@ -273,8 +289,8 @@ module Minjs
         end
       } or lex.eval_lit{
         # for(i ; cond; exp)
-        next nil unless lex.match_lit(ECMA262::PUNC_LPARENTHESIS)
-        if (v=exp(lex, context, :no_in => true) || true) and s1=lex.match_lit(ECMA262::PUNC_SEMICOLON) and (e=exp(lex, context, {}) || true) and s2=lex.match_lit(ECMA262::PUNC_SEMICOLON) and (e2=exp(lex, context, {})||true) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
+        next nil unless lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS)
+        if (v=exp(lex, context, :no_in => true) || true) and s1=lex.eql_lit?(ECMA262::PUNC_SEMICOLON) and (e=exp(lex, context, {}) || true) and s2=lex.eql_lit?(ECMA262::PUNC_SEMICOLON) and (e2=exp(lex, context, {})||true) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
           v = nil if v == true
           e = nil if e == true
           e2 = nil if e2 == true
@@ -288,7 +304,7 @@ module Minjs
     # 12.7
     #
     def continue_statement(lex, context)
-      return nil unless lex.match_lit(ECMA262::ID_CONTINUE)
+      return nil unless lex.eql_lit?(ECMA262::ID_CONTINUE)
       lex.eval_lit {
         if semicolon(lex, context)
           ECMA262::StContinue.new
@@ -307,7 +323,7 @@ module Minjs
     # 12.8
     #
     def break_statement(lex, context)
-      return nil unless lex.match_lit(ECMA262::ID_BREAK)
+      return nil unless lex.eql_lit?(ECMA262::ID_BREAK)
       lex.eval_lit {
         if semicolon(lex, context)
           ECMA262::StBreak.new
@@ -326,7 +342,7 @@ module Minjs
     # 12.9
     #
     def return_statement(lex, context)
-      return nil unless lex.match_lit(ECMA262::ID_RETURN)
+      return nil unless lex.eql_lit?(ECMA262::ID_RETURN)
       lex.eval_lit {
         if semicolon(lex, context)
           ECMA262::StReturn.new
@@ -341,9 +357,9 @@ module Minjs
     # 12.10
     #
     def with_statement(lex, context)
-      return nil unless lex.match_lit(ECMA262::ID_WITH)
+      return nil unless lex.eql_lit?(ECMA262::ID_WITH)
       lex.eval_lit {
-        if lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and e=exp(lex, context, {}) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
+        if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and e=exp(lex, context, {}) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
           ECMA262::StWith.new(context, e, s)
         else
           raise ParseError.new("unexpected token", lex)
@@ -354,9 +370,9 @@ module Minjs
     # 12.11
     #
     def switch_statement(lex, context)
-      return nil unless lex.match_lit(ECMA262::ID_SWITCH)
+      return nil unless lex.eql_lit?(ECMA262::ID_SWITCH)
       lex.eval_lit {
-        if lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and e=exp(lex, context, {}) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and  c = case_block(lex, context)
+        if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and e=exp(lex, context, {}) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and  c = case_block(lex, context)
           ECMA262::StSwitch.new(e, c)
         else
           raise ParseError.new("unexpected token", lex)
@@ -365,22 +381,22 @@ module Minjs
     end
 
     def case_block(lex, context)
-      return nil unless lex.match_lit(ECMA262::PUNC_LCURLYBRAC)
+      return nil unless lex.eql_lit?(ECMA262::PUNC_LCURLYBRAC)
       _case_block = []
       while true
         t = lex.eval_lit{
-          break unless lex.match_lit(ECMA262::ID_CASE) and e=exp(lex, context, {}) and lex.match_lit(ECMA262::PUNC_COLON)
+          break unless lex.eql_lit?(ECMA262::ID_CASE) and e=exp(lex, context, {}) and lex.eql_lit?(ECMA262::PUNC_COLON)
           sl = statement_list(lex, context)
           [e, sl]
         } || lex.eval_lit{
-          break unless lex.match_lit(ECMA262::ID_DEFAULT) and lex.match_lit(ECMA262::PUNC_COLON)
+          break unless lex.eql_lit?(ECMA262::ID_DEFAULT) and lex.eql_lit?(ECMA262::PUNC_COLON)
           sl = statement_list(lex, context)
           [nil, sl]
         }
         break if t.nil?
         _case_block.push(t)
       end
-      return nil unless lex.match_lit(ECMA262::PUNC_RCURLYBRAC)
+      return nil unless lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
       _case_block
     end
     #
@@ -388,7 +404,7 @@ module Minjs
     #
     def labelled_statement(lex, context)
       lex.eval_lit {
-        if i=identifier(lex, context) and s1=lex.match_lit(ECMA262::PUNC_COLON) and s=statement(lex, context)
+        if i=identifier(lex, context) and s1=lex.eql_lit?(ECMA262::PUNC_COLON) and s=statement(lex, context)
           ECMA262::StLabelled.new(i, s)
         else
           if s1
@@ -401,7 +417,7 @@ module Minjs
     # 12.13
     #
     def throw_statement(lex, context)
-      return nil unless lex.match_lit(ECMA262::ID_THROW)
+      return nil unless lex.eql_lit?(ECMA262::ID_THROW)
       lex.eval_lit{
         if semicolon(lex, context)
           raise ParseError.new("no line terminator here", lex)
@@ -420,7 +436,7 @@ module Minjs
     # 12.14
     #
     def try_statement(lex, context)
-      return nil unless lex.match_lit(ECMA262::ID_TRY)
+      return nil unless lex.eql_lit?(ECMA262::ID_TRY)
       lex.eval_lit {
         #
         # The catch argument context must be executable lexical environment.
@@ -448,9 +464,9 @@ module Minjs
       }
     end
     def try_catch(lex, catch_context)
-      return nil unless lex.match_lit(ECMA262::ID_CATCH)
+      return nil unless lex.eql_lit?(ECMA262::ID_CATCH)
 
-      if lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and i=identifier(lex, catch_context) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and b=block(lex, catch_context)
+      if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and i=identifier(lex, catch_context) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and b=block(lex, catch_context)
 #        catch_context.lex_env.record.create_mutable_binding(i, nil)
 #        catch_context.lex_env.record.set_mutable_binding(i, :undefined, nil, {:_parameter_list => true})
 #        catch_context.var_env.record.create_mutable_binding(i, nil)
@@ -464,7 +480,7 @@ module Minjs
     end
 
     def try_finally(lex, context)
-      return nil unless lex.match_lit(ECMA262::ID_FINALLY)
+      return nil unless lex.eql_lit?(ECMA262::ID_FINALLY)
       block(lex, context)
     end
 
@@ -472,7 +488,7 @@ module Minjs
     # 12.15
     #
     def debugger_statement(lex, context)
-      if lex.match_lit(ECMA262::ID_DEBUGGER) and semicolon(lex, context)
+      if lex.eql_lit?(ECMA262::ID_DEBUGGER) and semicolon(lex, context)
         t = ECMA262::StDebugger.new
       end
     end

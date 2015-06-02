@@ -5,13 +5,8 @@ module Minjs
   module Program
     def source_elements(lex, context, options = {})
       prog = []
-      while !lex.eof?
-        t = source_element(lex, context)
-        if t
-          prog.push(t)
-        else
-          break
-        end
+      while t = source_element(lex, context)
+        prog.push(t)
       end
       ECMA262::Prog.new(context, ECMA262::SourceElements.new(prog))
     end
