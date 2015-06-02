@@ -154,16 +154,7 @@ module Minjs
         else
           nil
         end
-      }# || lex.eval_lit {
-#        a = lex.fwd_lit(:nolt => true)
-#        if a == ECMA262::LIT_LINE_FEED
-#          ECMA262::StEmpty.new
-#        elsif a.lt?
-#          ECMA262::StEmpty.new
-#        else
-#          nil
-#        end
-#      }
+      }
     end
     #
     #12.4
@@ -190,7 +181,7 @@ module Minjs
       return nil unless lex.match_lit(ECMA262::ID_IF)
       lex.eval_lit {
         unless lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and cond=exp(lex, context, {}) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
-          raise ParseError.new("bad statement", lex)
+          raise ParseError.new("unexpected token", lex)
         end
         if lex.match_lit(ECMA262::ID_ELSE) and e=statement(lex, context)
           ECMA262::StIf.new(cond, s, e)
@@ -211,7 +202,7 @@ module Minjs
       if lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and e=exp(lex, context, {}) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
         ECMA262::StWhile.new(e, s)
       else
-        raise ParseError.new("while_statement", lex)
+        raise ParseError.new("unexpected token", lex)
       end
     end
 
@@ -220,7 +211,7 @@ module Minjs
       if s=statement(lex, context) and lex.match_lit(ECMA262::ID_WHILE) and lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and e=exp(lex, context, {}) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and semicolon(lex, context)
         ECMA262::StDoWhile.new(e, s)
       else
-        raise ParseError.new("do_while_statement", lex)
+        raise ParseError.new("unexpected token", lex)
       end
     end
 
@@ -229,52 +220,67 @@ module Minjs
       lex.eval_lit{
         # for(var i in a)
         next nil unless lex.match_lit(ECMA262::PUNC_LPARENTHESIS)
-        if lex.match_lit(ECMA262::ID_VAR) and v=var_decl(lex, context, :no_in => true) and lex.match_lit(ECMA262::ID_IN) and e=exp(lex, context, {}) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
-          #10.5
-          context.var_env.record.create_mutable_binding(v[0], nil)
-          context.var_env.record.set_mutable_binding(v[0], :undefined, nil)
-          context.lex_env.record.create_mutable_binding(v[0], nil)
-          context.lex_env.record.set_mutable_binding(v[0], :undefined, nil)
-          ECMA262::StForInVar.new(context, v, e, s)
-        else
-          nil
-        end
-      } or lex.eval_lit {
-        # for(var i ; cond ; exp)
-        next nil unless lex.match_lit(ECMA262::PUNC_LPARENTHESIS)
-        if lex.match_lit(ECMA262::ID_VAR) and vl=var_decl_list(lex, context, :no_in =>true) and lex.match_lit(ECMA262::PUNC_SEMICOLON) and (e=exp(lex, context, {})||true) and lex.match_lit(ECMA262::PUNC_SEMICOLON) and (e2=exp(lex, context, {})||true) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
-          e = nil if e == true
-          e2 = nil if e2 == true
-          #10.5
-          vl.each do |v|
-            dn = v[0]
-            context.var_env.record.create_mutable_binding(dn, nil)
-            context.var_env.record.set_mutable_binding(dn, :undefined, nil)
-            context.lex_env.record.create_mutable_binding(dn, nil)
-            context.lex_env.record.set_mutable_binding(dn, :undefined, nil)
-          end
-          ECMA262::StForVar.new(context, vl, e, e2, s)
+        if lex.match_lit(ECMA262::ID_VAR)
+          lex.eval_lit{
+            if v=var_decl(lex, context, :no_in => true) and _in=lex.match_lit(ECMA262::ID_IN) and e=exp(lex, context, {}) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
+              #10.5
+              context.var_env.record.create_mutable_binding(v[0], nil)
+              context.var_env.record.set_mutable_binding(v[0], :undefined, nil)
+              context.lex_env.record.create_mutable_binding(v[0], nil)
+              context.lex_env.record.set_mutable_binding(v[0], :undefined, nil)
+              ECMA262::StForInVar.new(context, v, e, s)
+            else
+              if _in
+                raise ParseError.new("unexpected token", lex)
+              end
+            end
+          } or lex.eval_lit {
+            # for(var i ; cond ; exp)
+            if vl=var_decl_list(lex, context, :no_in =>true) and s1=lex.match_lit(ECMA262::PUNC_SEMICOLON) and (e=exp(lex, context, {})||true) and s2=lex.match_lit(ECMA262::PUNC_SEMICOLON) and (e2=exp(lex, context, {})||true) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
+              e = nil if e == true
+              e2 = nil if e2 == true
+              #10.5
+              vl.each do |v|
+                dn = v[0]
+                context.var_env.record.create_mutable_binding(dn, nil)
+                context.var_env.record.set_mutable_binding(dn, :undefined, nil)
+                context.lex_env.record.create_mutable_binding(dn, nil)
+                context.lex_env.record.set_mutable_binding(dn, :undefined, nil)
+              end
+              ECMA262::StForVar.new(context, vl, e, e2, s)
+            else
+              if !s1
+                raise ParseError.new("no semicolon", lex)
+              elsif !s2
+                raise ParseError.new("no semicolon", lex)
+              else
+                nil
+              end
+            end
+          }
         else
           nil
         end
       } or lex.eval_lit{
         # for(i in exp)
         next nil unless lex.match_lit(ECMA262::PUNC_LPARENTHESIS)
-        if v=left_hand_side_exp(lex, context, {}) and lex.match_lit(ECMA262::ID_IN) and e=exp(lex, context, {}) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
+        if v=left_hand_side_exp(lex, context, {}) and _in = lex.match_lit(ECMA262::ID_IN) and e=exp(lex, context, {}) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
           ECMA262::StForIn.new(v, e, s)
         else
-          nil
+          if _in
+            raise ParseError.new("unexpected token", lex)
+          end
         end
       } or lex.eval_lit{
         # for(i ; cond; exp)
         next nil unless lex.match_lit(ECMA262::PUNC_LPARENTHESIS)
-        if (v=exp(lex, context, :no_in => true) || true) and lex.match_lit(ECMA262::PUNC_SEMICOLON) and (e=exp(lex, context, {}) || true) and lex.match_lit(ECMA262::PUNC_SEMICOLON) and (e2=exp(lex, context, {})||true) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
+        if (v=exp(lex, context, :no_in => true) || true) and s1=lex.match_lit(ECMA262::PUNC_SEMICOLON) and (e=exp(lex, context, {}) || true) and s2=lex.match_lit(ECMA262::PUNC_SEMICOLON) and (e2=exp(lex, context, {})||true) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
           v = nil if v == true
           e = nil if e == true
           e2 = nil if e2 == true
           ECMA262::StFor.new(v, e, e2, s)
         else
-          nil
+          raise ParseError.new("unexpected token", lex)
         end
       }
     end
@@ -292,7 +298,7 @@ module Minjs
           if e
             raise ParseError.new("no semicolon at end of continue statement", lex)
           else
-            raise ParseError.new("bad continue statement", lex)
+            raise ParseError.new("unexpected token", lex)
           end
         end
       }
@@ -311,7 +317,7 @@ module Minjs
           if e
             raise ParseError.new("no semicolon at end of break statement", lex)
           else
-            raise ParseError.new("bad break statement", lex)
+            raise ParseError.new("unexpected token", lex)
           end
         end
       }
@@ -327,7 +333,7 @@ module Minjs
         elsif e=exp(lex, context, {}) and semicolon(lex, context)
           ECMA262::StReturn.new(e)
         else
-          nil
+          raise ParseError.new("unexpected token", lex)
         end
       }
     end
@@ -340,7 +346,7 @@ module Minjs
         if lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and e=exp(lex, context, {}) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
           ECMA262::StWith.new(context, e, s)
         else
-          raise ParseError.new("switch_statement", lex)
+          raise ParseError.new("unexpected token", lex)
         end
       }
     end
@@ -353,7 +359,7 @@ module Minjs
         if lex.match_lit(ECMA262::PUNC_LPARENTHESIS) and e=exp(lex, context, {}) and lex.match_lit(ECMA262::PUNC_RPARENTHESIS) and  c = case_block(lex, context)
           ECMA262::StSwitch.new(e, c)
         else
-          raise ParseError.new("switch_statement", lex)
+          raise ParseError.new("unexpected token", lex)
         end
       }
     end
@@ -382,10 +388,12 @@ module Minjs
     #
     def labelled_statement(lex, context)
       lex.eval_lit {
-        if i=identifier(lex, context) and lex.match_lit(ECMA262::PUNC_COLON) and s=statement(lex, context)
+        if i=identifier(lex, context) and s1=lex.match_lit(ECMA262::PUNC_COLON) and s=statement(lex, context)
           ECMA262::StLabelled.new(i, s)
         else
-          nil
+          if s1
+            raise ParseError.new("unexpected token", lex)
+          end
         end
       }
     end
@@ -403,7 +411,7 @@ module Minjs
           if e
             raise ParseError.new("no semicolon at end of throw statement", lex)
           else
-            raise ParseError.new("bad throw statement", lex)
+            raise ParseError.new("unexpected token", lex)
           end
         end
       }

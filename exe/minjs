@@ -4,9 +4,19 @@ require 'minjs'
 
 argv = ARGV.dup
 f = []
+options = {}
 argv.each do |x|
+  if x.match(/^--?version/)
+    puts Minjs::VERSION
+    exit(0)
+  elsif x.match(/^--?/)
+    opt = $'.gsub(/-/, '_').to_sym
+    options[opt] = true
+  else
     f.push(open(x.to_s).read())
+  end
 end
+
 prog = Minjs::Compressor.new(:debug => false)
-prog.compress(f.join("\n"))
-puts prog.to_js({})
+prog.compress(f.join("\n"), options)
+puts prog.to_js(options)
