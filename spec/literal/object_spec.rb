@@ -63,10 +63,12 @@ EOS
 h ={
 get a(){return new Date()},
 set a(v){val=v},
+get: a,//get and set are not reserved word
+set: b
 }
 console.log(h.a)
 EOS
-      expect(js).to eq "h={get a(){return new Date()},set a(v){val=v}};console.log(h.a);"
+      expect(js).to eq "h={get a(){return new Date()},set a(v){val=v},get:a,set:b};console.log(h.a);"
     end
   end
 end

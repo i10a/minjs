@@ -32,57 +32,82 @@ module Minjs
       t
     end
 
+    # 7.8
+    # 7.8.1
+    # 7.8.2
     #
-    # 11.1.2
+    # Literal ::
+    # NullLiteral
+    # BooleanLiteral
+    # NumericLiteral
+    # StringLiteral
+    # RegularExpressionLiteral
     #
-    def identifier(lex, context)
-      a = lex.next_lit(nil)
-      if a.kind_of? ECMA262::IdentifierName and !a.reserved?
-        lex.fwd_lit(nil)
-        a.context = context
+    def literal(lex, context)
+      a = lex.next_lit(:regexp)
+      if a.kind_of? ECMA262::ECMA262Numeric or a.kind_of? ECMA262::ECMA262String or a.kind_of? ECMA262::ECMA262RegExp
+        lex.fwd_lit(:regexp)
         a
+      elsif a.eql? ECMA262::ID_NULL
+        lex.fwd_lit(:regexp)
+        ECMA262::Null.get
+      elsif a.eql? ECMA262::ID_TRUE
+        lex.fwd_lit(:regexp)
+        ECMA262::Boolean.get(:true)
+      elsif a.eql? ECMA262::ID_FALSE
+        lex.fwd_lit(:regexp)
+        ECMA262::Boolean.get(:false)
       else
         nil
       end
     end
 
     #
+    # 11.1.2
+    #
+    def identifier(lex, context)
+      a = lex.next_lit(:regexp)
+      if a.kind_of? ECMA262::IdentifierName and !a.reserved?
+        lex.fwd_lit(:regexp)
+        a.context = context
+        a
+      else
+        nil
+      end
+    end
+    #
     # 11.1.4
     #
     def array_literal(lex, context, options)
       return nil unless lex.eql_lit?(ECMA262::PUNC_LSQBRAC)
       t = []
-      lex.eval_lit {
-        while true
-          if lex.eql_lit?(ECMA262::PUNC_COMMA)
-            t.push(nil)
-          elsif lex.eql_lit?(ECMA262::PUNC_RSQBRAC)
-            break
-          elsif a = assignment_exp(lex, context, {})
-            t.push(a)
-            lex.eql_lit?(ECMA262::PUNC_COMMA)
-          else
-            raise ParseError.new("no `]' end of array", lex)
-          end
+      while true
+        if lex.eql_lit?(ECMA262::PUNC_COMMA)
+          t.push(nil)
+        elsif lex.eql_lit?(ECMA262::PUNC_RSQBRAC)
+          break
+        elsif a = assignment_exp(lex, context, {})
+          t.push(a)
+          lex.eql_lit?(ECMA262::PUNC_COMMA)
+        else
+          raise ParseError.new("no `]' end of array", lex)
         end
-        ECMA262::ECMA262Array.new(t)
-      }
+      end
+      ECMA262::ECMA262Array.new(t)
     end
     #
     # 11.1.5
     #
     def object_literal(lex, context, options)
       return nil unless lex.eql_lit?(ECMA262::PUNC_LCURLYBRAC)
-      lex.eval_lit {
-        if lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
-          next ECMA262::ECMA262Object.new([])
-        end
-        if h=property_name_and_value_list(lex, context, options)
-          ECMA262::ECMA262Object.new(h)
-        else
-          raise ParseError.new("no `}' end of object", lex)
-        end
-      }
+      if lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
+        return ECMA262::ECMA262Object.new([])
+      end
+      if h=property_name_and_value_list(lex, context, options)
+        ECMA262::ECMA262Object.new(h)
+      else
+        raise ParseError.new("no `}' end of object", lex)
+      end
     end
 
     #
@@ -91,61 +116,84 @@ module Minjs
     # set name(args){funcbody}
     #
     def property_name_and_value_list(lex, context, options)
-      lex.eval_lit{
-        h = []
-        while !lex.eof?
-          if lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
-            break
-          end
-          lex.eval_lit{
-            if lex.match_lit?(ECMA262::ID_GET) and a=property_name(lex, context) and lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and lex.eql_lit?(ECMA262::PUNC_LCURLYBRAC) and b=func_body(lex, context) and lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
-              h.push([a, ECMA262::StFunc.new(context, ECMA262::ID_GET, [], b, :getter => true)])
-            elsif lex.match_lit?(ECMA262::ID_SET) and a=property_name(lex, context) and lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and arg=property_set_parameter_list(lex, context) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and lex.eql_lit?(ECMA262::PUNC_LCURLYBRAC) and b=func_body(lex, context) and lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
-              h.push([a, ECMA262::StFunc.new(context, ECMA262::ID_SET, arg, b, :setter => true)])
+      h = []
+      while !lex.eof?
+        if lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
+          break
+        end
+        lex.eval_lit{
+          if lex.match_lit?(ECMA262::ID_GET) and a=property_name(lex, context)
+            new_context = ECMA262::Context.new
+            new_context.lex_env = context.lex_env.new_declarative_env()
+            new_context.var_env = context.var_env.new_declarative_env()
+            if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and
+              lex.eql_lit?(ECMA262::PUNC_LCURLYBRAC) and b=func_body(lex, new_context) and lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
+              h.push([a, ECMA262::StFunc.new(new_context, ECMA262::ID_GET, [], b, :getter => true)])
             else
-              nil
+              raise ParseError.new("unexpceted token", lex)
             end
-          } or lex.eval_lit{
-            a=property_name(lex, context) and lex.eql_lit?(ECMA262::PUNC_COLON) and b=assignment_exp(lex, context, options)
-            h.push([a, b])
-          }
-
-          if lex.eql_lit?(ECMA262::PUNC_COMMA)
-            break if lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
-          elsif lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
-            break
+          elsif lex.match_lit?(ECMA262::ID_SET) and a=property_name(lex, context)
+            new_context = ECMA262::Context.new
+            new_context.lex_env = context.lex_env.new_declarative_env()
+            new_context.var_env = context.var_env.new_declarative_env()
+            if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and arg=property_set_parameter_list(lex, new_context) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and lex.eql_lit?(ECMA262::PUNC_LCURLYBRAC) and b=func_body(lex, new_context) and lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
+              h.push([a, ECMA262::StFunc.new(new_context, ECMA262::ID_SET, arg, b, :setter => true)])
+            else
+              raise ParseError.new("unexpceted token", lex)
+            end
           else
-            raise ParseError.new("no `}' end of object", lex)
+            nil
           end
+        } or lex.eval_lit{
+          a=property_name(lex, context) and lex.eql_lit?(ECMA262::PUNC_COLON) and b=assignment_exp(lex, context, options)
+          h.push([a, b])
+        }
+
+        if lex.eql_lit?(ECMA262::PUNC_COMMA)
+          break if lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
+        elsif lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
+          break
+        else
+          raise ParseError.new("no `}' end of object", lex)
         end
-        h
-      }
+      end
+      h
     end
 
+    #11.1.5
+    #
+    # PropertyName :
+    # IdentifierName
+    # StringLiteral
+    # NumericLiteral
+    #
     def property_name(lex, context)
-      lex.eval_lit {
-        a = lex.fwd_lit(nil)
-        if a.kind_of?(ECMA262::ECMA262String)
-          a
-        elsif a.kind_of?(ECMA262::IdentifierName)
-          ECMA262::ECMA262String.new(a.to_js)
-        elsif a.kind_of?(ECMA262::ECMA262Numeric)
-          a
-        else
-          nil
-        end
-      }
+      a = lex.fwd_lit(nil)
+      if a.kind_of?(ECMA262::ECMA262String)
+        a
+      elsif a.kind_of?(ECMA262::IdentifierName)
+        ECMA262::ECMA262String.new(a.to_js)
+      elsif a.kind_of?(ECMA262::ECMA262Numeric)
+        a
+      elsif a.eql?(ECMA262::PUNC_COLON)
+        nil
+      else
+        raise ParseError.new("unexpceted token", lex)
+      end
     end
 
+    #11.1.5
+    #
+    # PropertySetParameterList :
+    # Identifier
+    #
     def property_set_parameter_list(lex, context)
-      lex.eval_lit {
-        a = lex.fwd_lit(nil)
-        if a.kind_of?(ECMA262::IdentifierName) and !a.reserved?
-          [a]
-        else
-          nil
-        end
-      }
+      argName = identifier(lex, context)
+      context.var_env.record.create_mutable_binding(argName, nil)
+      context.var_env.record.set_mutable_binding(argName, :undefined, nil, {:_parameter_list => true})
+      context.lex_env.record.create_mutable_binding(argName, nil)
+      context.lex_env.record.set_mutable_binding(argName, :undefined, nil, {:_parameter_list => true})
+      [argName]
     end
 
     #
@@ -374,7 +422,7 @@ module Minjs
         next nil if !a
         t = a
         while punc = lex.eql_lit?(ECMA262::PUNC_MUL) ||
-                     lex.eql_lit?(ECMA262::PUNC_DIV, :hint => :div) ||
+                     lex.eql_lit?(ECMA262::PUNC_DIV, :div) ||
                      lex.eql_lit?(ECMA262::PUNC_MOD)
 
           if b = unary_exp(lex, context, options)
@@ -650,7 +698,7 @@ module Minjs
       return nil if t.nil?
       lex.eval_lit {
         left_hand = t
-        punc = lex.next_lit
+        punc = lex.next_lit(:div)
         if punc == ECMA262::PUNC_LET ||
            punc == ECMA262::PUNC_DIVLET ||
            punc == ECMA262::PUNC_MULLET ||
@@ -711,9 +759,9 @@ module Minjs
     def exp(lex, context, options)
       @logger.debug "*** expression"
       lex.eval_lit{
-        t = assignment_exp(lex, context, {:hint => :regexp}.merge(options))
+        t = assignment_exp(lex, context, options)
         while punc = lex.eql_lit?(ECMA262::PUNC_COMMA)
-          if b = assignment_exp(lex,context, {:hint => :regexp}.merge(options))
+          if b = assignment_exp(lex,context, options)
             t = ECMA262::ExpComma.new(t, b)
           else
             raise ParseError.new("unexpceted token", lex)

@@ -1287,7 +1287,7 @@ module Minjs
       def to_js(options = {})
         _args = @args.collect{|x|x.to_js(options)}.join(",")
         if @getter
-          concat options, :get, @name, '(', _args, ")", "{", @statements, "}"
+          concat options, :get, @name, "()", "{", @statements, "}"
         elsif @setter
           concat options, :set, @name, '(', _args, ")", "{", @statements, "}"
         else
