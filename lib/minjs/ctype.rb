@@ -18,12 +18,6 @@ module Minjs
       code >= 0x61 && code <= 0x66
     end
 
-    def hex_number?(code)
-      code >= 0x30 && code <= 0x39 or
-      code >= 0x41 && code <= 0x46 or
-      code >= 0x61 && code <= 0x66
-    end
-
     # 7.2
     #
     # WhiteSpace ::

@@ -1,3 +1,4 @@
+# coding: utf-8
 require 'minjs/ctype'
 
 module Minjs
@@ -68,13 +69,10 @@ module Minjs
 
     # 7.2
     def white_space
-      code = @codes[@pos]
-      if white_space?(code)
-        while true
+      if white_space?(@codes[@pos])
+        begin
           @pos += 1
-          code = @codes[@pos]
-          break unless white_space?(code)
-        end
+        end until !white_space?(@codes[@pos])
         return ECMA262::WhiteSpace.get
       else
         nil
@@ -83,13 +81,10 @@ module Minjs
 
     #7.3
     def line_terminator
-      code = @codes[@pos]
-      if line_terminator?(code)
-        while true
+      if line_terminator?(@codes[@pos])
+        begin
           @pos += 1
-          code = @codes[@pos]
-          break unless line_terminator?(code)
-        end
+        end until !line_terminator?(@codes[@pos])
         return ECMA262::LineFeed.get
       else
         nil
@@ -102,31 +97,28 @@ module Minjs
     end
 
     def multi_line_comment
+      # /*
       if @codes[@pos] == 0x2f and @codes[@pos + 1] == 0x2a
-        @pos = @pos + 2
+        @pos += 2
         pos0 = @pos
-        lf = false
-        while (@codes[@pos] != 0x2a or @codes[@pos + 1] != 0x2f)
-          if @codes[@pos].nil?
-            raise ParseError.new("no `*/' at end of comment", self)
-          end
-          if line_terminator?(@codes[@pos])
-            lf = true
-          end
-          @pos = @pos + 1
+        # */
+        while (code = @codes[@pos] != 0x2a) or @codes[@pos + 1] != 0x2f
+          raise ParseError.new("no `*/' at end of comment", self) if code.nil?
+          @pos += 1
         end
-        @pos = @pos + 2
-        return ECMA262::MultiLineComment.new(@codes[pos0...(@pos-2)].pack("U*"), lf)
+        @pos +=2
+        return ECMA262::MultiLineComment.new(@codes[pos0...(@pos-2)].pack("U*"))
       else
         nil
       end
     end
 
     def single_line_comment
+      # //
       if @codes[@pos] == 0x2f and @codes[@pos + 1] == 0x2f
-        @pos = @pos + 2
+        @pos += 2
         pos0 = @pos
-        while !line_terminator?(@codes[@pos]) and @codes[@pos]
+        while (code = @codes[@pos]) and !line_terminator?(code)
           @pos += 1
         end
         if @codes[@pos].nil?
@@ -143,38 +135,36 @@ module Minjs
     # 7.5 tokens
     #
     def token
-      pos0 = @pos
-      ret = (identifier_name || numeric_literal || punctuator || string_literal)
-      if ret
-        @lit_cache[pos0] = ret
-        @lit_nextpos[pos0] = @pos
-      end
-      ret
+      identifier_name || numeric_literal || punctuator || string_literal
     end
 
+    #
     def unicode_escape?
-      if @codes[@pos] == 0x5c and
-         @codes[@pos+1] == 0x75 and
-         hex_number?(@codes[@pos+2]) and
-         hex_number?(@codes[@pos+3]) and
-         hex_number?(@codes[@pos+4]) and
-         hex_number?(@codes[@pos+5])
-        [@codes[@pos+2],@codes[@pos+3],@codes[@pos+4],@codes[@pos+5]].pack("U*").to_i(16)
+      # @codes[@pos] == 0x5c
+      if @codes[@pos+1] == 0x75 #u
+        if hex_digit?(@codes[@pos+2]) and
+          hex_digit?(@codes[@pos+3]) and
+          hex_digit?(@codes[@pos+4]) and
+          hex_digit?(@codes[@pos+5])
+          @codes[(@pos+2)..(@pos+5)].pack("U*").to_i(16)
+        else
+          raise ParseError.new("bad unicode escpae sequence", self)
+        end
       else
-        false
+        nil
       end
     end
 
     def identifier_name
-      pos0 = @pos
-      return nil if @codes[@pos].nil?
+      return nil if (code = @codes[@pos]).nil?
 
+      pos0 = @pos
       chars = []
-      if u=unicode_escape? and identifier_start?(u)
-        chars.push(u)
+      if code == 0x5c and ucode = unicode_escape? and identifier_start?(ucode)
+        chars.push(ucode)
         @pos += 6
-      elsif identifier_start?(@codes[@pos])
-        chars.push(@codes[@pos])
+      elsif identifier_start?(code)
+        chars.push(code)
         @pos += 1
       else
         return nil
@@ -182,11 +172,11 @@ module Minjs
 
       while true
         code = @codes[@pos]
-        if u=unicode_escape? and (identifier_start?(u) || identifier_part?(u))
-          chars.push(u)
+        if code == 0x5c and ucode = unicode_escape? and identifier_part?(ucode)
+          chars.push(ucode)
           @pos += 6
-        elsif identifier_part?(@codes[@pos])
-          chars.push(@codes[@pos])
+        elsif identifier_part?(code)
+          chars.push(code)
           @pos += 1
         else
           name = chars.pack("U*").to_sym
@@ -456,68 +446,124 @@ module Minjs
     end
 
     #7.8.3
+    #B.1.1
     def numeric_literal
-      code = @codes[@pos]
-      return nil if code.nil?
-
-      hex_integer_literal || decimal_literal
+      hex_integer_literal || octal_integer_literal || decimal_literal
     end
 
+    #7.8.3
+    #
+    # HexIntegerLiteral ::
+    # 0x HexDigit
+    # 0X HexDigit
+    # HexIntegerLiteral HexDigit
+    #
     def hex_integer_literal
-      pos0 = @pos
-      # 0x.... or 0X....
       code = @codes[@pos]
-      if code == 0x30 and (@codes[@pos+1] == 0x78 || @codes[@pos+1] == 0x58) #hex integer
+      if code.nil?
+        return nil
+      #0x / 0X
+      elsif code == 0x30 and (@codes[@pos+1] == 0x78 || @codes[@pos+1] == 0x58)
         @pos += 2
-        while true
-          code = @codes[@pos]
-          if (code >= 0x30 and code <= 0x39) || (code >= 0x41 and code <= 0x4f) || (code >= 0x61 and code <= 0x6f)
-            ;
-          elsif identifier_start?(code)
-            raise ParseError.new("The source character immediately following a NumericLiteral must not be an IdentifierStart or DecimalDigit", self)
-          else
-            return ECMA262::ECMA262Numeric.new(@codes[(pos0+2)...@pos].pack("U*").to_i(16))
-          end
-          @pos += 1
+        pos0 = @pos
+        while code = @codes[@pos] and hex_digit?(code)
+          @pos += 1;
+        end
+        if identifier_start?(code)
+          raise ParseError.new("The source character immediately following a NumericLiteral must not be an IdentifierStart or DecimalDigit", self)
+        else
+          return ECMA262::ECMA262Numeric.new(@codes[pos0...@pos].pack("U*").to_i(16))
         end
       else
         nil
       end
     end
 
+    #B.1.1
+    # OctalIntegerLiteral ::
+    # 0 OctalDigit
+    # OctalIntegerLiteral OctalDigit
+    #
+    def octal_integer_literal
+      code = @codes[@pos]
+      if code.nil?
+        return nil
+      elsif code == 0x30 and (code1 = @codes[@pos + 1]) >= 0x30 and code1 <= 0x37
+        @pos += 1
+        pos0 = @pos
+        while code = @codes[@pos] and code >= 0x30 and code <= 0x37
+          @pos += 1
+        end
+        if identifier_start?(code)
+          raise ParseError.new("The source character immediately following a NumericLiteral must not be an IdentifierStart or DecimalDigit", self)
+        else
+          return ECMA262::ECMA262Numeric.new(@codes[pos0...@pos].pack("U*").to_i(8))
+        end
+      else
+        nil
+      end
+    end
+
+    # 7.8.3
+    #
+    # DecimalLiteral ::
+    # DecimalIntegerLiteral . DecimalDigitsopt ExponentPartopt
+    # . DecimalDigits ExponentPartopt
+    # DecimalIntegerLiteral ExponentPartopt
+    #
     def decimal_literal
       pos0 = @pos
       code = @codes[@pos]
-      if code == 0x2e #.
+
+      if code.nil?
+        return nil
+      elsif code == 0x2e #.
         @pos += 1
         f = decimal_digits
-        if f.nil?
-          @pos = pos0
-          return nil
+        if f.nil? #=> this period is punctuator
+          @pos = pos0 + 1
+          return ECMA262::PUNC_PERIOD
         end
-        if @codes[@pos] == 0x65 || @codes[@pos] == 0x45
+        if (code = @codes[@pos]) == 0x65 || code == 0x45
           @pos += 1
-          e = exp_part
+          e = exponent_part
         end
         if identifier_start?(@codes[@pos])
           raise ParseError.new("The source character immediately following a NumericLiteral must not be an IdentifierStart or DecimalDigit", self)
         end
 
         return ECMA262::ECMA262Numeric.new('0', f, e)
-      end
+      elsif code == 0x30 # zero
+        i = "0"
+        @pos += 1
+        if @codes[@pos] == 0x2e #.
+          @pos += 1
+          f = decimal_digits
+          if (code = @codes[@pos]) == 0x65 || code == 0x45 #e or E
+            @pos += 1
+            e = exponent_part
+          end
+        elsif (code = @codes[@pos]) == 0x65 || code == 0x45 #e or E
+          @pos += 1
+          e = exponent_part
+        end
+        if identifier_start?(@codes[@pos])
+          raise ParseError.new("The source character immediately following a NumericLiteral must not be an IdentifierStart or DecimalDigit", self)
+        end
 
-      if code >= 0x30 and code <= 0x39
+        return ECMA262::ECMA262Numeric.new(i, f, e)
+      elsif code >= 0x31 and code <= 0x39
         i = decimal_digits
         if @codes[@pos] == 0x2e #.
           @pos += 1
           f = decimal_digits
-          if @codes[@pos] == 0x65 || @codes[@pos] == 0x45 #e or E
+          if (code = @codes[@pos]) == 0x65 || code == 0x45 #e or E
             @pos += 1
-            e = exp_part
+            e = exponent_part
           end
-        elsif @codes[@pos] == 0x65 || @codes[@pos] == 0x45 #e or E
+        elsif (code = @codes[@pos]) == 0x65 || code == 0x45 #e or E
           @pos += 1
-          e = exp_part
+          e = exponent_part
         end
         if identifier_start?(@codes[@pos])
           raise ParseError.new("The source character immediately following a NumericLiteral must not be an IdentifierStart or DecimalDigit", self)
@@ -529,10 +575,15 @@ module Minjs
       nil
     end
 
-    def exp_part
-      if @codes[@pos] == 0x2b
+    # 7.8.3
+    #
+    # ExponentPart ::
+    # ExponentIndicator SignedInteger
+    #
+    def exponent_part
+      if (code = @codes[@pos]) == 0x2b
         @pos += 1
-      elsif @codes[@pos] == 0x2d
+      elsif code == 0x2d
         @pos += 1
         neg = true
       end
@@ -544,111 +595,180 @@ module Minjs
       e
     end
 
+    #7.8.3
+    #
+    # DecimalDigit :: one of
+    # 0 1 2 3 4 5 6 7 8 9
+    #
     def decimal_digits
       pos0 = @pos
-      code = @codes[@pos]
-      return nil if code.nil?
-      if code >= 0x30 and code <= 0x39
+      if (code = @codes[@pos]) >= 0x30 and code <= 0x39
         @pos += 1
-        while true
-          code = @codes[@pos]
-          if code >= 0x30 and code <= 0x39
-            @pos += 1
-          else
-            return @codes[pos0...@pos].pack("U*")
-          end
+        while code = @codes[@pos] and code >= 0x30 and code <= 0x39
+          @pos += 1
         end
+        return @codes[pos0...@pos].pack("U*")
       else
         nil
       end
     end
 
     #7.8.4
+    #
+    # StringLiteral ::
+    # " DoubleStringCharactersopt "
+    # ' SingleStringCharactersopt '
+    #
+    # DoubleStringCharacters ::
+    # DoubleStringCharacter DoubleStringCharactersopt
+    #
+    # SingleStringCharacters ::
+    # SingleStringCharacter SingleStringCharactersopt
+    #
+    # DoubleStringCharacter ::
+    # SourceCharacter but not one of " or \ or LineTerminator
+    # \ EscapeSequence
+    # LineContinuation
+    #
+    # SingleStringCharacter ::
+    # SourceCharacter but not one of ' or \ or LineTerminator
+    # \ EscapeSequence
+    # LineContinuation
+    #
     def string_literal
-      code = @codes[@pos]
-      return nil if code.nil?
-      pos0 = @pos
-      if code == 0x27 #'
+      if (code = @codes[@pos]) == 0x27 #'
         term = 0x27
       elsif code == 0x22 #"
         term = 0x22
       else
         return nil
       end
+      @pos += 1
+      pos0 = @pos
 
-      str = ''
-      while @codes[@pos]
-        @pos += 1
-        code = @codes[@pos]
+      str = []
+      while (code = @codes[@pos])
         if code.nil?
           raise ParseError.new("no `#{term}' at end of string", self)
         elsif line_terminator?(code)
           raise ParseError.new("string has line terminator in body", self)
         elsif code == 0x5c #\
           @pos += 1
-          str << esc_string
+          str.push(escape_sequence)
         elsif code == term
-            @pos += 1
-            return ECMA262::ECMA262String.new(str)
+          @pos += 1
+          return ECMA262::ECMA262String.new(str.compact.pack("U*"))
         else
-          str << code
+          @pos += 1
+          str.push(code)
         end
       end
       nil
     end
 
-    # Annex B
-    def octal?(char)
-      char >= 0x30 and char <= 0x39
-    end
+    # 7.8.4
+    # B.1.2
+    #
+    # EscapeSequence ::
+    # CharacterEscapeSequence
+    # 0 [lookahead ∉ DecimalDigit]
+    # HexEscapeSequence
+    # UnicodeEscapeSequence
+    # OctalEscapeSequence
 
-    def esc_string
-      case @codes[@pos]
-      #      when 0x30
-      #        "\u{0}"
-      when 0x27
-        "\'"
-      when 0x22
-        "\""
-      when 0x5c
-        "\\"
+    def escape_sequence
+      case (code = @codes[@pos])
+#      when 0x30
+#        @pos += 1
+#        0
+      when 0x27 #'
+        @pos += 1
+        0x27
+      when 0x22 #"
+        @pos += 1
+        0x22
+      when 0x5c #\
+        @pos += 1
+        0x5c
       when 0x62 #b
-        "\u{0008}"
+        @pos += 1
+        0x08
       when 0x74 #t
-        "\u{0009}"
+        @pos += 1
+        0x09
       when 0x6e #n
-        "\u{000a}"
+        @pos += 1
+        0x0a
       when 0x76 #v
-        "\u{000b}"
+        @pos += 1
+        0x0b
       when 0x66 #f
-        "\u{000c}"
+        @pos += 1
+        0x0c
       when 0x72 #r
-        "\u{000d}"
+        @pos += 1
+        0x0d
       when 0x78 #x
-        t = [[@codes[@pos+1], @codes[@pos+2]].pack("U*").to_i(16)].pack("U*")
-        @pos += 2
+        #check
+        t = @codes[(@pos+1)..(@pos+2)].pack("U*").to_i(16)
+        @pos += 3
         t
       when 0x75 #u
-        t = [[@codes[@pos+1], @codes[@pos+2], @codes[@pos+3], @codes[@pos+4]].pack("U*").to_i(16)].pack("U*")
-        @pos += 4
+        #check
+        t = @codes[(@pos+1)..(@pos+4)].pack("U*").to_i(16)
+        @pos += 5
         t
       else
         # line continuation
-        if line_terminator?(@codes[@pos])
-          ""
-        # octal
-        # Annex B
-        elsif octal?(@codes[@pos])
-          oct = (@codes[@pos] - 0x30)
-          2.times do
-            break unless octal?(@codes[@pos+1])
-            @pos += 1
-            oct *= 8
-            oct += (@codes[@pos] - 0x30)
+        if line_terminator?(code)
+          @pos += 1
+          nil
+        # Annex B.1.2
+        #
+        # OctalEscapeSequence ::
+        # OctalDigit [lookahead ∉ DecimalDigit]
+        # ZeroToThree OctalDigit [lookahead ∉ DecimalDigit]
+        # FourToSeven OctalDigit
+        # ZeroToThree OctalDigit OctalDigit
+        #
+        # Note:
+        #
+        # A string such as the following is invalid
+        # as a octal escape sequence.
+        #
+        # \19 or \319
+        #
+        # However, it is not to an error in most implementations.
+        # Therefore, minjs also intepret it such way.
+        #
+        elsif octal_digit?(code)
+          code1 = @codes[@pos+1]
+          code2 = @codes[@pos+2]
+          if code >= 0x30 and code <= 0x33
+            if octal_digit?(code1)
+              if octal_digit?(code2)
+                @pos += 3
+                (code - 0x30) * 64 + (code1 - 0x30) * 8 + (code2 - 0x30)
+              else
+                @pos += 2
+                (code - 0x30) * 8 + (code1 - 0x30)
+              end
+            else
+              @pos += 1
+              code - 0x30
+            end
+          else #if code >= 0x34 and code <= 0x37
+            if octal_digit?(code1)
+              @pos += 2
+              (code - 0x30) * 8 + (code1 - 0x30)
+            else
+              @pos += 1
+              code - 0x30
+            end
           end
-          [oct].pack("U*")
         else
-          [@codes[@pos]].pack("U*")
+          @pos += 1
+          code
         end
       end
     end

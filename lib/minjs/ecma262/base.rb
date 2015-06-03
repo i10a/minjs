@@ -24,7 +24,7 @@ module Minjs
             if prev.match(/[\w\$]\z/) and js.match(/\A[\w\$]/)
               sep = ' '
             end
-            #;; means empty statement that must not be deleted
+            #';;' means 'empty statement' that must not be deleted
             if prev.match(/;;\Z/)
               prev.sub!(/;;\Z/, ";")
             elsif prev.match(/;\Z/) and js == "}"

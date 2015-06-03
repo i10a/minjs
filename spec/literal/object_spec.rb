@@ -62,9 +62,11 @@ EOS
       js = test_parse <<-'EOS'
 h ={
 get a(){return new Date()},
+set a(v){val=v},
 }
 console.log(h.a)
 EOS
+      expect(js).to eq "h={get a(){return new Date()},set a(v){val=v}};console.log(h.a);"
     end
   end
 end
