@@ -8,7 +8,7 @@ module Minjs
       @logger.debug "*** primary_exp"
 
       if lex.eql_lit?(ECMA262::ID_THIS)
-      @logger.debug "*** primary_exp => this"
+        @logger.debug "*** primary_exp => this"
         return ECMA262::ID_THIS
       end
       # (exp)
@@ -352,180 +352,165 @@ module Minjs
     # 11.3
     #
     def postfix_exp(lex, context, options)
-      t = lex.eval_lit{
-        a = left_hand_side_exp(lex, context, options)
-        return nil if a.nil?
-        if punc = (lex.eql_lit_nolt?(ECMA262::PUNC_INC) ||
-                   lex.eql_lit_nolt?(ECMA262::PUNC_DEC))
-          if punc == ECMA262::PUNC_INC
-            ECMA262::ExpPostInc.new(a)
-          else
-            ECMA262::ExpPostDec.new(a)
-          end
+      exp = left_hand_side_exp(lex, context, options)
+      return nil if exp.nil?
+      if punc = (lex.eql_lit_nolt?(ECMA262::PUNC_INC) ||
+                 lex.eql_lit_nolt?(ECMA262::PUNC_DEC))
+        if punc == ECMA262::PUNC_INC
+          ECMA262::ExpPostInc.new(exp)
         else
-          a
+          ECMA262::ExpPostDec.new(exp)
         end
-      }
-      t
+      else
+        exp
+      end
     end
 
     #
     # 11.4
     #
     def unary_exp(lex, context, options)
-      lex.eval_lit{
-        if punc = (lex.eql_lit?(ECMA262::ID_DELETE) ||
-                   lex.eql_lit?(ECMA262::ID_VOID) ||
-                   lex.eql_lit?(ECMA262::ID_TYPEOF) ||
-                   lex.eql_lit?(ECMA262::PUNC_INC) ||
-                   lex.eql_lit?(ECMA262::PUNC_DEC) ||
-                   lex.eql_lit?(ECMA262::PUNC_ADD) ||
-                   lex.eql_lit?(ECMA262::PUNC_SUB) ||
-                   lex.eql_lit?(ECMA262::PUNC_NOT) ||
-                   lex.eql_lit?(ECMA262::PUNC_LNOT))
-          a = unary_exp(lex, context, options)
-          if a.nil?
-            raise ParseError.new("unexpceted token", lex)
-          elsif punc == ECMA262::PUNC_INC
-            ECMA262::ExpPreInc.new(a)
-          elsif punc == ECMA262::PUNC_DEC
-            ECMA262::ExpPreDec.new(a)
-          elsif punc == ECMA262::PUNC_ADD
-            ECMA262::ExpPositive.new(a)
-          elsif punc == ECMA262::PUNC_SUB
-            ECMA262::ExpNegative.new(a)
-          elsif punc == ECMA262::PUNC_NOT
-            ECMA262::ExpBitwiseNot.new(a)
-          elsif punc == ECMA262::PUNC_LNOT
-            ECMA262::ExpLogicalNot.new(a)
-          elsif punc.respond_to?(:val)
+      if punc = (lex.eql_lit?(ECMA262::ID_DELETE) ||
+                 lex.eql_lit?(ECMA262::ID_VOID) ||
+                 lex.eql_lit?(ECMA262::ID_TYPEOF) ||
+                 lex.eql_lit?(ECMA262::PUNC_INC) ||
+                 lex.eql_lit?(ECMA262::PUNC_DEC) ||
+                 lex.eql_lit?(ECMA262::PUNC_ADD) ||
+                 lex.eql_lit?(ECMA262::PUNC_SUB) ||
+                 lex.eql_lit?(ECMA262::PUNC_NOT) ||
+                 lex.eql_lit?(ECMA262::PUNC_LNOT))
+        exp = unary_exp(lex, context, options)
+        if exp.nil?
+          raise ParseError.new("unexpceted token", lex)
+        elsif punc == ECMA262::PUNC_INC
+          ECMA262::ExpPreInc.new(exp)
+        elsif punc == ECMA262::PUNC_DEC
+          ECMA262::ExpPreDec.new(exp)
+        elsif punc == ECMA262::PUNC_ADD
+          ECMA262::ExpPositive.new(exp)
+        elsif punc == ECMA262::PUNC_SUB
+          ECMA262::ExpNegative.new(exp)
+        elsif punc == ECMA262::PUNC_NOT
+          ECMA262::ExpBitwiseNot.new(exp)
+        elsif punc == ECMA262::PUNC_LNOT
+          ECMA262::ExpLogicalNot.new(exp)
+        elsif punc.respond_to?(:val)
             if punc.val == :delete
-              ECMA262::ExpDelete.new(a)
+              ECMA262::ExpDelete.new(exp)
             elsif punc.val == :void
-              ECMA262::ExpVoid.new(a)
+              ECMA262::ExpVoid.new(exp)
             elsif punc.val == :typeof
-              ECMA262::ExpTypeof.new(a)
+              ECMA262::ExpTypeof.new(exp)
             end
-          end
         end
-      } || lex.eval_lit{
+      else
         postfix_exp(lex, context, options)
-      }
+      end
     end
 
     #
     # 11.5
     #
     def multiplicative_exp(lex, context, options)
-      lex.eval_lit {
-        a = unary_exp(lex, context, options)
-        next nil if !a
-        t = a
-        while punc = lex.eql_lit?(ECMA262::PUNC_MUL) ||
-                     lex.eql_lit?(ECMA262::PUNC_DIV, :div) ||
-                     lex.eql_lit?(ECMA262::PUNC_MOD)
+      a = unary_exp(lex, context, options)
+      return nil if !a
+      t = a
+      while punc = lex.eql_lit?(ECMA262::PUNC_MUL) ||
+                   lex.eql_lit?(ECMA262::PUNC_DIV, :div) ||
+                   lex.eql_lit?(ECMA262::PUNC_MOD)
 
-          if b = unary_exp(lex, context, options)
-            if punc == ECMA262::PUNC_MUL
-              t = ECMA262::ExpMul.new(t, b)
-            elsif punc == ECMA262::PUNC_DIV
-              t = ECMA262::ExpDiv.new(t, b)
-            else
-              t = ECMA262::ExpMod.new(t, b)
-            end
+        if b = unary_exp(lex, context, options)
+          if punc == ECMA262::PUNC_MUL
+            t = ECMA262::ExpMul.new(t, b)
+          elsif punc == ECMA262::PUNC_DIV
+            t = ECMA262::ExpDiv.new(t, b)
           else
-            raise ParseError.new("unexpceted token", lex)
+            t = ECMA262::ExpMod.new(t, b)
           end
+        else
+          raise ParseError.new("unexpceted token", lex)
         end
-        t
-      }
+      end
+      t
     end
 
     #
     # 11.6
     #
     def additive_exp(lex, context, options)
-      lex.eval_lit {
-        a = multiplicative_exp(lex, context, options)
-        next nil if !a
+      a = multiplicative_exp(lex, context, options)
+      return nil if !a
 
-        t = a
-        while punc = lex.eql_lit?(ECMA262::PUNC_ADD) || lex.eql_lit?(ECMA262::PUNC_SUB)
-          if b = multiplicative_exp(lex, context, options)
-            if punc == ECMA262::PUNC_ADD
-              t = ECMA262::ExpAdd.new(t, b)
-            else
-              t = ECMA262::ExpSub.new(t, b)
-            end
+      t = a
+      while punc = lex.eql_lit?(ECMA262::PUNC_ADD) || lex.eql_lit?(ECMA262::PUNC_SUB)
+        if b = multiplicative_exp(lex, context, options)
+          if punc == ECMA262::PUNC_ADD
+            t = ECMA262::ExpAdd.new(t, b)
           else
-            raise ParseError.new("unexpceted token", lex)
+            t = ECMA262::ExpSub.new(t, b)
           end
+        else
+          raise ParseError.new("unexpceted token", lex)
         end
-
-        t
-      }
+      end
+      t
     end
     #
     # 11.7
     def shift_exp(lex, context, options)
-      lex.eval_lit {
-        a = additive_exp(lex, context, options)
-        next nil if !a
+      a = additive_exp(lex, context, options)
+      return nil if !a
 
-        t = a
-        while punc = lex.eql_lit?(ECMA262::PUNC_LSHIFT) ||
-                     lex.eql_lit?(ECMA262::PUNC_RSHIFT) ||
-                     lex.eql_lit?(ECMA262::PUNC_URSHIFT)
-          if b = additive_exp(lex, context, options)
-            if punc == ECMA262::PUNC_LSHIFT
-              t = ECMA262::ExpLShift.new(t, b)
-            elsif punc == ECMA262::PUNC_RSHIFT
-              t = ECMA262::ExpRShift.new(t, b)
-            elsif punc == ECMA262::PUNC_URSHIFT
-              t = ECMA262::ExpURShift.new(t, b)
-            end
-          else
-            raise ParseError.new("unexpceted token", lex)
+      t = a
+      while punc = lex.eql_lit?(ECMA262::PUNC_LSHIFT) ||
+                   lex.eql_lit?(ECMA262::PUNC_RSHIFT) ||
+                   lex.eql_lit?(ECMA262::PUNC_URSHIFT)
+        if b = additive_exp(lex, context, options)
+          if punc == ECMA262::PUNC_LSHIFT
+            t = ECMA262::ExpLShift.new(t, b)
+          elsif punc == ECMA262::PUNC_RSHIFT
+            t = ECMA262::ExpRShift.new(t, b)
+          elsif punc == ECMA262::PUNC_URSHIFT
+            t = ECMA262::ExpURShift.new(t, b)
           end
+        else
+          raise ParseError.new("unexpceted token", lex)
         end
-        t
-      }
+      end
+      t
     end
     #
     #
     # 11.8
     #
     def relational_exp(lex, context, options)
-      lex.eval_lit {
-        a = shift_exp(lex, context, options)
-        next nil if !a
+      a = shift_exp(lex, context, options)
+      return nil if !a
 
-        t = a
-        while (punc = lex.eql_lit?(ECMA262::PUNC_LT) || lex.eql_lit?(ECMA262::PUNC_GT) ||
-                      lex.eql_lit?(ECMA262::PUNC_LTEQ) || lex.eql_lit?(ECMA262::PUNC_GTEQ) ||
-                      lex.eql_lit?(ECMA262::ID_INSTANCEOF) || (!options[:no_in] && lex.eql_lit?(ECMA262::ID_IN)))
-          if b = shift_exp(lex, context, options)
-            if punc == ECMA262::PUNC_LT
-              t = ECMA262::ExpLt.new(t, b)
-            elsif punc == ECMA262::PUNC_GT
-              t = ECMA262::ExpGt.new(t, b)
-            elsif punc == ECMA262::PUNC_LTEQ
-              t = ECMA262::ExpLtEq.new(t, b)
-            elsif punc == ECMA262::PUNC_GTEQ
-              t = ECMA262::ExpGtEq.new(t, b)
-            elsif punc.val == :instanceof
-              t = ECMA262::ExpInstanceOf.new(t, b)
-            elsif !options[:no_in] and punc.val == :in
-              t = ECMA262::ExpIn.new(t, b)
-            else
-            end
+      t = a
+      while (punc = lex.eql_lit?(ECMA262::PUNC_LT) || lex.eql_lit?(ECMA262::PUNC_GT) ||
+                    lex.eql_lit?(ECMA262::PUNC_LTEQ) || lex.eql_lit?(ECMA262::PUNC_GTEQ) ||
+                    lex.eql_lit?(ECMA262::ID_INSTANCEOF) || (!options[:no_in] && lex.eql_lit?(ECMA262::ID_IN)))
+        if b = shift_exp(lex, context, options)
+          if punc == ECMA262::PUNC_LT
+            t = ECMA262::ExpLt.new(t, b)
+          elsif punc == ECMA262::PUNC_GT
+            t = ECMA262::ExpGt.new(t, b)
+          elsif punc == ECMA262::PUNC_LTEQ
+            t = ECMA262::ExpLtEq.new(t, b)
+          elsif punc == ECMA262::PUNC_GTEQ
+            t = ECMA262::ExpGtEq.new(t, b)
+          elsif punc.val == :instanceof
+            t = ECMA262::ExpInstanceOf.new(t, b)
+          elsif !options[:no_in] and punc.val == :in
+            t = ECMA262::ExpIn.new(t, b)
           else
-            raise ParseError.new("unexpceted token", lex)
           end
+        else
+          raise ParseError.new("unexpceted token", lex)
         end
-
-        t
-      }
+      end
+      t
     end
     #
     #
@@ -536,32 +521,29 @@ module Minjs
     # a !== b
     #
     def equality_exp(lex, context, options)
-      lex.eval_lit {
-        a = relational_exp(lex, context, options)
-        next nil if !a
+      a = relational_exp(lex, context, options)
+      return nil if !a
 
-        t = a
-        while punc = lex.eql_lit?(ECMA262::PUNC_EQ) ||
-                     lex.eql_lit?(ECMA262::PUNC_NEQ) ||
-                     lex.eql_lit?(ECMA262::PUNC_SEQ) ||
-                     lex.eql_lit?(ECMA262::PUNC_SNEQ)
-          if b = relational_exp(lex, context, options)
-            if punc == ECMA262::PUNC_EQ
-              t = ECMA262::ExpEq.new(t, b)
-            elsif punc == ECMA262::PUNC_NEQ
-              t = ECMA262::ExpNotEq.new(t, b)
-            elsif punc == ECMA262::PUNC_SEQ
-              t = ECMA262::ExpStrictEq.new(t, b)
-            elsif punc == ECMA262::PUNC_SNEQ
-              t = ECMA262::ExpStrictNotEq.new(t, b)
-            end
-          else
-            raise ParseError.new("unexpceted token", lex)
+      t = a
+      while punc = lex.eql_lit?(ECMA262::PUNC_EQ) ||
+                   lex.eql_lit?(ECMA262::PUNC_NEQ) ||
+                   lex.eql_lit?(ECMA262::PUNC_SEQ) ||
+                   lex.eql_lit?(ECMA262::PUNC_SNEQ)
+        if b = relational_exp(lex, context, options)
+          if punc == ECMA262::PUNC_EQ
+            t = ECMA262::ExpEq.new(t, b)
+          elsif punc == ECMA262::PUNC_NEQ
+            t = ECMA262::ExpNotEq.new(t, b)
+          elsif punc == ECMA262::PUNC_SEQ
+            t = ECMA262::ExpStrictEq.new(t, b)
+          elsif punc == ECMA262::PUNC_SNEQ
+            t = ECMA262::ExpStrictNotEq.new(t, b)
           end
+        else
+          raise ParseError.new("unexpceted token", lex)
         end
-
-        t
-      }
+      end
+      t
     end
 
     #
@@ -569,126 +551,115 @@ module Minjs
     # a & b
     #
     def bitwise_and_exp(lex, context, options)
-      lex.eval_lit {
-        a = equality_exp(lex, context, options)
-        next nil if !a
+      a = equality_exp(lex, context, options)
+      return nil if !a
 
-        t = a
-        while punc = lex.eql_lit?(ECMA262::PUNC_AND)
-          if b = equality_exp(lex, context, options)
-            t = ECMA262::ExpAnd.new(t, b)
-          else
-            raise ParseError.new("unexpceted token", lex)
-          end
+      t = a
+      while punc = lex.eql_lit?(ECMA262::PUNC_AND)
+        if b = equality_exp(lex, context, options)
+          t = ECMA262::ExpAnd.new(t, b)
+        else
+          raise ParseError.new("unexpceted token", lex)
         end
-
-        t
-      }
+      end
+      t
     end
 
     #
     # a ^ b
     #
     def bitwise_xor_exp(lex, context, options)
-      lex.eval_lit {
-        a = bitwise_and_exp(lex, context, options)
-        next nil if !a
+      a = bitwise_and_exp(lex, context, options)
+      return nil if !a
 
-        t = a
-        while punc = lex.eql_lit?(ECMA262::PUNC_XOR)
-          if b = bitwise_and_exp(lex, context, options)
-            t = ECMA262::ExpXor.new(t, b)
-          else
-            raise ParseError.new("unexpceted token", lex)
-          end
+      t = a
+      while punc = lex.eql_lit?(ECMA262::PUNC_XOR)
+        if b = bitwise_and_exp(lex, context, options)
+          t = ECMA262::ExpXor.new(t, b)
+        else
+          raise ParseError.new("unexpceted token", lex)
         end
+      end
 
-        t
-      }
+      t
     end
 
     #
     # a | b
     #
     def bitwise_or_exp(lex, context, options)
-      lex.eval_lit {
-        a = bitwise_xor_exp(lex, context, options)
-        next nil if !a
+      a = bitwise_xor_exp(lex, context, options)
+      return nil if !a
 
-        t = a
-        while punc = lex.eql_lit?(ECMA262::PUNC_OR)
-          if b = bitwise_xor_exp(lex, context, options)
-            t = ECMA262::ExpOr.new(t, b)
-          else
-            raise ParseError.new("unexpceted token", lex)
-          end
+      t = a
+      while punc = lex.eql_lit?(ECMA262::PUNC_OR)
+        if b = bitwise_xor_exp(lex, context, options)
+          t = ECMA262::ExpOr.new(t, b)
+        else
+          raise ParseError.new("unexpceted token", lex)
         end
-
-        t
-      }
+      end
+      t
     end
     #
     # 11.11
     # a && b
     #
     def logical_and_exp(lex, context, options)
-      lex.eval_lit {
-        a = bitwise_or_exp(lex, context, options)
-        next nil if !a
+      a = bitwise_or_exp(lex, context, options)
+      return nil if !a
 
-        t = a
-        while punc = lex.eql_lit?(ECMA262::PUNC_LAND)
-          if b = bitwise_or_exp(lex, context, options)
-            t = ECMA262::ExpLogicalAnd.new(t, b)
-          else
-            raise ParseError.new("unexpceted token", lex)
-          end
+      t = a
+      while punc = lex.eql_lit?(ECMA262::PUNC_LAND)
+        if b = bitwise_or_exp(lex, context, options)
+          t = ECMA262::ExpLogicalAnd.new(t, b)
+        else
+          raise ParseError.new("unexpceted token", lex)
         end
+      end
 
-        t
-      }
+      t
     end
 
     def logical_or_exp(lex, context, options)
-      lex.eval_lit {
-        a = logical_and_exp(lex, context, options)
-        next nil if !a
+      a = logical_and_exp(lex, context, options)
+      return nil if !a
 
-        t = a
-        while punc = lex.eql_lit?(ECMA262::PUNC_LOR)
-          if b = logical_and_exp(lex, context, options)
-            t = ECMA262::ExpLogicalOr.new(t, b)
-          else
-            raise ParseError.new("unexpceted token", lex)
-          end
+      t = a
+      while punc = lex.eql_lit?(ECMA262::PUNC_LOR)
+        if b = logical_and_exp(lex, context, options)
+          t = ECMA262::ExpLogicalOr.new(t, b)
+        else
+          raise ParseError.new("unexpceted token", lex)
         end
+      end
 
-        t
-      }
+      t
     end
     #
     # 11.12
     # a ? b : c
     #
     def cond_exp(lex, context, options)
-      t = lex.eval_lit {
-        a = logical_or_exp(lex, context, options)
-        next nil if !a
+      a = logical_or_exp(lex, context, options)
+      return nil if !a
 
-        if lex.eql_lit?(ECMA262::PUNC_CONDIF)
-          if b=assignment_exp(lex, context, options) and lex.eql_lit?(ECMA262::PUNC_COLON) and c=assignment_exp(lex, context, options)
-            ECMA262::ExpCond.new(a, b, c)
-          else
-            raise ParseError.new("unexpceted token", lex)
-          end
+      if lex.eql_lit?(ECMA262::PUNC_CONDIF)
+        if b=assignment_exp(lex, context, options) and lex.eql_lit?(ECMA262::PUNC_COLON) and c=assignment_exp(lex, context, options)
+          ECMA262::ExpCond.new(a, b, c)
         else
-          a
+          raise ParseError.new("unexpceted token", lex)
         end
-      }
-      t
+      else
+        a
+      end
     end
     #
     #11.13
+    # AssignmentExpression :
+    # ConditionalExpression
+    # LeftHandSideExpression = AssignmentExpression
+    # LeftHandSideExpression AssignmentOperator AssignmentExpression
     #
     def assignment_exp(lex, context, options)
       @logger.debug "*** assignment_exp"
@@ -696,82 +667,84 @@ module Minjs
       left_hand = nil
       t = cond_exp(lex, context, options)
       return nil if t.nil?
-      lex.eval_lit {
-        left_hand = t
-        punc = lex.next_lit(:div)
-        if punc == ECMA262::PUNC_LET ||
-           punc == ECMA262::PUNC_DIVLET ||
-           punc == ECMA262::PUNC_MULLET ||
-           punc == ECMA262::PUNC_MODLET ||
-           punc == ECMA262::PUNC_ADDLET ||
-           punc == ECMA262::PUNC_SUBLET ||
-           punc == ECMA262::PUNC_LSHIFTLET ||
-           punc == ECMA262::PUNC_RSHIFTLET ||
-           punc == ECMA262::PUNC_URSHIFTLET ||
-           punc == ECMA262::PUNC_ANDLET ||
-           punc == ECMA262::PUNC_ORLET ||
-           punc == ECMA262::PUNC_XORLET
-          lex.fwd_lit(nil)
-          if b = assignment_exp(lex, context, options)
-            case punc
-            when ECMA262::PUNC_LET
-              ECMA262::ExpAssign.new(left_hand, b)
-            when ECMA262::PUNC_DIVLET
-              ECMA262::ExpDivAssign.new(left_hand, b)
-            when ECMA262::PUNC_MULLET
-              ECMA262::ExpMulAssign.new(left_hand, b)
-            when ECMA262::PUNC_MODLET
-              ECMA262::ExpModAssign.new(left_hand, b)
-            when ECMA262::PUNC_ADDLET
-              ECMA262::ExpAddAssign.new(left_hand, b)
-            when ECMA262::PUNC_SUBLET
-              ECMA262::ExpSubAssign.new(left_hand, b)
-            when ECMA262::PUNC_LSHIFTLET
-              ECMA262::ExpLShiftAssign.new(left_hand, b)
-            when ECMA262::PUNC_RSHIFTLET
-              ECMA262::ExpRShiftAssign.new(left_hand, b)
-            when ECMA262::PUNC_URSHIFTLET
-              ECMA262::ExpURShiftAssign.new(left_hand, b)
-            when ECMA262::PUNC_ANDLET
-              ECMA262::ExpAndAssign.new(left_hand, b)
-            when ECMA262::PUNC_ORLET
-              ECMA262::ExpOrAssign.new(left_hand, b)
-            when ECMA262::PUNC_XORLET
-              ECMA262::ExpXorAssign.new(left_hand, b)
-            else
-              raise "internal error"
-            end
+
+      left_hand = t
+      punc = lex.next_lit(:div)
+      if punc == ECMA262::PUNC_LET ||
+         punc == ECMA262::PUNC_DIVLET ||
+         punc == ECMA262::PUNC_MULLET ||
+         punc == ECMA262::PUNC_MODLET ||
+         punc == ECMA262::PUNC_ADDLET ||
+         punc == ECMA262::PUNC_SUBLET ||
+         punc == ECMA262::PUNC_LSHIFTLET ||
+         punc == ECMA262::PUNC_RSHIFTLET ||
+         punc == ECMA262::PUNC_URSHIFTLET ||
+         punc == ECMA262::PUNC_ANDLET ||
+         punc == ECMA262::PUNC_ORLET ||
+         punc == ECMA262::PUNC_XORLET
+        lex.fwd_lit(:div)
+        if b = assignment_exp(lex, context, options)
+          case punc
+          when ECMA262::PUNC_LET
+            ECMA262::ExpAssign.new(left_hand, b)
+          when ECMA262::PUNC_DIVLET
+            ECMA262::ExpDivAssign.new(left_hand, b)
+          when ECMA262::PUNC_MULLET
+            ECMA262::ExpMulAssign.new(left_hand, b)
+          when ECMA262::PUNC_MODLET
+            ECMA262::ExpModAssign.new(left_hand, b)
+          when ECMA262::PUNC_ADDLET
+            ECMA262::ExpAddAssign.new(left_hand, b)
+          when ECMA262::PUNC_SUBLET
+            ECMA262::ExpSubAssign.new(left_hand, b)
+          when ECMA262::PUNC_LSHIFTLET
+            ECMA262::ExpLShiftAssign.new(left_hand, b)
+          when ECMA262::PUNC_RSHIFTLET
+            ECMA262::ExpRShiftAssign.new(left_hand, b)
+          when ECMA262::PUNC_URSHIFTLET
+            ECMA262::ExpURShiftAssign.new(left_hand, b)
+          when ECMA262::PUNC_ANDLET
+            ECMA262::ExpAndAssign.new(left_hand, b)
+          when ECMA262::PUNC_ORLET
+            ECMA262::ExpOrAssign.new(left_hand, b)
+          when ECMA262::PUNC_XORLET
+            ECMA262::ExpXorAssign.new(left_hand, b)
           else
-            raise ParseError.new("unexpceted token", lex)
+            raise "internal error"
           end
         else
-          @logger.debug {
-            "*** assignment_exp => #{t ? t.to_js : t}"
-          }
-          t
+          raise ParseError.new("unexpceted token", lex)
         end
-      }
+      else
+        @logger.debug {
+          "*** assignment_exp => #{t ? t.to_js : t}"
+        }
+        t
+      end
     end
 
     #
     # 11.14
+    # Expression :
+    # AssignmentExpression
+    # Expression , AssignmentExpression
     #
     def exp(lex, context, options)
       @logger.debug "*** expression"
-      lex.eval_lit{
-        t = assignment_exp(lex, context, options)
-        while punc = lex.eql_lit?(ECMA262::PUNC_COMMA)
-          if b = assignment_exp(lex,context, options)
-            t = ECMA262::ExpComma.new(t, b)
-          else
-            raise ParseError.new("unexpceted token", lex)
-          end
+
+      t = assignment_exp(lex, context, options)
+      return nil if t.nil?
+      while punc = lex.eql_lit?(ECMA262::PUNC_COMMA)
+        if b = assignment_exp(lex,context, options)
+          t = ECMA262::ExpComma.new(t, b)
+        else
+          raise ParseError.new("unexpceted token", lex)
         end
-        @logger.debug{
-          "*** expression => #{t ? t.to_js : t}"
-        }
-        t
+      end
+      @logger.debug{
+        "*** expression => #{t ? t.to_js : t}"
       }
+      t
     end
   end
 end

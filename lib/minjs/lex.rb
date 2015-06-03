@@ -21,6 +21,11 @@ module Minjs
       @logger = options[:logger]
     end
 
+    def clear_cache
+      @lit_cache = []
+      @lit_nextpos = []
+    end
+
     def next_input_element(hint)
       if ret = @lit_cache[@pos]
         @pos = @lit_nextpos[@pos]

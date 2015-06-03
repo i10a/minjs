@@ -30,6 +30,10 @@ module Minjs
       def reduce(parent)
       end
 
+      def left_hand_side?
+        false
+      end
+
       def priority
         9999
       end
@@ -46,6 +50,7 @@ module Minjs
         end
         self
       end
+
       def add_paren
         if @val.priority > self.priority
           @val = ExpParen.new(@val)
@@ -141,6 +146,10 @@ module Minjs
 
       def to_js(options = {})
         concat options, sym, @val
+      end
+
+      def left_hand_side?
+        true
       end
     end
 
@@ -274,6 +283,10 @@ module Minjs
         "#{@val.to_js(options)}[#{@val2.to_js(options)}]"
       end
 
+      def left_hand_side?
+        true
+      end
+
       def remove_paren
         if @val.kind_of? ExpParen and @val.val.priority <= PRIORITY_LEFT_HAND_SIDE
           @val = @val.val if @val.remove_paren?
@@ -322,6 +335,10 @@ module Minjs
 
       def to_js(options = {})
         "#{@val.to_js(options)}.#{@val2.val}"
+      end
+
+      def left_hand_side?
+        true
       end
 
       def remove_paren
@@ -388,6 +405,10 @@ module Minjs
       def to_js(options = {})
         args = @args.collect{|x| x.to_js(options)}.join(",")
         "#{@name.to_js(options)}(#{args})"
+      end
+
+      def left_hand_side?
+        true
       end
 
       def remove_paren
@@ -476,6 +497,10 @@ module Minjs
         else
           concat options, :new, @name
         end
+      end
+
+      def left_hand_side?
+        true
       end
 
       def remove_paren

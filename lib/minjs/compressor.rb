@@ -104,6 +104,7 @@ module Minjs
       @prog = source_elements(@lex, @global_context)
 
       remove_empty_statement
+      @lex.clear_cache
       self
     end
 

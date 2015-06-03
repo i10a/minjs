@@ -86,6 +86,9 @@ module Minjs
 
     LIT_LINE_FEED = LineFeed.get
 
+    class This < Literal #TODO
+    end
+
     class Null < Literal
       def initialize(val)
         @val = :null
@@ -109,6 +112,10 @@ module Minjs
 
       def to_js(options = {})
         "null"
+      end
+
+      def left_hand_side?
+        true
       end
 
       @@instance = self.new(nil)
@@ -159,6 +166,10 @@ module Minjs
 
       def to_js(options = {})
         @val.to_s
+      end
+
+      def left_hand_side?
+        true
       end
 
       def true?
@@ -267,6 +278,10 @@ module Minjs
         else
           t << "\'"
         end
+      end
+
+      def left_hand_side?
+        true
       end
 
       def to_ecma262_boolean
@@ -528,6 +543,10 @@ module Minjs
         t.length <= t0.length ? t : t0
       end
 
+      def left_hand_side?
+        true
+      end
+
       def to_i
         to_ecma262_string.to_i
       end
@@ -651,6 +670,10 @@ module Minjs
       def to_js(options = {})
         "/#{@body}/#{@flags}"
       end
+
+      def left_hand_side?
+        true
+      end
     end
 
     LITERAL_TRUE = Boolean.new(:true)
@@ -681,6 +704,11 @@ module Minjs
       def to_js(options = {})
         "[" + @val.collect{|x| x.to_s}.join(",") + "]"
       end
+
+      def left_hand_side?
+        true
+      end
+
       def to_ecma262_boolean
         true
       end
@@ -730,6 +758,11 @@ module Minjs
                  end
                }.join(","), "}")
       end
+
+      def left_hand_side?
+        true
+      end
+
       def to_ecma262_boolean
         true
       end
@@ -839,6 +872,10 @@ module Minjs
 
       def to_js(options = {})
         val.to_s
+      end
+
+      def left_hand_side?
+        true
       end
 
       def binding_env(type = :var)
