@@ -294,13 +294,13 @@ module Minjs
             end
           end
           #hex
-          if v[pos] == 0x30 and (v[pos+1] == 0x78 || v[pos+1] == 0x58) and hex_number?(v[pos+2])
+          if v[pos] == 0x30 and (v[pos+1] == 0x78 || v[pos+1] == 0x58) and hex_digit?(v[pos+2])
             base = 16
             pos += 2
             pos0 = pos
             while true
               break if v[pos].nil?
-              if hex_number?(v[pos])
+              if hex_digit?(v[pos])
                 pos += 1
               else
                 break

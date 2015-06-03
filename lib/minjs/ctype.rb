@@ -1,18 +1,75 @@
+# coding: utf-8
 module Minjs
   module Ctype
-    def hex_number?(code)
-      code >= 0x30 && code <= 0x39 or
-        code >= 0x41 && code <= 0x46 or
-        code >= 0x61 && code <= 0x66
-    end
-    def white_space?(code)
-      code == 0x20 || code == 0x9 || code == 0xb || code == 0xc || code == 0xa0 || code == 0xfeff
+    # Annex B
+    def octal_digit?(code)
+      code >= 0x30 and code <= 0x37
     end
 
+    # 7.8.3
+    def decimal_digit?(code)
+      code >= 0x30 and code <= 0x39
+    end
+
+    # 7.8.3
+    def hex_digit?(code)
+      code >= 0x30 && code <= 0x39 or
+      code >= 0x41 && code <= 0x46 or
+      code >= 0x61 && code <= 0x66
+    end
+
+    def hex_number?(code)
+      code >= 0x30 && code <= 0x39 or
+      code >= 0x41 && code <= 0x46 or
+      code >= 0x61 && code <= 0x66
+    end
+
+    # 7.2
+    #
+    # WhiteSpace ::
+    # <TAB>
+    # <VT>
+    # <FF>
+    # <SP>
+    # <NBSP>
+    # <BOM>
+    # <USP> any character in the Unicode category Zs
+    #
+    def white_space?(code)
+      code == 0x20 || code == 0x9 || code == 0xb || code == 0xc || code == 0xa0 || code == 0xfeff ||
+        code == 0x1680 || # OGHAM SPACE MARK
+        (code and code >= 0x2000 && code <= 0x200a) ||
+        code == 0x202f || # NARROW NO-BREAK SPACE
+        code == 0x205f || # MEDIUM MATHEMATICAL SPACE
+        code == 0x3000  # IDEOGRAPHIC SPACE
+    end
+
+    # 7.3
+    #
+    # LineTerminator ::
+    # <LF>
+    # <CR>
+    # <LS>
+    # <PS>
+    #
     def line_terminator?(code)
       code == 0x0a || code == 0x0d || code == 0x2028 || code == 0x2029
     end
 
+    # 7.6
+    #
+    # IdentifierStart ::
+    # UnicodeLetter
+    # $
+    # _
+    # \ UnicodeEscapeSequence
+    #
+    # UnicodeLetter ::
+    # any character in the Unicode categories “Uppercase letter
+    # (Lu)”, “Lowercase letter (Ll)”, “Titlecase letter (Lt)”,
+    # “Modifier letter (Lm)”, “Other letter (Lo)”, or “Letter
+    # number (Nl)”.
+    #
     def identifier_start?(c)
       return false if c.nil?
       # almost all characters are ascii
@@ -564,7 +621,8 @@ module Minjs
         (c == 0x2a700) || # 16651
         (c == 0x2b734) || # 16652
         (c == 0x2b740) || # 16653
-        (c == 0x2b81d)  # 16654
+        (c == 0x2b81d) || # 16654
+        (c >= 0x2f800 && c <= 0x2fa1d)  # 17196
             return true
       else
         return false
@@ -1209,7 +1267,8 @@ module Minjs
         (c == 0x2b740) || # 18780
         (c == 0x2b81d) || # 18781
         (c >= 0x2f800 && c <= 0x2fa1d) || # 19323
-            c == 0x200d || c == 0x200c
+        (c >= 0xe0100 && c <= 0xe01ef) || # 19563
+        c == 0x200d || c == 0x200c
         return true
       end
     end
