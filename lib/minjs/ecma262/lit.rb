@@ -499,6 +499,8 @@ module Minjs
           return "-Infinity"
         end
         t0 = to_ecma262_string
+        t0.sub!(/^0\./, '.')
+
         t = @integer.nil? ? "" : @integer.dup.to_s
 
         d = @decimal.to_s
@@ -710,38 +712,27 @@ module Minjs
       end
 
       def to_js(options = {})
-        "{" + @val.collect{|x, y|
-          if y.kind_of? StFunc and (y.getter? || y.setter?)
-            if y.name.val == :get
-              t = "get #{x.val.to_s}(){#{y.statements.to_js(options)}}"
-            else
-              t = "set #{x.val.to_s}(#{y.args[0].to_js(options)}){#{y.statements.to_js(options)}}"
-            end
-          else
-            if x.kind_of? ECMA262Numeric
-              a = "#{x.to_ecma262_string}"
-              t = a
-            elsif idname?(x.val.to_s)
-              t = "#{x.val.to_s}"
-            else
-              t = "#{x.to_js(options)}"
-            end
-            t << ":#{y.to_js(options)}"
-          end
-        }.join(",") + "}"
+        concat(options, "{" + @val.collect{|x, y|
+                 if y.kind_of? StFunc and (y.getter? || y.setter?)
+                   if y.name.val == :get
+                     t = concat options, "get", x.val, "()", "{", y.statements, "}"
+                   else
+                     t = concat options, "set", x.val, "(", y.args[0], ")", "{", y.statements, "}"
+                   end
+                 else
+                   if x.kind_of? ECMA262Numeric
+                     t = concat options, x.to_ecma262_string, ":", y
+                   elsif idname?(x.val.to_s)
+                     t = concat options, x.val, ":", y
+                   else
+                     t = concat options, x, ":", y
+                   end
+                 end
+               }.join(","), "}")
       end
       def to_ecma262_boolean
         true
       end
-#      def ecma262_eval(type)
-#
-#        case type
-#        when :boolean
-#          to_ecma262_boolean
-#        else
-#          nil
-#        end
-#      end
     end
 
     class SingleLineComment < Literal
@@ -768,27 +759,21 @@ module Minjs
 
     class MultiLineComment < Literal
       attr_reader :comment, :has_lf
+      include Ctype
 
-      def initialize(comment, has_lf)
+      def initialize(comment)
         @comment = comment
-        @has_lf = has_lf
       end
 
       def traverse(parent, &block)
       end
 
       def ==(obj)
-        self.class == obj.class and
-          @comment == obj.comment and
-          @has_lf == obj.has_lf
+        self.class == obj.class and @comment == obj.comment
       end
 
       def to_js(options)
-        if lt?
-          "/*#{@comment}*/"
-        else
-          "/*#{@comment}*/"
-        end
+        "/*#{@comment}*/"
       end
 
       def ws?
@@ -796,7 +781,10 @@ module Minjs
       end
 
       def lt?
-        @has_lf ? true : false
+        @comment.codepoints.each{|char|
+          return true if line_terminator?(char)
+        }
+        false
       end
     end
 
