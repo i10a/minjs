@@ -41,6 +41,9 @@ module Minjs
         @error_pos = @pos
         return ret
       end
+      if @codes[@pos].nil?
+        return nil
+      end
       #
       # ECMA262 says:
       #
@@ -778,12 +781,8 @@ module Minjs
       end
     end
 
-    def eof?(pos = nil)
-      if pos.nil?
-        @codes[@pos].nil?
-      else
-        @codes[pos].nil?
-      end
+    def eof?
+      next_lit.nil?
     end
 
     #

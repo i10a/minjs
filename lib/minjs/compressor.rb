@@ -101,7 +101,7 @@ module Minjs
         end
         nil
       }
-      @prog = source_elements(@lex, @global_context)
+      @prog = program(@lex, @global_context)
 
       remove_empty_statement
       @lex.clear_cache
