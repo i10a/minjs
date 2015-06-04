@@ -30,7 +30,7 @@ module Minjs
       def reduce(parent)
       end
 
-      def left_hand_side?
+      def left_hand_side_exp?
         false
       end
 
@@ -148,7 +148,7 @@ module Minjs
         concat options, sym, @val
       end
 
-      def left_hand_side?
+      def left_hand_side_exp?
         true
       end
     end
@@ -221,6 +221,10 @@ module Minjs
         "(#{@val.to_js(options)})"
       end
 
+      def left_hand_side_exp?
+        true
+      end
+
       def remove_paren?
         js = @val.to_js
         if js.match(/^function/) or js.match(/^{/)
@@ -283,7 +287,7 @@ module Minjs
         "#{@val.to_js(options)}[#{@val2.to_js(options)}]"
       end
 
-      def left_hand_side?
+      def left_hand_side_exp?
         true
       end
 
@@ -337,7 +341,7 @@ module Minjs
         "#{@val.to_js(options)}.#{@val2.val}"
       end
 
-      def left_hand_side?
+      def left_hand_side_exp?
         true
       end
 
@@ -407,7 +411,7 @@ module Minjs
         "#{@name.to_js(options)}(#{args})"
       end
 
-      def left_hand_side?
+      def left_hand_side_exp?
         true
       end
 
@@ -499,7 +503,7 @@ module Minjs
         end
       end
 
-      def left_hand_side?
+      def left_hand_side_exp?
         true
       end
 

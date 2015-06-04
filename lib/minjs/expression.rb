@@ -9,7 +9,7 @@ module Minjs
 
       if lex.eql_lit?(ECMA262::ID_THIS)
         @logger.debug "*** primary_exp => this"
-        return ECMA262::ID_THIS
+        return ECMA262::This.new(context)
       end
       # (exp)
       if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS)
@@ -664,10 +664,12 @@ module Minjs
     def assignment_exp(lex, context, options)
       @logger.debug "*** assignment_exp"
 
-      left_hand = nil
       t = cond_exp(lex, context, options)
       return nil if t.nil?
 
+      if !t.left_hand_side_exp?
+        return  t
+      end
       left_hand = t
       punc = lex.next_lit(:div)
       if punc == ECMA262::PUNC_LET ||

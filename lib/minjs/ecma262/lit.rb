@@ -86,7 +86,36 @@ module Minjs
 
     LIT_LINE_FEED = LineFeed.get
 
-    class This < Literal #TODO
+    class This < Literal
+      attr_reader :context
+
+      def initialize(context)
+        @context = context
+      end
+
+      def deep_dup
+        self.class.new(@context)
+      end
+
+      def traverse(parent, &block)
+        yield self, parent
+      end
+
+      def to_s
+        "this"
+      end
+
+      def ==(obj)
+        self.class == obj.class
+      end
+
+      def to_js(options = {})
+        "this"
+      end
+
+      def left_hand_side_exp?
+        true
+      end
     end
 
     class Null < Literal
@@ -114,7 +143,7 @@ module Minjs
         "null"
       end
 
-      def left_hand_side?
+      def left_hand_side_exp?
         true
       end
 
@@ -168,7 +197,7 @@ module Minjs
         @val.to_s
       end
 
-      def left_hand_side?
+      def left_hand_side_exp?
         true
       end
 
@@ -280,7 +309,7 @@ module Minjs
         end
       end
 
-      def left_hand_side?
+      def left_hand_side_exp?
         true
       end
 
@@ -543,7 +572,7 @@ module Minjs
         t.length <= t0.length ? t : t0
       end
 
-      def left_hand_side?
+      def left_hand_side_exp?
         true
       end
 
@@ -671,7 +700,7 @@ module Minjs
         "/#{@body}/#{@flags}"
       end
 
-      def left_hand_side?
+      def left_hand_side_exp?
         true
       end
     end
@@ -705,7 +734,7 @@ module Minjs
         "[" + @val.collect{|x| x.to_s}.join(",") + "]"
       end
 
-      def left_hand_side?
+      def left_hand_side_exp?
         true
       end
 
@@ -759,7 +788,7 @@ module Minjs
                }.join(","), "}")
       end
 
-      def left_hand_side?
+      def left_hand_side_exp?
         true
       end
 
@@ -874,7 +903,7 @@ module Minjs
         val.to_s
       end
 
-      def left_hand_side?
+      def left_hand_side_exp?
         true
       end
 

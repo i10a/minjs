@@ -1237,8 +1237,8 @@ module Minjs
     end
 
     #
-    # 13 function / function expression
-    #
+    # 13 function declaration
+    # 13 function expression
     # 11.1.5 getter/setter
     #
     class StFunc < St
@@ -1293,6 +1293,10 @@ module Minjs
         else
           concat options, :function, @name, '(', _args, ")", "{", @statements, "}"
         end
+      end
+
+      def left_hand_side_exp?
+        true
       end
 
       def getter?
