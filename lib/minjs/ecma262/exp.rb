@@ -303,7 +303,7 @@ module Minjs
 
       def add_paren
         if @val.priority > PRIORITY_LEFT_HAND_SIDE
-          @val = ExpPare.new(@val)
+          @val = ExpParen.new(@val)
         end
         self
       end
@@ -433,7 +433,7 @@ module Minjs
 
       def add_paren
         if @name.priority > PRIORITY_LEFT_HAND_SIDE
-          @name = ExpPare.new(@name)
+          @name = ExpParen.new(@name)
         end
         if @args
           @args.map! do |arg|
