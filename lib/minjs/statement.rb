@@ -392,19 +392,24 @@ module Minjs
       return nil unless lex.eql_lit?(ECMA262::PUNC_LCURLYBRAC)
       _case_block = []
       while true
-        t = lex.eval_lit{
-          break unless lex.eql_lit?(ECMA262::ID_CASE) and e=exp(lex, context, {}) and lex.eql_lit?(ECMA262::PUNC_COLON)
-          sl = statement_list(lex, context)
-          [e, sl]
-        } || lex.eval_lit{
-          break unless lex.eql_lit?(ECMA262::ID_DEFAULT) and lex.eql_lit?(ECMA262::PUNC_COLON)
-          sl = statement_list(lex, context)
-          [nil, sl]
-        }
-        break if t.nil?
-        _case_block.push(t)
+        if lex.eql_lit?(ECMA262::ID_CASE)
+          if e = exp(lex, context, {}) and lex.eql_lit?(ECMA262::PUNC_COLON)
+            sl = statement_list(lex, context)
+            _case_block.push [e, sl]
+          else
+            raise ParseError.new("unexpected token", lex)
+          end
+        elsif lex.eql_lit?(ECMA262::ID_DEFAULT)
+          if lex.eql_lit?(ECMA262::PUNC_COLON)
+            sl = statement_list(lex, context)
+            _case_block.push [nil, sl]
+          else
+            raise ParseError.new("unexpected token", lex)
+          end
+        elsif lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
+          break
+        end
       end
-      return nil unless lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
       _case_block
     end
     #
@@ -412,12 +417,14 @@ module Minjs
     #
     def labelled_statement(lex, context)
       lex.eval_lit {
-        if i=identifier(lex, context) and s1=lex.eql_lit?(ECMA262::PUNC_COLON) and s=statement(lex, context)
-          ECMA262::StLabelled.new(i, s)
-        else
-          if s1
+        if i=identifier(lex, context) and s1=lex.eql_lit?(ECMA262::PUNC_COLON)
+          if s=statement(lex, context)
+            ECMA262::StLabelled.new(i, s)
+          else
             raise ParseError.new("unexpected token", lex)
           end
+        else
+          nil
         end
       }
     end

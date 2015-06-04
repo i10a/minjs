@@ -98,18 +98,32 @@ module Minjs
     #
     # 11.1.5
     #
+    # ObjectLiteral :
+    # { }
+    # { PropertyNameAndValueList }
+    # { PropertyNameAndValueList , }
+    #
     def object_literal(lex, context, options)
       return nil unless lex.eql_lit?(ECMA262::PUNC_LCURLYBRAC)
+      #{}
       if lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
-        return ECMA262::ECMA262Object.new([])
-      end
-      if h=property_name_and_value_list(lex, context, options)
-        ECMA262::ECMA262Object.new(h)
+        ECMA262::ECMA262Object.new([])
       else
-        raise ParseError.new("no `}' end of object", lex)
+        ECMA262::ECMA262Object.new(property_name_and_value_list(lex, context, options))
       end
     end
 
+    # 11.1.5
+    #
+    # PropertyNameAndValueList :
+    # PropertyAssignment
+    # PropertyNameAndValueList , PropertyAssignment
+    #
+    # PropertyAssignment :
+    # PropertyName : AssignmentExpression
+    # get PropertyName ( ) { FunctionBody }
+    # set PropertyName ( PropertySetParameterList ) { FunctionBody }
+    #
     #
     # name: exp
     # get name(){funcbody}
@@ -118,9 +132,6 @@ module Minjs
     def property_name_and_value_list(lex, context, options)
       h = []
       while !lex.eof?
-        if lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
-          break
-        end
         lex.eval_lit{
           if lex.match_lit?(ECMA262::ID_GET) and a=property_name(lex, context)
             new_context = ECMA262::Context.new
@@ -325,28 +336,31 @@ module Minjs
         t
       } or a
     end
-
+    # 11.2
+    # Arguments :
+    # ( )
+    # ( ArgumentList )
+    #
     def arguments(lex, context, options)
-      lex.eval_lit{
-        return nil if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS).nil?
-        next [] if lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS)
-        args = []
-        while true
-          if t = assignment_exp(lex, context, options)
-            args.push(t)
-          else
-            return
-          end
-          if lex.eql_lit?(ECMA262::PUNC_COMMA)
-            ;
-          elsif lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS)
-            break
-          else
-            return
-          end
+      return nil if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS).nil?
+      return [] if lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS)
+
+      args = []
+      while true
+        if t = assignment_exp(lex, context, options)
+          args.push(t)
+        else
+          raise ParseError.new("unexpected token", lex)
         end
-        args
-      }
+        if lex.eql_lit?(ECMA262::PUNC_COMMA)
+          ;
+        elsif lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS)
+          break
+        else
+          raise ParseError.new("unexpected token", lex)
+        end
+      end
+      args
     end
     #
     # 11.3
