@@ -41,6 +41,14 @@ EOS
       js = c.simple_replacement.to_js
       expect(js).to eq 'A.B;A.$;A.あ;A[3.14];A[""];'
     end
+    it 'add and remove paren' do
+      c = test_compressor
+      c.parse <<-EOS
+new a()() // mean => (new a()) () => (new a)()
+EOS
+      js = c.simple_replacement.to_js
+      expect(js).to eq "(new a)();"
+    end
   end
 end
 

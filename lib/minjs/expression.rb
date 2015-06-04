@@ -1,3 +1,4 @@
+# coding: utf-8
 module Minjs
   module Exp
     #
@@ -197,7 +198,7 @@ module Minjs
       h
     end
 
-    #11.1.5
+    # 11.1.5
     #
     # PropertyName :
     # IdentifierName
@@ -219,7 +220,7 @@ module Minjs
       end
     end
 
-    #11.1.5
+    # 11.1.5
     #
     # PropertySetParameterList :
     # Identifier
@@ -233,134 +234,174 @@ module Minjs
       [argName]
     end
 
-    #
     # 11.2
+    #
+    # LeftHandSideExpression :
+    # NewExpression
+    # CallExpression
     #
     def left_hand_side_exp(lex, context, options)
       @logger.debug "*** left_hand_side_exp"
 
-      t = lex.eval_lit{
-        call_exp(lex, context, options)
-      } || lex.eval_lit{
-        new_exp(lex, context, options)
-      }
+      t = call_exp(lex, context, options) || new_exp(lex, context, options)
+      #t = new_exp(lex, context, options) || call_exp(lex, context, options)
+
       @logger.debug{
         "*** left_hand_side_exp => #{t ? t.to_js: t}"
       }
       t
     end
 
+    # 11.2
+    #
+    # NewExpression :
+    # MemberExpression
+    # new NewExpression
+    #
+    # NOTE:
+    #
+    # The NewExpression only matchs no-arguments-constructor because
+    # member expression also has "new MemberExpression Arguments"
+    #
+    # For example,
+    #
+    # 1. new A;
+    # 2. new A[B];
+    # 3. new A.B;
+    # 4. new A.B();
+    # 5. new new B();
+    # 6. A();
+    #
+    # 1 to 3 are NewExpression.
+    # 4 is MemberExpression.
+    # 5 's first new is NewExpression and second one is MemberExpression.
+    # 6 is CallExpression
+    #
+    # NewExpression can be rewritten as follows:
+    #
+    # NewExpression:
+    # MemberExpression [lookahead ∉ {(}]
+    # new NewExpression [lookahead ∉ {(}]
+    #
     def new_exp(lex, context, options)
-      lex.eval_lit{
+      lex.eval_lit {
         if lex.eql_lit?(ECMA262::ID_NEW)
-          if a=new_exp(lex, context, options)
+          if a = new_exp(lex, context, options)
+            if lex.eql_lit? ECMA262::PUNC_LPARENTHESIS
+              # minjs evaluate CallExpression first, so
+              # program never falls to here.
+              next nil # this is not NewExpression, may be MemberExpression.
+            end
+            #puts "new_exp> #{a.to_js}"
             ECMA262::ExpNew.new(a, nil)
+          else
+            # minjs evaluate CallExpression first, so
+            # raise exception when program falls to here.
+            raise ParseError.new("unexpceted token", lex)
+            #nil
+          end
+        end
+      } || member_exp(lex, context, options)
+      # minjs evaluate CallExpression first, so
+      # there is no reason to check parenthesis.
+      #
+      # lex.eval_lit{
+      #   t = member_exp(lex, context, options)
+      #   if lex.eql_lit? ECMA262::PUNC_LPARENTHESIS
+      #     break nil
+      #   end
+      #   t
+      # }
+    end
+    # 11.2
+    #
+    # CallExpression :
+    # MemberExpression Arguments
+    # CallExpression Arguments
+    # CallExpression [ Expression ]
+    # CallExpression . IdentifierName
+    #
+    def call_exp(lex, context, options)
+      if a = member_exp(lex, context, options)
+        if b = arguments(lex, context, options)
+          t = ECMA262::ExpCall.new(a, b)
+        # if b is nil, this may be MemberExpression of NewExpression
+        else
+          return a
+        end
+      else
+        return nil
+      end
+
+      while true
+        if b = arguments(lex, context, options)
+          t = ECMA262::ExpCall.new(t, b)
+        elsif lex.eql_lit?(ECMA262::PUNC_LSQBRAC)
+          if b=exp(lex, context, options) and lex.eql_lit?(ECMA262::PUNC_RSQBRAC)
+            t = ECMA262::ExpPropBrac.new(t, b)
+          else
+            raise ParseError.new("unexpceted token", lex)
+          end
+        elsif lex.eql_lit?(ECMA262::PUNC_PERIOD)
+          if (b=lex.fwd_lit(nil)).kind_of?(ECMA262::IdentifierName)
+            t = ECMA262::ExpProp.new(t, b)
           else
             raise ParseError.new("unexpceted token", lex)
           end
         else
-          nil
+          break
         end
-      } or lex.eval_lit{
-        member_exp(lex, context, options)
-      }
+      end
+      t
     end
 
+    # 11.2
     #
-    # call
-    #
-    # member_exp arguments
-    #
-    # call_exp arguments
-    # call_exp [exp]
-    # call_exp . identifier_name
-    #
-    #
-    def call_exp(lex, context, options)
-      a = lex.eval_lit{
-        if f = member_exp(lex, context, options)
-          if b = arguments(lex, context, options)
-            ECMA262::ExpCall.new(f, b)
-          else
-            f
-          end
-        else
-          nil
-        end
-      }
-      return nil if a.nil?
-
-      t = a
-
-      lex.eval_lit{
-        while true
-          if b=arguments(lex, context, options)
-            t = ECMA262::ExpCall.new(t, b)
-          elsif lex.eql_lit?(ECMA262::PUNC_LSQBRAC)
-            if b=exp(lex, context, options) and lex.eql_lit?(ECMA262::PUNC_RSQBRAC)
-              t = ECMA262::ExpPropBrac.new(t, b)
-            else
-              raise ParseError.new("unexpceted token", lex)
-            end
-          elsif lex.eql_lit?(ECMA262::PUNC_PERIOD)
-            if (b=lex.fwd_lit(nil)).kind_of?(ECMA262::IdentifierName)
-              t = ECMA262::ExpProp.new(t, b)
-            else
-              raise ParseError.new("unexpceted token", lex)
-            end
-          else
-            break
-          end
-        end
-        t
-      } or a
-    end
-
-    #
-    # member_exp
-    #  primary_exp
-    #  function_exp
-    #  new member_exp arguments
-    #
-    #  member_exp[exp]
-    #  member_exp.identifier_name #prop(a,b)
+    # MemberExpression :
+    # PrimaryExpression
+    # FunctionExpression
+    # MemberExpression [ Expression ]
+    # MemberExpression . IdentifierName
+    # new MemberExpression Arguments
     #
     def member_exp(lex, context, options)
-      a = lex.eval_lit {
-        primary_exp(lex, context, options)
-      } || lex.eval_lit {
-        func_exp(lex, context)
-      } || lex.eval_lit {
-        if lex.eql_lit?(ECMA262::ID_NEW) and a=member_exp(lex, context, options) and b=arguments(lex, context, options)
-          ECMA262::ExpNew.new(a, b)
-        else
-          nil
+      t = lex.eval_lit{
+        if lex.eql_lit? ECMA262::ID_NEW
+           if a = member_exp(lex, context, options)
+             b = arguments(lex, context, options)
+             # if b is nil, this may be NewExpression
+             if b
+               s = b.collect{|x| x.to_js}.join(',');
+               #puts "member_exp> [new] #{a.to_js} (#{s})"
+               next ECMA262::ExpNew.new(a, b)
+             else
+               return nil
+             end
+           else
+             return nil
+           end
         end
-      }
-      return nil if a.nil?
+      } || primary_exp(lex, context, options) || func_exp(lex, context)
+      return nil if t.nil?
 
-      t = a
-
-      lex.eval_lit {
-        while true
-          if lex.eql_lit?(ECMA262::PUNC_LSQBRAC)
-            if b=exp(lex, context, options) and lex.eql_lit?(ECMA262::PUNC_RSQBRAC)
-              t = ECMA262::ExpPropBrac.new(t, b)
-            else
-              raise ParseError.new("unexpceted token", lex)
-            end
-          elsif lex.eql_lit?(ECMA262::PUNC_PERIOD)
-            if (b=lex.fwd_lit(nil)).kind_of?(ECMA262::IdentifierName)
-              t = ECMA262::ExpProp.new(t, b)
-            else
-              raise ParseError.new("unexpceted token", lex)
-            end
+      while true
+        if lex.eql_lit?(ECMA262::PUNC_LSQBRAC)
+          if b=exp(lex, context, options) and lex.eql_lit?(ECMA262::PUNC_RSQBRAC)
+            t = ECMA262::ExpPropBrac.new(t, b)
           else
-            break
+            raise ParseError.new("unexpceted token", lex)
           end
+        elsif lex.eql_lit?(ECMA262::PUNC_PERIOD)
+          if (b=lex.fwd_lit(nil)).kind_of?(ECMA262::IdentifierName)
+            t = ECMA262::ExpProp.new(t, b)
+          else
+            raise ParseError.new("unexpceted token", lex)
+          end
+        else
+          break
         end
-        t
-      } or a
+      end
+      t
     end
     # 11.2
     # Arguments :
