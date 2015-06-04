@@ -7,8 +7,8 @@ module Minjs
     #
     # NOTE:
     #
-    # function declaration in statement(block) is not permitted by ECMA262.
-    # however, almost all implementation permit it.
+    # The function declaration in statement(block) is not permitted by ECMA262.
+    # However, almost all implementation permit it.
     #
     def func_declaration(lex, context)
       return nil if lex.eql_lit?(ECMA262::ID_FUNCTION).nil?

@@ -132,33 +132,59 @@ module Minjs
     def property_name_and_value_list(lex, context, options)
       h = []
       while !lex.eof?
-        lex.eval_lit{
-          if lex.match_lit?(ECMA262::ID_GET) and a=property_name(lex, context)
+        #get
+        if lex.match_lit? ECMA262::ID_GET
+          # {get : val}
+          if lex.eql_lit? ECMA262::PUNC_COLON
+            b = assignment_exp(lex, context, options)
+            h.push([ECMA262::ID_GET, b])
+          # {get name(){}}
+          else
             new_context = ECMA262::Context.new
             new_context.lex_env = context.lex_env.new_declarative_env()
             new_context.var_env = context.var_env.new_declarative_env()
-            if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and
-              lex.eql_lit?(ECMA262::PUNC_LCURLYBRAC) and b=func_body(lex, new_context) and lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
+            if(a = property_name(lex, context) and
+               lex.eql_lit? ECMA262::PUNC_LPARENTHESIS and
+               lex.eql_lit? ECMA262::PUNC_RPARENTHESIS and
+               lex.eql_lit? ECMA262::PUNC_LCURLYBRAC and
+               b = func_body(lex, new_context) and
+               lex.eql_lit? ECMA262::PUNC_RCURLYBRAC)
               h.push([a, ECMA262::StFunc.new(new_context, ECMA262::ID_GET, [], b, :getter => true)])
             else
               raise ParseError.new("unexpceted token", lex)
             end
-          elsif lex.match_lit?(ECMA262::ID_SET) and a=property_name(lex, context)
+          end
+        #set
+        elsif lex.match_lit?(ECMA262::ID_SET)
+          # {set : val}
+          if lex.eql_lit? ECMA262::PUNC_COLON
+            b = assignment_exp(lex, context, options)
+            h.push([ECMA262::ID_SET, b])
+          # {set name(arg){}}
+          else
             new_context = ECMA262::Context.new
             new_context.lex_env = context.lex_env.new_declarative_env()
             new_context.var_env = context.var_env.new_declarative_env()
-            if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and arg=property_set_parameter_list(lex, new_context) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and lex.eql_lit?(ECMA262::PUNC_LCURLYBRAC) and b=func_body(lex, new_context) and lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
+            if(a = property_name(lex, context) and
+               lex.eql_lit? ECMA262::PUNC_LPARENTHESIS and
+               arg = property_set_parameter_list(lex, new_context) and
+               lex.eql_lit? ECMA262::PUNC_RPARENTHESIS and
+               lex.eql_lit? ECMA262::PUNC_LCURLYBRAC and
+               b = func_body(lex, new_context) and
+               lex.eql_lit? ECMA262::PUNC_RCURLYBRAC)
               h.push([a, ECMA262::StFunc.new(new_context, ECMA262::ID_SET, arg, b, :setter => true)])
             else
               raise ParseError.new("unexpceted token", lex)
             end
-          else
-            nil
           end
-        } or lex.eval_lit{
-          a=property_name(lex, context) and lex.eql_lit?(ECMA262::PUNC_COLON) and b=assignment_exp(lex, context, options)
+        #property
+        elsif(a = property_name(lex, context) and
+              lex.eql_lit? ECMA262::PUNC_COLON and
+              b = assignment_exp(lex, context, options))
           h.push([a, b])
-        }
+        else
+          raise ParseError.new("unexpceted token", lex)
+        end
 
         if lex.eql_lit?(ECMA262::PUNC_COMMA)
           break if lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)

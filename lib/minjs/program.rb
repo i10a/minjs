@@ -21,11 +21,11 @@ module Minjs
     end
 
     def source_element(lex, context)
-      lex.eval_lit{
-        statement(lex, context)
-      } or lex.eval_lit{
-        func_declaration(lex, context)
-      }
+      #lex.eval_lit{
+      statement(lex, context)
+      #} or lex.eval_lit{ => statement
+      #  func_declaration(lex, context)
+      #}
     end
   end
 end
