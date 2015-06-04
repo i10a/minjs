@@ -637,19 +637,21 @@ module Minjs
       #test();
       #
       catch_scopes.each{|st, parent|
-        catch_context = ECMA262::Context.new
-        catch_context.lex_env = st.context.lex_env.new_declarative_env()
-        catch_context.var_env = st.context.var_env
-        catch_context.lex_env.record.create_mutable_binding(st.catch[0], nil)
-        catch_context.lex_env.record.set_mutable_binding(st.catch[0], :undefined, nil)
-        st.catch[0].context = catch_context
+        if st.catch
+          catch_context = ECMA262::Context.new
+          catch_context.lex_env = st.context.lex_env.new_declarative_env()
+          catch_context.var_env = st.context.var_env
+          catch_context.lex_env.record.create_mutable_binding(st.catch[0], nil)
+          catch_context.lex_env.record.set_mutable_binding(st.catch[0], :undefined, nil)
+          st.catch[0].context = catch_context
 
-        st.catch[1].traverse(parent){|st2|
-          if st2.kind_of? ECMA262::IdentifierName and st2 == st.catch[0] and st2.binding_env == st.catch[0].binding_env
-            st2.context = catch_context
-          end
-        }
-        func_scopes.unshift([st, parent])
+          st.catch[1].traverse(parent){|st2|
+            if st2.kind_of? ECMA262::IdentifierName and st2 == st.catch[0] and st2.binding_env == st.catch[0].binding_env
+              st2.context = catch_context
+            end
+          }
+          func_scopes.unshift([st, parent])
+        end
       }
 #      with_scopes.each{|st, parent|
 #        with_context = ECMA262::Context.new

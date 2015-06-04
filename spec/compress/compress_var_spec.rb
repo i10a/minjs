@@ -79,6 +79,21 @@ EOS
       js = c.compress_var.to_js
       expect(js).to eq "function zz(){var a=function b(){console.log(b)};console.log(b)}"
     end
+
+    it 'compress without exception' do
+      c = test_compressor
+      c.parse <<-EOS
+function zz()
+{
+try{
+}//no catch-clause
+finally{
+}
+}
+EOS
+      js = c.compress_var.to_js
+      expect(js).to eq "function zz(){try{}finally{}}"
+    end
   end
 end
 
