@@ -78,14 +78,14 @@ module Minjs
 
     def formal_parameter_list(lex, context)
       ret = []
-      unless lex.next_lit.eql?(ECMA262::PUNC_RPARENTHESIS)
+      unless lex.peek_lit(nil).eql? ECMA262::PUNC_RPARENTHESIS
         while true
           if arg = identifier(lex, context)
             ret.push(arg)
           else
             raise ParseError.new("unexpceted token", lex)
           end
-          if lex.next_lit.eql? ECMA262::PUNC_RPARENTHESIS
+          if lex.peek_lit(nil).eql? ECMA262::PUNC_RPARENTHESIS
             break
           elsif lex.eql_lit? ECMA262::PUNC_COMMA
             ;

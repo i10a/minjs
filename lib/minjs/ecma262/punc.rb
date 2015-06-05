@@ -31,6 +31,10 @@ module Minjs
         val.to_s
       end
 
+      def to_js
+        val.to_s
+      end
+
       def ==(obj)
         self.class == obj.class and self.val == obj.val
       end

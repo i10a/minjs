@@ -45,7 +45,7 @@ module Minjs
     # RegularExpressionLiteral
     #
     def literal(lex, context)
-      a = lex.next_lit(:regexp)
+      a = lex.peek_lit(:regexp)
       if a.kind_of? ECMA262::ECMA262Numeric or a.kind_of? ECMA262::ECMA262String or a.kind_of? ECMA262::ECMA262RegExp
         lex.fwd_lit(:regexp)
         a
@@ -67,7 +67,7 @@ module Minjs
     # 11.1.2
     #
     def identifier(lex, context)
-      a = lex.next_lit(:regexp)
+      a = lex.peek_lit(:regexp)
       if a.kind_of? ECMA262::IdentifierName and !a.reserved?
         lex.fwd_lit(:regexp)
         a.context = context
@@ -752,7 +752,7 @@ module Minjs
         return  t
       end
       left_hand = t
-      punc = lex.next_lit(:div)
+      punc = lex.peek_lit(:div)
       if punc == ECMA262::PUNC_LET ||
          punc == ECMA262::PUNC_DIVLET ||
          punc == ECMA262::PUNC_MULLET ||

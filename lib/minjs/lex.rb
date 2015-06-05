@@ -26,6 +26,21 @@ module Minjs
       @lit_nextpos = []
     end
 
+    #
+    # Fetch next literal
+    #
+    # hint:
+    #  :regexp
+    #  :div
+    #  nil
+    #
+    # ECMA262 says:
+    #
+    # There are no syntactic grammar contexts where both a leading division
+    # or division-assignment, and a leading RegularExpressionLiteral are permitted.
+    # This is not affected by semicolon insertion (see 7.9); in examples such as the following:
+    # To determine `/' is regular expression or not
+    #
     def next_input_element(hint)
       if ret = @lit_cache[@pos]
         @pos = @lit_nextpos[@pos]
@@ -44,14 +59,6 @@ module Minjs
       if @codes[@pos].nil?
         return nil
       end
-      #
-      # ECMA262 says:
-      #
-      # There are no syntactic grammar contexts where both a leading division
-      # or division-assignment, and a leading RegularExpressionLiteral are permitted.
-      # This is not affected by semicolon insertion (see 7.9); in examples such as the following:
-      # To determine `/' is regular expression or not
-      #
       if hint.nil?
         ECMA262::LIT_DIV_OR_REGEXP_LITERAL
       elsif hint == :div
@@ -782,7 +789,7 @@ module Minjs
     end
 
     def eof?
-      next_lit.nil?
+      peek_lit(nil).nil?
     end
 
     #
@@ -793,35 +800,29 @@ module Minjs
     # if next literal is 'l', position is forwarded
     #
     def eql_lit?(l, hint = nil)
-      pos0 = @pos
-      while lit = next_input_element(hint) and (lit.ws? or lit.lt?)
-      end
-
+      lit = peek_lit(hint)
       if lit.eql? l
+        fwd_lit(hint)
         lit
       else
-        @pos = pos0
         nil
       end
     end
 
     #
-    # check next literal is equal to 'l' or not.
+    # check next literal is strictly equal to 'l' or not.
     # white spaces are skipped and ignored.
     # line terminators are not ignored.
     #
     # if next literal is not 'l', position is not forwarded
     # if next literal is 'l', position is forwarded
     #
-    def eql_lit_nolt?(l)
-      pos0 = @pos
-      while lit = next_input_element(nil) and lit.ws?
-      end
-
+    def eql_lit_nolt?(l, hint = nil)
+      lit = peek_lit_nolt(hint)
       if lit.eql? l
+        fwd_lit_nolt(hint)
         lit
       else
-        @pos = pos0
         nil
       end
     end
@@ -834,14 +835,11 @@ module Minjs
     # if next literal is 'l', position is forwarded
     #
     def match_lit?(l, hint = nil)
-      pos0 = @pos
-      while lit = next_input_element(hint) and (lit.ws? or lit.lt?)
-      end
-
+      lit = peek_lit(hint)
       if lit == l
+        fwd_lit(hint)
         lit
       else
-        @pos = pos0
         nil
       end
     end
@@ -854,15 +852,12 @@ module Minjs
     # if next literal is not 'l', position is not forwarded
     # if next literal is 'l', position is forwarded
     #
-    def match_lit_nolt?(l)
-      pos0 = @pos
-      while lit = next_input_element(nil) and lit.ws?
-      end
-
+    def match_lit_nolt?(l, hint = nil)
+      lit = peek_lit_nolt(hint)
       if lit == l
+        fwd_lit_nolt(hint)
         lit
       else
-        @pos = pos0
         nil
       end
     end
@@ -872,7 +867,7 @@ module Minjs
     # position is not forwarded.
     # white spaces and line terminators are skipped and ignored.
     #
-    def next_lit(hint = nil)
+    def peek_lit(hint)
       pos0 = @pos
       while lit = next_input_element(hint) and (lit.ws? or lit.lt?)
       end
@@ -886,7 +881,7 @@ module Minjs
     # white spaces are skipped and ignored.
     # line terminators are not ignored.
     #
-    def next_lit_nolt(hint)
+    def peek_lit_nolt(hint)
       pos0 = @pos
       while lit = next_input_element(hint) and lit.ws?
       end
@@ -969,8 +964,8 @@ module Minjs
         saved_pos = @pos
         ret = yield
       ensure
+        @nest -= 1
         if ret.nil?
-          #@error_pos = @pos
           @pos = saved_pos
           nil
         end

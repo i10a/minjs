@@ -7,7 +7,7 @@ module Minjs
     # check next literal is ';' or '}' or LT
     #
     def semicolon(lex, context)
-      a = lex.next_lit_nolt(nil)
+      a = lex.peek_lit_nolt(nil)
       #
       # ; ?
       #
@@ -44,27 +44,24 @@ module Minjs
 
     #12
     def statement(lex, context)
-      [:block,			#12.1
-       :var_statement,		#12.2
-       :if_statement,		#12.5
-       :iteration_statement,
-       :continue_statement,	#12.7
-       :break_statement,	#12.8
-       :return_statement,	#12.9
-       :with_statement,		#12.10
-       :switch_statement,	#12.11
-       :labelled_statement,	#12.12
-       :throw_statement,	#12.13
-       :try_statement,		#12.14
-       :debugger_statement,	#12.15
-       :func_declaration,	#13 => func.rb
-       :exp_statement,		#12.4
-       :empty_statement,	#12.3
-      ].each do |f|
-        t = __send__(f, lex, context)
-        return t if t
-      end
-      nil
+      (
+        block(lex, context) or			#12.1
+        var_statement(lex, context) or		#12.2
+        if_statement(lex, context) or		#12.5
+        iteration_statement(lex, context) or	#12.6
+        continue_statement(lex, context) or	#12.7
+        break_statement(lex, context) or	#12.8
+        return_statement(lex, context) or	#12.9
+        with_statement(lex, context) or		#12.10
+        switch_statement(lex, context) or	#12.11
+        labelled_statement(lex, context) or	#12.12
+        throw_statement(lex, context) or	#12.13
+        try_statement(lex, context) or		#12.14
+        debugger_statement(lex, context) or	#12.15
+        func_declaration(lex, context) or	#13 => func.rb
+        exp_statement(lex, context) or		#12.4
+        empty_statement(lex, context) 		#12.3
+      )
     end
     #
     #12.1
@@ -164,7 +161,7 @@ module Minjs
     #12.3
     #
     def empty_statement(lex, context)
-      a = lex.next_lit(nil)
+      a = lex.peek_lit(nil)
       if a == ECMA262::PUNC_SEMICOLON
         lex.fwd_lit(nil)
         ECMA262::StEmpty.new
@@ -176,10 +173,10 @@ module Minjs
     #12.4
     #
     def exp_statement(lex, context)
-      if lex.next_lit.eql? ECMA262::PUNC_LCURLYBRAC
+      if lex.peek_lit(nil).eql? ECMA262::PUNC_LCURLYBRAC
         return block(lex, context)
       end
-      if lex.next_lit.eql? ECMA262::ID_FUNCTION
+      if lex.peek_lit(nil).eql? ECMA262::ID_FUNCTION
         return func_declaration(lex, context)
       end
 
@@ -189,7 +186,7 @@ module Minjs
         else
           if a
             # There is a possibility of labelled statemet
-            if lex.next_lit.eql? ECMA262::PUNC_COLON and a.kind_of? ECMA262::IdentifierName
+            if lex.peek_lit(nil).eql? ECMA262::PUNC_COLON and a.kind_of? ECMA262::IdentifierName
               nil
             else
               raise ParseError.new("no semicolon at end of expression statement", lex)
