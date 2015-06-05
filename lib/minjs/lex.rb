@@ -6,7 +6,6 @@ module Minjs
     include Ctype
 
     attr_reader :pos
-    attr_reader :error_pos
     attr_reader :codes
 
     def initialize(str = "", options = {})
@@ -44,18 +43,28 @@ module Minjs
     def next_input_element(hint)
       if ret = @lit_cache[@pos]
         @pos = @lit_nextpos[@pos]
-        @error_pos = @pos
+        @head_pos = @pos
         return ret
       end
       pos0 = @pos
-      if ret = (white_space || line_terminator || comment || token)
-        if ret
-          @lit_cache[pos0] = ret
-          @lit_nextpos[pos0] = @pos
-        end
-        @error_pos = @pos
+      #
+      # skip white space here, because ECMA262(5.1.2) says:
+      #
+      #   Simple white space and single-line comments are discarded and
+      #   do not appear in the stream of input elements for the
+      #   syntactic grammar.
+      #
+      while white_space or single_line_comment
+      end
+
+      ret = line_terminator || multi_line_comment || token
+      if ret
+        @lit_cache[pos0] = ret
+        @lit_nextpos[pos0] = @pos
+        @head_pos = @pos
         return ret
       end
+
       if @codes[@pos].nil?
         return nil
       end
@@ -67,7 +76,7 @@ module Minjs
           @lit_cache[pos0] = ret
           @lit_nextpos[pos0] = @pos
         end
-        @error_pos = @pos
+        @head_pos = @pos
         return ret
       elsif hint == :regexp
         ret = regexp_literal
@@ -75,7 +84,7 @@ module Minjs
           @lit_cache[pos0] = ret
           @lit_nextpos[pos0] = @pos
         end
-        @error_pos = @pos
+        @head_pos = @pos
         return ret
       else
         ECMA262::LIT_DIV_OR_REGEXP_LITERAL
@@ -136,11 +145,7 @@ module Minjs
         while (code = @codes[@pos]) and !line_terminator?(code)
           @pos += 1
         end
-        if @codes[@pos].nil?
-          return ECMA262::SingleLineComment.new(@codes[pos0...@pos].pack("U*") + "\n")
-        else
-          return ECMA262::SingleLineComment.new(@codes[pos0...@pos].pack("U*"))
-        end
+        return ECMA262::SingleLineComment.new(@codes[pos0...@pos].pack("U*"))
       else
         nil
       end
@@ -602,10 +607,12 @@ module Minjs
         @pos += 1
         neg = true
       end
+      d = decimal_digits
+      raise ParseError.new("unexpecting token", self) if d.nil?
       if neg
-        e = "-#{decimal_digits}"
+        e = "-#{d}"
       else
-        e = decimal_digits
+        e = d
       end
       e
     end
@@ -802,7 +809,7 @@ module Minjs
     def eql_lit?(l, hint = nil)
       lit = peek_lit(hint)
       if lit.eql? l
-        fwd_lit(hint)
+        fwd_after_peek
         lit
       else
         nil
@@ -820,7 +827,7 @@ module Minjs
     def eql_lit_nolt?(l, hint = nil)
       lit = peek_lit_nolt(hint)
       if lit.eql? l
-        fwd_lit_nolt(hint)
+        fwd_after_peek
         lit
       else
         nil
@@ -837,7 +844,7 @@ module Minjs
     def match_lit?(l, hint = nil)
       lit = peek_lit(hint)
       if lit == l
-        fwd_lit(hint)
+        fwd_after_peek
         lit
       else
         nil
@@ -855,7 +862,7 @@ module Minjs
     def match_lit_nolt?(l, hint = nil)
       lit = peek_lit_nolt(hint)
       if lit == l
-        fwd_lit_nolt(hint)
+        fwd_after_peek
         lit
       else
         nil
@@ -889,6 +896,10 @@ module Minjs
       lit
     end
 
+    def fwd_after_peek
+      @pos = @head_pos
+    end
+
     #
     # fetch next literal.
     # position is forwarded.
@@ -912,48 +923,6 @@ module Minjs
       lit
     end
 
-    def debug_str(pos = nil, line = nil, col = nil)
-      if pos.nil?
-        pos = @error_pos
-        if pos.nil?
-          pos = @pos
-        end
-      end
-      if pos > 20
-        pos -= 20
-        pos0 = 20
-      elsif pos >= 0
-        pos0 = pos
-        pos = 0
-      end
-      if col and col >= 1
-        pos0 = col - 1;
-      end
-      t = ''
-      t << @codes[pos..(pos+80)].pack("U*")
-      t << "\n"
-      t << (' ' * pos0) + "^"
-      t
-    end
-
-    def debug_lit(pos = nil)
-      if pos.nil?
-        pos = @error_pos
-        if pos.nil?
-          pos = @pos
-        end
-      end
-      if pos > 20
-        pos -= 20
-        pos0 = 20
-      elsif pos >= 0
-        pos0 = pos
-        pos = 0
-      end
-      #STDERR.puts pos0
-      STDERR.puts @codes[pos..(pos+80)].collect{|u| u == 10 ? 0x20 : u}.pack("U*")
-      STDERR.puts (' ' * pos0) + "^"
-    end
     #
     # break <val> => position is rewind, then break with <val>
     # return <val> => position is rewind, then return <val>
@@ -964,7 +933,6 @@ module Minjs
         saved_pos = @pos
         ret = yield
       ensure
-        @nest -= 1
         if ret.nil?
           @pos = saved_pos
           nil
@@ -972,7 +940,10 @@ module Minjs
       end
     end
 
-    def line_col(pos)
+    #
+    # position to [row, col]
+    #
+    def row_col(pos)
       _pos = 0
       row = 0
       col = 1
@@ -987,6 +958,46 @@ module Minjs
         _pos += 1
       end
       return [row+1, col+1]
+    end
+
+    #
+    # position to line
+    #
+    def line(pos)
+      pos0 = pos1 = pos
+      while true
+        pos0 -= 1
+        break if line_terminator?(@codes[pos0])
+      end
+      pos0 += 1
+
+      while true
+        break if line_terminator?(@codes[pos1])
+        pos1 += 1
+      end
+
+      @codes[pos0..pos1].pack("U*")
+    end
+
+    def debug_str(pos = nil, row = nil, col = nil)
+      if pos.nil?
+        pos = @head_pos or @pos
+      end
+
+      t = ''
+      if col >= 80
+        t << @codes[(pos-80)..(pos+80)].pack("U*")
+        col = 81
+      else
+        t << line(pos)
+      end
+
+      if col and col >= 1
+        col = col - 1;
+      end
+      t << "\n"
+      t << (' ' * col) + "^"
+      t
     end
   end
 end

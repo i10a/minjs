@@ -34,10 +34,15 @@ EOS
 
     it 'raise error' do
       expect {
-        js = test_parse <<-EOS
-a=018
-EOS
+        js = test_parse "a=018"
       }.to raise_error(Minjs::ParseError)
     end
+
+    it 'raise error' do
+      expect {
+        js = test_parse "3.1415e"
+      }.to raise_error(Minjs::ParseError)
+    end
+
   end
 end

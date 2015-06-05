@@ -2,7 +2,6 @@
 # coding: utf-8
 require 'minjs/lex'
 require 'minjs/ecma262'
-require 'minjs/literal'
 require 'minjs/statement'
 require 'minjs/expression'
 require 'minjs/func'
@@ -13,7 +12,6 @@ require 'logger'
 
 module Minjs
   class Compressor
-    include Literal
     include Statement
     include Exp
     include Func
@@ -95,12 +93,14 @@ module Minjs
       @lex = Minjs::Lex.new(data, :logger => @logger)
       @global_context = ECMA262::Context.new
       @heading_comments = []
-      @lex.eval_lit{
-        while a = @lex.next_input_element(nil) and (a.ws? or a.lt?)
-          @heading_comments.push(a)
-        end
-        nil
-      }
+
+      while a = (@lex.comment || @lex.line_terminator || @lex.white_space)
+        @heading_comments.push(a)
+      end
+      while @heading_comments.last == ECMA262::LIT_LINE_FEED and
+            !(@heading_comments[-2].kind_of?(ECMA262::SingleLineComment))
+        @heading_comments.pop
+      end
       @prog = program(@lex, @global_context)
 
       remove_empty_statement

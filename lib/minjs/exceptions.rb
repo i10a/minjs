@@ -13,9 +13,9 @@ module Minjs
       t << super
       t << "\n"
       if @lex
-        line, col = @lex.line_col(@lex_pos)
-        t << "line: #{line}, col: #{col}\n"
-        t << @lex.debug_str(@lex_pos, line, col)
+        row, col = @lex.row_col(@lex_pos)
+        t << "row: #{row}, col: #{col}\n"
+        t << @lex.debug_str(@lex_pos, row, col)
       end
       t
     end

@@ -8,34 +8,24 @@ module Minjs
     #
     def semicolon(lex, context)
       a = lex.peek_lit_nolt(nil)
-      #
       # ; ?
-      #
       if a == ECMA262::PUNC_SEMICOLON
-        lex.fwd_lit_nolt(nil)
+        lex.fwd_after_peek
         a
-      #
       # } ?
-      #
       elsif a == ECMA262::PUNC_RCURLYBRAC
         a
-      #
       # line feed?
-      #
       elsif a == ECMA262::LIT_LINE_FEED
-        lex.fwd_lit_nolt(nil)
+        lex.fwd_after_peek
         a
-      #
       # end of program
-      #
       elsif a.nil?
-        lex.fwd_lit_nolt(nil)
+        lex.fwd_after_peek
         ECMA262::LIT_LINE_FEED
-      #
       # line terminator?
-      #
       elsif a.lt?
-        lex.fwd_lit_nolt(nil)
+        lex.fwd_after_peek
         a
       else
         nil
@@ -163,7 +153,7 @@ module Minjs
     def empty_statement(lex, context)
       a = lex.peek_lit(nil)
       if a == ECMA262::PUNC_SEMICOLON
-        lex.fwd_lit(nil)
+        lex.fwd_after_peek
         ECMA262::StEmpty.new
       else
         nil
@@ -173,15 +163,15 @@ module Minjs
     #12.4
     #
     def exp_statement(lex, context)
-      if lex.peek_lit(nil).eql? ECMA262::PUNC_LCURLYBRAC
+      if (a = lex.peek_lit(nil)).eql? ECMA262::PUNC_LCURLYBRAC
         return block(lex, context)
       end
-      if lex.peek_lit(nil).eql? ECMA262::ID_FUNCTION
+      if a.eql? ECMA262::ID_FUNCTION
         return func_declaration(lex, context)
       end
 
       lex.eval_lit{
-        if a=exp(lex, context, {}) and semicolon(lex, context)
+        if a = exp(lex, context, {}) and semicolon(lex, context)
           ECMA262::StExp.new(a)
         else
           if a

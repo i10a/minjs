@@ -47,16 +47,16 @@ module Minjs
     def literal(lex, context)
       a = lex.peek_lit(:regexp)
       if a.kind_of? ECMA262::ECMA262Numeric or a.kind_of? ECMA262::ECMA262String or a.kind_of? ECMA262::ECMA262RegExp
-        lex.fwd_lit(:regexp)
+        lex.fwd_after_peek
         a
       elsif a.eql? ECMA262::ID_NULL
-        lex.fwd_lit(:regexp)
+        lex.fwd_after_peek
         ECMA262::Null.get
       elsif a.eql? ECMA262::ID_TRUE
-        lex.fwd_lit(:regexp)
+        lex.fwd_after_peek
         ECMA262::Boolean.get(:true)
       elsif a.eql? ECMA262::ID_FALSE
-        lex.fwd_lit(:regexp)
+        lex.fwd_after_peek
         ECMA262::Boolean.get(:false)
       else
         nil
@@ -69,7 +69,7 @@ module Minjs
     def identifier(lex, context)
       a = lex.peek_lit(:regexp)
       if a.kind_of? ECMA262::IdentifierName and !a.reserved?
-        lex.fwd_lit(:regexp)
+        lex.fwd_after_peek
         a.context = context
         a
       else
@@ -765,7 +765,7 @@ module Minjs
          punc == ECMA262::PUNC_ANDLET ||
          punc == ECMA262::PUNC_ORLET ||
          punc == ECMA262::PUNC_XORLET
-        lex.fwd_lit(:div)
+        lex.fwd_after_peek
         if b = assignment_exp(lex, context, options)
           case punc
           when ECMA262::PUNC_LET
