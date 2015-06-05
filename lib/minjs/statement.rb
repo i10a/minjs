@@ -170,22 +170,18 @@ module Minjs
         return func_declaration(lex, context)
       end
 
-      lex.eval_lit{
-        if a = exp(lex, context, {}) and semicolon(lex, context)
+
+      if a = exp(lex, context, {})
+        if semicolon(lex, context)
           ECMA262::StExp.new(a)
+        # There is a possibility of labelled statemet if
+        # exp_statement call before labelled_statement
         else
-          if a
-            # There is a possibility of labelled statemet
-            if lex.peek_lit(nil).eql? ECMA262::PUNC_COLON and a.kind_of? ECMA262::IdentifierName
-              nil
-            else
-              raise ParseError.new("no semicolon at end of expression statement", lex)
-            end
-          else
-            nil
-          end
+          raise ParseError.new("no semicolon at end of expression statement", lex)
         end
-      }
+      else
+        nil
+      end
     end
     #
     #12.5

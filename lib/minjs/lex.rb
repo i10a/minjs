@@ -18,6 +18,8 @@ module Minjs
       @lit_cache = []
       @lit_nextpos = []
       @logger = options[:logger]
+
+      @eval_nest = 0
     end
 
     def clear_cache
@@ -931,11 +933,18 @@ module Minjs
     def eval_lit(&block)
       begin
         saved_pos = @pos
+        @eval_nest += 1
         ret = yield
       ensure
+        @eval_nest -= 1
         if ret.nil?
           @pos = saved_pos
           nil
+        else
+          if @eval_nest == 0
+            #STDERR.puts "clear_cache [#{saved_pos}..#{@pos}]"
+            clear_cache
+          end
         end
       end
     end
