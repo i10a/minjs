@@ -1,10 +1,11 @@
-module Minjs
+module Minjs::Lex
   #
   # 14 Program
   #
   module Program
-    def program(lex, context)
-      prog = source_elements(@lex, @global_context)
+    include Minjs
+    def program(context)
+      prog = source_elements(context)
       if lex.eof?
         return prog
       else
@@ -12,19 +13,19 @@ module Minjs
       end
     end
 
-    def source_elements(lex, context, options = {})
+    def source_elements(context)
       prog = []
-      while t = source_element(lex, context)
+      while t = source_element(context)
         prog.push(t)
       end
       ECMA262::Prog.new(context, ECMA262::SourceElements.new(prog))
     end
 
-    def source_element(lex, context)
+    def source_element(context)
       #lex.eval_lit{
-      statement(lex, context)
+      statement(context)
       #} or lex.eval_lit{ => statement
-      #  func_declaration(lex, context)
+      #  func_declaration(context)
       #}
     end
   end

@@ -35,13 +35,13 @@ EOS
     it 'raise error' do
       expect {
         js = test_parse "a=018"
-      }.to raise_error(Minjs::ParseError)
+      }.to raise_error(Minjs::Lex::ParseError)
     end
 
     it 'raise error' do
       expect {
         js = test_parse "3.1415e"
-      }.to raise_error(Minjs::ParseError)
+      }.to raise_error(Minjs::Lex::ParseError)
     end
 
   end

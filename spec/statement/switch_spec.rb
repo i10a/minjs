@@ -51,7 +51,7 @@ EOS
 switch($)// {} are required
 ;
 EOS
-      }.to raise_error(Minjs::ParseError)
+      }.to raise_error(Minjs::Lex::ParseError)
     end
   end
 end

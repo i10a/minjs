@@ -19,7 +19,7 @@ EOS
         js = test_parse <<-EOS
 throw
 EOS
-      }.to raise_error(Minjs::ParseError)
+      }.to raise_error(Minjs::Lex::ParseError)
     end
 
     it 'cause syntax error' do
@@ -28,7 +28,7 @@ EOS
 throw//no line terminator here
 a
 EOS
-      }.to raise_error(Minjs::ParseError)
+      }.to raise_error(Minjs::Lex::ParseError)
     end
 
     it 'cause syntax error' do
@@ -36,7 +36,7 @@ EOS
         js = test_parse <<-EOS
 throw 1+;// bad expression
 EOS
-      }.to raise_error(Minjs::ParseError)
+      }.to raise_error(Minjs::Lex::ParseError)
     end
   end
 end

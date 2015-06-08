@@ -18,7 +18,7 @@ EOS
     it 'cause syntax error' do
       expect {
         js = test_parse '()'
-      }.to raise_error(Minjs::ParseError)
+      }.to raise_error(Minjs::Lex::ParseError)
     end
   end
 end

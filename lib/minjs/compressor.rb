@@ -2,22 +2,11 @@
 # coding: utf-8
 require 'minjs/lex'
 require 'minjs/ecma262'
-require 'minjs/statement'
-require 'minjs/expression'
-require 'minjs/func'
-require 'minjs/program'
-require 'minjs/exceptions'
 require 'minjs/version'
 require 'logger'
 
 module Minjs
   class Compressor
-    include Statement
-    include Exp
-    include Func
-    include Program
-    include Ctype
-
     attr_reader :prog
 
     def initialize(options = {})
@@ -90,7 +79,7 @@ module Minjs
     end
 
     def parse(data)
-      @lex = Minjs::Lex.new(data, :logger => @logger)
+      @lex = Minjs::Lex::Parser.new(data, :logger => @logger)
       @global_context = ECMA262::Context.new
       @heading_comments = []
 
@@ -101,7 +90,7 @@ module Minjs
             !(@heading_comments[-2].kind_of?(ECMA262::SingleLineComment))
         @heading_comments.pop
       end
-      @prog = program(@lex, @global_context)
+      @prog = @lex.program(@global_context)
 
       remove_empty_statement
       @lex.clear_cache
@@ -942,7 +931,7 @@ module Minjs
         # A["B"] => A.N
         #
         elsif st.kind_of? ECMA262::ExpPropBrac and st.val2.kind_of? ECMA262::ECMA262String
-          if idname?(st.val2.val)
+          if @lex.idname?(st.val2.val)
             parent.replace(st, ECMA262::ExpProp.new(st.val, st.val2))
           elsif !st.val2.to_ecma262_number.nil? and (v=ECMA262::ECMA262Numeric.new(st.val2.to_ecma262_number)).to_ecma262_string == st.val2.to_ecma262_string
             st.replace(st.val2, v)

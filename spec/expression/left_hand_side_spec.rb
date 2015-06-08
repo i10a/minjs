@@ -23,19 +23,19 @@ EOS
     it 'cause syntax error' do
       expect {
         js = test_parse 'a[]'
-      }.to raise_error(Minjs::ParseError)
+      }.to raise_error(Minjs::Lex::ParseError)
       expect {
         js = test_parse 'a.'
-      }.to raise_error(Minjs::ParseError)
+      }.to raise_error(Minjs::Lex::ParseError)
       expect {
         js = test_parse 'new'
-      }.to raise_error(Minjs::ParseError)
+      }.to raise_error(Minjs::Lex::ParseError)
       expect {
         js = test_parse 'a['
-      }.to raise_error(Minjs::ParseError)
+      }.to raise_error(Minjs::Lex::ParseError)
       expect {
         js = test_parse 'a('
-      }.to raise_error(Minjs::ParseError)
+      }.to raise_error(Minjs::Lex::ParseError)
     end
   end
 end

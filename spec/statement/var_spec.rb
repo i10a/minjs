@@ -15,7 +15,7 @@ EOS
     it 'is raise exception' do
       expect {
         js = test_parse "var x="
-      }.to raise_error(Minjs::ParseError)
+      }.to raise_error(Minjs::Lex::ParseError)
     end
   end
 end

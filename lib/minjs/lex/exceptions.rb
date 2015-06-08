@@ -1,4 +1,4 @@
-module Minjs
+module Minjs::Lex
   class ParseError < StandardError
     def initialize(error_message = nil, lex = nil)
       super(error_message)

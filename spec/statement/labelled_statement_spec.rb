@@ -13,7 +13,7 @@ describe 'Statement' do
 this://this is reserved word
 while(true);
 EOS
-      }.to raise_error(Minjs::ParseError)
+      }.to raise_error(Minjs::Lex::ParseError)
     end
   end
 end

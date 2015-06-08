@@ -1,11 +1,12 @@
 # coding: utf-8
-module Minjs
-  module Exp
+module Minjs::Lex
+  module Expression
+    include Minjs
     #
     # Primary Expressions
     # 11.1
     #
-    def primary_exp(lex, context, options)
+    def primary_exp(context, options)
       @logger.debug "*** primary_exp"
 
       if lex.eql_lit?(ECMA262::ID_THIS)
@@ -14,7 +15,7 @@ module Minjs
       end
       # (exp)
       if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS)
-        if a=exp(lex, context, options) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS)
+        if a=exp(context, options) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS)
           @logger.debug "*** primary_exp => ()"
           return ECMA262::ExpParen.new(a)
         else
@@ -22,10 +23,10 @@ module Minjs
         end
       end
 
-      t = identifier(lex, context) ||
-          literal(lex, context) ||
-          array_literal(lex, context, options) ||
-          object_literal(lex, context, options)
+      t = identifier(context) ||
+          literal(context) ||
+          array_literal(context, options) ||
+          object_literal(context, options)
 
       @logger.debug {
         "*** primary_exp => #{t ? t.to_js : t}"
@@ -44,7 +45,7 @@ module Minjs
     # StringLiteral
     # RegularExpressionLiteral
     #
-    def literal(lex, context)
+    def literal(context)
       a = lex.peek_lit(:regexp)
       if a.kind_of? ECMA262::ECMA262Numeric or a.kind_of? ECMA262::ECMA262String or a.kind_of? ECMA262::ECMA262RegExp
         lex.fwd_after_peek
@@ -66,7 +67,7 @@ module Minjs
     #
     # 11.1.2
     #
-    def identifier(lex, context)
+    def identifier(context)
       a = lex.peek_lit(:regexp)
       if a.kind_of? ECMA262::IdentifierName and !a.reserved?
         lex.fwd_after_peek
@@ -79,7 +80,7 @@ module Minjs
     #
     # 11.1.4
     #
-    def array_literal(lex, context, options)
+    def array_literal(context, options)
       return nil unless lex.eql_lit?(ECMA262::PUNC_LSQBRAC)
       t = []
       while true
@@ -87,7 +88,7 @@ module Minjs
           t.push(nil)
         elsif lex.eql_lit?(ECMA262::PUNC_RSQBRAC)
           break
-        elsif a = assignment_exp(lex, context, {})
+        elsif a = assignment_exp(context, {})
           t.push(a)
           lex.eql_lit?(ECMA262::PUNC_COMMA)
         else
@@ -104,13 +105,13 @@ module Minjs
     # { PropertyNameAndValueList }
     # { PropertyNameAndValueList , }
     #
-    def object_literal(lex, context, options)
+    def object_literal(context, options)
       return nil unless lex.eql_lit?(ECMA262::PUNC_LCURLYBRAC)
       #{}
       if lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
         ECMA262::ECMA262Object.new([])
       else
-        ECMA262::ECMA262Object.new(property_name_and_value_list(lex, context, options))
+        ECMA262::ECMA262Object.new(property_name_and_value_list(context, options))
       end
     end
 
@@ -130,25 +131,25 @@ module Minjs
     # get name(){funcbody}
     # set name(args){funcbody}
     #
-    def property_name_and_value_list(lex, context, options)
+    def property_name_and_value_list(context, options)
       h = []
       while !lex.eof?
         #get
         if lex.match_lit? ECMA262::ID_GET
           # {get : val}
           if lex.eql_lit? ECMA262::PUNC_COLON
-            b = assignment_exp(lex, context, options)
+            b = assignment_exp(context, options)
             h.push([ECMA262::ID_GET, b])
           # {get name(){}}
           else
             new_context = ECMA262::Context.new
             new_context.lex_env = context.lex_env.new_declarative_env()
             new_context.var_env = context.var_env.new_declarative_env()
-            if(a = property_name(lex, context) and
+            if(a = property_name(context) and
                lex.eql_lit? ECMA262::PUNC_LPARENTHESIS and
                lex.eql_lit? ECMA262::PUNC_RPARENTHESIS and
                lex.eql_lit? ECMA262::PUNC_LCURLYBRAC and
-               b = func_body(lex, new_context) and
+               b = func_body(new_context) and
                lex.eql_lit? ECMA262::PUNC_RCURLYBRAC)
               h.push([a, ECMA262::StFunc.new(new_context, ECMA262::ID_GET, [], b, :getter => true)])
             else
@@ -159,19 +160,19 @@ module Minjs
         elsif lex.match_lit?(ECMA262::ID_SET)
           # {set : val}
           if lex.eql_lit? ECMA262::PUNC_COLON
-            b = assignment_exp(lex, context, options)
+            b = assignment_exp(context, options)
             h.push([ECMA262::ID_SET, b])
           # {set name(arg){}}
           else
             new_context = ECMA262::Context.new
             new_context.lex_env = context.lex_env.new_declarative_env()
             new_context.var_env = context.var_env.new_declarative_env()
-            if(a = property_name(lex, context) and
+            if(a = property_name(context) and
                lex.eql_lit? ECMA262::PUNC_LPARENTHESIS and
-               arg = property_set_parameter_list(lex, new_context) and
+               arg = property_set_parameter_list(new_context) and
                lex.eql_lit? ECMA262::PUNC_RPARENTHESIS and
                lex.eql_lit? ECMA262::PUNC_LCURLYBRAC and
-               b = func_body(lex, new_context) and
+               b = func_body(new_context) and
                lex.eql_lit? ECMA262::PUNC_RCURLYBRAC)
               h.push([a, ECMA262::StFunc.new(new_context, ECMA262::ID_SET, arg, b, :setter => true)])
             else
@@ -179,9 +180,9 @@ module Minjs
             end
           end
         #property
-        elsif(a = property_name(lex, context) and
+        elsif(a = property_name(context) and
               lex.eql_lit? ECMA262::PUNC_COLON and
-              b = assignment_exp(lex, context, options))
+              b = assignment_exp(context, options))
           h.push([a, b])
         else
           raise ParseError.new("unexpceted token", lex)
@@ -205,7 +206,7 @@ module Minjs
     # StringLiteral
     # NumericLiteral
     #
-    def property_name(lex, context)
+    def property_name(context)
       a = lex.fwd_lit(nil)
       if a.kind_of?(ECMA262::ECMA262String)
         a
@@ -225,8 +226,8 @@ module Minjs
     # PropertySetParameterList :
     # Identifier
     #
-    def property_set_parameter_list(lex, context)
-      argName = identifier(lex, context)
+    def property_set_parameter_list(context)
+      argName = identifier(context)
       context.var_env.record.create_mutable_binding(argName, nil)
       context.var_env.record.set_mutable_binding(argName, :undefined, nil, {:_parameter_list => true})
       context.lex_env.record.create_mutable_binding(argName, nil)
@@ -240,11 +241,11 @@ module Minjs
     # NewExpression
     # CallExpression
     #
-    def left_hand_side_exp(lex, context, options)
+    def left_hand_side_exp(context, options)
       @logger.debug "*** left_hand_side_exp"
 
-      t = call_exp(lex, context, options) || new_exp(lex, context, options)
-      #t = new_exp(lex, context, options) || call_exp(lex, context, options)
+      t = call_exp(context, options) || new_exp(context, options)
+      #t = new_exp(context, options) || call_exp(context, options)
 
       @logger.debug{
         "*** left_hand_side_exp => #{t ? t.to_js: t}"
@@ -283,10 +284,10 @@ module Minjs
     # MemberExpression [lookahead ∉ {(}]
     # new NewExpression [lookahead ∉ {(}]
     #
-    def new_exp(lex, context, options)
+    def new_exp(context, options)
       lex.eval_lit {
         if lex.eql_lit?(ECMA262::ID_NEW)
-          if a = new_exp(lex, context, options)
+          if a = new_exp(context, options)
             if lex.eql_lit? ECMA262::PUNC_LPARENTHESIS
               # minjs evaluate CallExpression first, so
               # program never falls to here.
@@ -301,12 +302,12 @@ module Minjs
             #nil
           end
         end
-      } || member_exp(lex, context, options)
+      } || member_exp(context, options)
       # minjs evaluate CallExpression first, so
       # there is no reason to check parenthesis.
       #
       # lex.eval_lit{
-      #   t = member_exp(lex, context, options)
+      #   t = member_exp(context, options)
       #   if lex.eql_lit? ECMA262::PUNC_LPARENTHESIS
       #     break nil
       #   end
@@ -321,9 +322,9 @@ module Minjs
     # CallExpression [ Expression ]
     # CallExpression . IdentifierName
     #
-    def call_exp(lex, context, options)
-      if a = member_exp(lex, context, options)
-        if b = arguments(lex, context, options)
+    def call_exp(context, options)
+      if a = member_exp(context, options)
+        if b = arguments(context, options)
           t = ECMA262::ExpCall.new(a, b)
         # if b is nil, this may be MemberExpression of NewExpression
         else
@@ -334,10 +335,10 @@ module Minjs
       end
 
       while true
-        if b = arguments(lex, context, options)
+        if b = arguments(context, options)
           t = ECMA262::ExpCall.new(t, b)
         elsif lex.eql_lit?(ECMA262::PUNC_LSQBRAC)
-          if b=exp(lex, context, options) and lex.eql_lit?(ECMA262::PUNC_RSQBRAC)
+          if b=exp(context, options) and lex.eql_lit?(ECMA262::PUNC_RSQBRAC)
             t = ECMA262::ExpPropBrac.new(t, b)
           else
             raise ParseError.new("unexpceted token", lex)
@@ -364,11 +365,11 @@ module Minjs
     # MemberExpression . IdentifierName
     # new MemberExpression Arguments
     #
-    def member_exp(lex, context, options)
+    def member_exp(context, options)
       t = lex.eval_lit{
         if lex.eql_lit? ECMA262::ID_NEW
-           if a = member_exp(lex, context, options)
-             b = arguments(lex, context, options)
+           if a = member_exp(context, options)
+             b = arguments(context, options)
              # if b is nil, this may be NewExpression
              if b
                s = b.collect{|x| x.to_js}.join(',');
@@ -381,12 +382,12 @@ module Minjs
              return nil
            end
         end
-      } || primary_exp(lex, context, options) || func_exp(lex, context)
+      } || primary_exp(context, options) || func_exp(context)
       return nil if t.nil?
 
       while true
         if lex.eql_lit?(ECMA262::PUNC_LSQBRAC)
-          if b=exp(lex, context, options) and lex.eql_lit?(ECMA262::PUNC_RSQBRAC)
+          if b=exp(context, options) and lex.eql_lit?(ECMA262::PUNC_RSQBRAC)
             t = ECMA262::ExpPropBrac.new(t, b)
           else
             raise ParseError.new("unexpceted token", lex)
@@ -408,13 +409,13 @@ module Minjs
     # ( )
     # ( ArgumentList )
     #
-    def arguments(lex, context, options)
+    def arguments(context, options)
       return nil if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS).nil?
       return [] if lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS)
 
       args = []
       while true
-        if t = assignment_exp(lex, context, options)
+        if t = assignment_exp(context, options)
           args.push(t)
         else
           raise ParseError.new("unexpected token", lex)
@@ -432,8 +433,8 @@ module Minjs
     #
     # 11.3
     #
-    def postfix_exp(lex, context, options)
-      exp = left_hand_side_exp(lex, context, options)
+    def postfix_exp(context, options)
+      exp = left_hand_side_exp(context, options)
       return nil if exp.nil?
       if punc = (lex.eql_lit_nolt?(ECMA262::PUNC_INC) ||
                  lex.eql_lit_nolt?(ECMA262::PUNC_DEC))
@@ -450,7 +451,7 @@ module Minjs
     #
     # 11.4
     #
-    def unary_exp(lex, context, options)
+    def unary_exp(context, options)
       if punc = (lex.eql_lit?(ECMA262::ID_DELETE) ||
                  lex.eql_lit?(ECMA262::ID_VOID) ||
                  lex.eql_lit?(ECMA262::ID_TYPEOF) ||
@@ -460,7 +461,7 @@ module Minjs
                  lex.eql_lit?(ECMA262::PUNC_SUB) ||
                  lex.eql_lit?(ECMA262::PUNC_NOT) ||
                  lex.eql_lit?(ECMA262::PUNC_LNOT))
-        exp = unary_exp(lex, context, options)
+        exp = unary_exp(context, options)
         if exp.nil?
           raise ParseError.new("unexpceted token", lex)
         elsif punc == ECMA262::PUNC_INC
@@ -485,22 +486,22 @@ module Minjs
             end
         end
       else
-        postfix_exp(lex, context, options)
+        postfix_exp(context, options)
       end
     end
 
     #
     # 11.5
     #
-    def multiplicative_exp(lex, context, options)
-      a = unary_exp(lex, context, options)
+    def multiplicative_exp(context, options)
+      a = unary_exp(context, options)
       return nil if !a
       t = a
       while punc = lex.eql_lit?(ECMA262::PUNC_MUL) ||
                    lex.eql_lit?(ECMA262::PUNC_DIV, :div) ||
                    lex.eql_lit?(ECMA262::PUNC_MOD)
 
-        if b = unary_exp(lex, context, options)
+        if b = unary_exp(context, options)
           if punc == ECMA262::PUNC_MUL
             t = ECMA262::ExpMul.new(t, b)
           elsif punc == ECMA262::PUNC_DIV
@@ -518,13 +519,13 @@ module Minjs
     #
     # 11.6
     #
-    def additive_exp(lex, context, options)
-      a = multiplicative_exp(lex, context, options)
+    def additive_exp(context, options)
+      a = multiplicative_exp(context, options)
       return nil if !a
 
       t = a
       while punc = lex.eql_lit?(ECMA262::PUNC_ADD) || lex.eql_lit?(ECMA262::PUNC_SUB)
-        if b = multiplicative_exp(lex, context, options)
+        if b = multiplicative_exp(context, options)
           if punc == ECMA262::PUNC_ADD
             t = ECMA262::ExpAdd.new(t, b)
           else
@@ -538,15 +539,15 @@ module Minjs
     end
     #
     # 11.7
-    def shift_exp(lex, context, options)
-      a = additive_exp(lex, context, options)
+    def shift_exp(context, options)
+      a = additive_exp(context, options)
       return nil if !a
 
       t = a
       while punc = lex.eql_lit?(ECMA262::PUNC_LSHIFT) ||
                    lex.eql_lit?(ECMA262::PUNC_RSHIFT) ||
                    lex.eql_lit?(ECMA262::PUNC_URSHIFT)
-        if b = additive_exp(lex, context, options)
+        if b = additive_exp(context, options)
           if punc == ECMA262::PUNC_LSHIFT
             t = ECMA262::ExpLShift.new(t, b)
           elsif punc == ECMA262::PUNC_RSHIFT
@@ -564,15 +565,15 @@ module Minjs
     #
     # 11.8
     #
-    def relational_exp(lex, context, options)
-      a = shift_exp(lex, context, options)
+    def relational_exp(context, options)
+      a = shift_exp(context, options)
       return nil if !a
 
       t = a
       while (punc = lex.eql_lit?(ECMA262::PUNC_LT) || lex.eql_lit?(ECMA262::PUNC_GT) ||
                     lex.eql_lit?(ECMA262::PUNC_LTEQ) || lex.eql_lit?(ECMA262::PUNC_GTEQ) ||
                     lex.eql_lit?(ECMA262::ID_INSTANCEOF) || (!options[:no_in] && lex.eql_lit?(ECMA262::ID_IN)))
-        if b = shift_exp(lex, context, options)
+        if b = shift_exp(context, options)
           if punc == ECMA262::PUNC_LT
             t = ECMA262::ExpLt.new(t, b)
           elsif punc == ECMA262::PUNC_GT
@@ -601,8 +602,8 @@ module Minjs
     # a === b
     # a !== b
     #
-    def equality_exp(lex, context, options)
-      a = relational_exp(lex, context, options)
+    def equality_exp(context, options)
+      a = relational_exp(context, options)
       return nil if !a
 
       t = a
@@ -610,7 +611,7 @@ module Minjs
                    lex.eql_lit?(ECMA262::PUNC_NEQ) ||
                    lex.eql_lit?(ECMA262::PUNC_SEQ) ||
                    lex.eql_lit?(ECMA262::PUNC_SNEQ)
-        if b = relational_exp(lex, context, options)
+        if b = relational_exp(context, options)
           if punc == ECMA262::PUNC_EQ
             t = ECMA262::ExpEq.new(t, b)
           elsif punc == ECMA262::PUNC_NEQ
@@ -631,13 +632,13 @@ module Minjs
     # 11.10
     # a & b
     #
-    def bitwise_and_exp(lex, context, options)
-      a = equality_exp(lex, context, options)
+    def bitwise_and_exp(context, options)
+      a = equality_exp(context, options)
       return nil if !a
 
       t = a
       while punc = lex.eql_lit?(ECMA262::PUNC_AND)
-        if b = equality_exp(lex, context, options)
+        if b = equality_exp(context, options)
           t = ECMA262::ExpAnd.new(t, b)
         else
           raise ParseError.new("unexpceted token", lex)
@@ -649,13 +650,13 @@ module Minjs
     #
     # a ^ b
     #
-    def bitwise_xor_exp(lex, context, options)
-      a = bitwise_and_exp(lex, context, options)
+    def bitwise_xor_exp(context, options)
+      a = bitwise_and_exp(context, options)
       return nil if !a
 
       t = a
       while punc = lex.eql_lit?(ECMA262::PUNC_XOR)
-        if b = bitwise_and_exp(lex, context, options)
+        if b = bitwise_and_exp(context, options)
           t = ECMA262::ExpXor.new(t, b)
         else
           raise ParseError.new("unexpceted token", lex)
@@ -668,13 +669,13 @@ module Minjs
     #
     # a | b
     #
-    def bitwise_or_exp(lex, context, options)
-      a = bitwise_xor_exp(lex, context, options)
+    def bitwise_or_exp(context, options)
+      a = bitwise_xor_exp(context, options)
       return nil if !a
 
       t = a
       while punc = lex.eql_lit?(ECMA262::PUNC_OR)
-        if b = bitwise_xor_exp(lex, context, options)
+        if b = bitwise_xor_exp(context, options)
           t = ECMA262::ExpOr.new(t, b)
         else
           raise ParseError.new("unexpceted token", lex)
@@ -686,13 +687,13 @@ module Minjs
     # 11.11
     # a && b
     #
-    def logical_and_exp(lex, context, options)
-      a = bitwise_or_exp(lex, context, options)
+    def logical_and_exp(context, options)
+      a = bitwise_or_exp(context, options)
       return nil if !a
 
       t = a
       while punc = lex.eql_lit?(ECMA262::PUNC_LAND)
-        if b = bitwise_or_exp(lex, context, options)
+        if b = bitwise_or_exp(context, options)
           t = ECMA262::ExpLogicalAnd.new(t, b)
         else
           raise ParseError.new("unexpceted token", lex)
@@ -702,13 +703,13 @@ module Minjs
       t
     end
 
-    def logical_or_exp(lex, context, options)
-      a = logical_and_exp(lex, context, options)
+    def logical_or_exp(context, options)
+      a = logical_and_exp(context, options)
       return nil if !a
 
       t = a
       while punc = lex.eql_lit?(ECMA262::PUNC_LOR)
-        if b = logical_and_exp(lex, context, options)
+        if b = logical_and_exp(context, options)
           t = ECMA262::ExpLogicalOr.new(t, b)
         else
           raise ParseError.new("unexpceted token", lex)
@@ -721,12 +722,12 @@ module Minjs
     # 11.12
     # a ? b : c
     #
-    def cond_exp(lex, context, options)
-      a = logical_or_exp(lex, context, options)
+    def cond_exp(context, options)
+      a = logical_or_exp(context, options)
       return nil if !a
 
       if lex.eql_lit?(ECMA262::PUNC_CONDIF)
-        if b=assignment_exp(lex, context, options) and lex.eql_lit?(ECMA262::PUNC_COLON) and c=assignment_exp(lex, context, options)
+        if b=assignment_exp(context, options) and lex.eql_lit?(ECMA262::PUNC_COLON) and c=assignment_exp(context, options)
           ECMA262::ExpCond.new(a, b, c)
         else
           raise ParseError.new("unexpceted token", lex)
@@ -742,10 +743,10 @@ module Minjs
     # LeftHandSideExpression = AssignmentExpression
     # LeftHandSideExpression AssignmentOperator AssignmentExpression
     #
-    def assignment_exp(lex, context, options)
+    def assignment_exp(context, options)
       @logger.debug "*** assignment_exp"
 
-      t = cond_exp(lex, context, options)
+      t = cond_exp(context, options)
       return nil if t.nil?
 
       if !t.left_hand_side_exp?
@@ -766,7 +767,7 @@ module Minjs
          punc == ECMA262::PUNC_ORLET ||
          punc == ECMA262::PUNC_XORLET
         lex.fwd_after_peek
-        if b = assignment_exp(lex, context, options)
+        if b = assignment_exp(context, options)
           case punc
           when ECMA262::PUNC_LET
             ECMA262::ExpAssign.new(left_hand, b)
@@ -812,13 +813,13 @@ module Minjs
     # AssignmentExpression
     # Expression , AssignmentExpression
     #
-    def exp(lex, context, options)
+    def exp(context, options)
       @logger.debug "*** expression"
 
-      t = assignment_exp(lex, context, options)
+      t = assignment_exp(context, options)
       return nil if t.nil?
       while punc = lex.eql_lit?(ECMA262::PUNC_COMMA)
-        if b = assignment_exp(lex,context, options)
+        if b = assignment_exp(context, options)
           t = ECMA262::ExpComma.new(t, b)
         else
           raise ParseError.new("unexpceted token", lex)

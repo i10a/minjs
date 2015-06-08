@@ -57,7 +57,7 @@ EOS
         js = test_parse <<-EOS
 break 0//0 is not identifier
 EOS
-      }.to raise_error(Minjs::ParseError)
+      }.to raise_error(Minjs::Lex::ParseError)
     end
   end
 end

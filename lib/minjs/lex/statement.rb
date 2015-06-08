@@ -1,12 +1,13 @@
-module Minjs
+module Minjs::Lex
   #
   # 12
   #
   module Statement
+    include Minjs
     #
     # check next literal is ';' or '}' or LT
     #
-    def semicolon(lex, context)
+    def semicolon(context)
       a = lex.peek_lit_nolt(nil)
       # ; ?
       if a == ECMA262::PUNC_SEMICOLON
@@ -33,46 +34,46 @@ module Minjs
     end
 
     #12
-    def statement(lex, context)
+    def statement(context)
       (
-        block(lex, context) or			#12.1
-        var_statement(lex, context) or		#12.2
-        if_statement(lex, context) or		#12.5
-        iteration_statement(lex, context) or	#12.6
-        continue_statement(lex, context) or	#12.7
-        break_statement(lex, context) or	#12.8
-        return_statement(lex, context) or	#12.9
-        with_statement(lex, context) or		#12.10
-        switch_statement(lex, context) or	#12.11
-        labelled_statement(lex, context) or	#12.12
-        throw_statement(lex, context) or	#12.13
-        try_statement(lex, context) or		#12.14
-        debugger_statement(lex, context) or	#12.15
-        func_declaration(lex, context) or	#13 => func.rb
-        exp_statement(lex, context) or		#12.4
-        empty_statement(lex, context) 		#12.3
+        block(context) or		#12.1
+        var_statement(context) or	#12.2
+        if_statement(context) or	#12.5
+        iteration_statement(context) or	#12.6
+        continue_statement(context) or	#12.7
+        break_statement(context) or	#12.8
+        return_statement(context) or	#12.9
+        with_statement(context) or	#12.10
+        switch_statement(context) or	#12.11
+        labelled_statement(context) or	#12.12
+        throw_statement(context) or	#12.13
+        try_statement(context) or	#12.14
+        debugger_statement(context) or	#12.15
+        func_declaration(context) or	#13 => func.rb
+        exp_statement(context) or	#12.4
+        empty_statement(context) 	#12.3
       )
     end
     #
     #12.1
     # block
-    def block(lex, context)
+    def block(context)
       pos0 = lex.pos
       return nil unless lex.eql_lit?(ECMA262::PUNC_LCURLYBRAC)
       if lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
         return ECMA262::StBlock.new(ECMA262::StatementList.new([]))
       end
 
-      if s = statement_list(lex, context) and lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
+      if s = statement_list(context) and lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
         ECMA262::StBlock.new(s)
       else
         raise ParseError.new('no "}" end of block', lex)
       end
     end
 
-    def statement_list(lex, context)
+    def statement_list(context)
       t = []
-      while !lex.eof? and s = statement(lex, context)
+      while !lex.eof? and s = statement(context)
         t.push(s)
       end
       ECMA262::StatementList.new(t)
@@ -81,11 +82,11 @@ module Minjs
     #12.2
     # variable_statement
     #
-    def var_statement(lex, context)
+    def var_statement(context)
       raise 'internal error' if context.nil?
       return nil unless lex.eql_lit?(ECMA262::ID_VAR)
 
-      if vl = var_decl_list(lex, context, {}) and semicolon(lex, context)
+      if vl = var_decl_list(context, {}) and semicolon(context)
         #10.5
         vl.each do |v|
           dn = v[0]
@@ -105,11 +106,11 @@ module Minjs
     # VariableDeclaration
     # VariableDeclarationList , VariableDeclaration
     #
-    def var_decl_list(lex, context, options)
+    def var_decl_list(context, options)
       list = []
-      list.push(var_decl(lex, context, options))
+      list.push(var_decl(context, options))
 
-      while lex.eql_lit?(ECMA262::PUNC_COMMA) and b = var_decl(lex, context, options)
+      while lex.eql_lit?(ECMA262::PUNC_COMMA) and b = var_decl(context, options)
         list.push(b)
       end
       list
@@ -122,12 +123,12 @@ module Minjs
     #
     # return tuple of [name, initialiser]
     #
-    def var_decl(lex, context, options)
-      a = identifier(lex, context)
+    def var_decl(context, options)
+      a = identifier(context)
       if !a
         raise ParseError.new("bad identifier", lex);
       else
-        b = initialiser(lex, context, options)
+        b = initialiser(context, options)
         [a, b]
       end
     end
@@ -137,9 +138,9 @@ module Minjs
     # Initialiser :
     # = AssignmentExpression
     #
-    def initialiser(lex, context, options)
+    def initialiser(context, options)
       if lex.eql_lit?(ECMA262::PUNC_LET)
-        if a = assignment_exp(lex, context, options)
+        if a = assignment_exp(context, options)
           return a
         else
           raise ParseError.new("unexpceted token", lex);
@@ -150,7 +151,7 @@ module Minjs
     #
     #12.3
     #
-    def empty_statement(lex, context)
+    def empty_statement(context)
       a = lex.peek_lit(nil)
       if a == ECMA262::PUNC_SEMICOLON
         lex.fwd_after_peek
@@ -162,17 +163,17 @@ module Minjs
     #
     #12.4
     #
-    def exp_statement(lex, context)
+    def exp_statement(context)
       if (a = lex.peek_lit(nil)).eql? ECMA262::PUNC_LCURLYBRAC
-        return block(lex, context)
+        return block(context)
       end
       if a.eql? ECMA262::ID_FUNCTION
-        return func_declaration(lex, context)
+        return func_declaration(context)
       end
 
 
-      if a = exp(lex, context, {})
-        if semicolon(lex, context)
+      if a = exp(context, {})
+        if semicolon(context)
           ECMA262::StExp.new(a)
         # There is a possibility of labelled statemet if
         # exp_statement call before labelled_statement
@@ -186,12 +187,13 @@ module Minjs
     #
     #12.5
     #
-    def if_statement(lex, context)
+    def if_statement(context)
       return nil unless lex.eql_lit?(ECMA262::ID_IF)
-      unless lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and cond=exp(lex, context, {}) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
+      unless(lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and cond=exp(context, {}) and
+             lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and s = statement(context))
         raise ParseError.new("unexpected token", lex)
       end
-      if lex.eql_lit?(ECMA262::ID_ELSE) and e=statement(lex, context)
+      if(lex.eql_lit?(ECMA262::ID_ELSE) and e = statement(context))
         ECMA262::StIf.new(cond, s, e)
       else
         ECMA262::StIf.new(cond, s, nil)
@@ -200,22 +202,22 @@ module Minjs
     #
     # 12.6
     #
-    def iteration_statement(lex, context)
-      for_statement(lex, context) or while_statement(lex, context) or do_while_statement(lex, context)
+    def iteration_statement(context)
+      for_statement(context) or while_statement(context) or do_while_statement(context)
     end
 
-    def while_statement(lex, context)
+    def while_statement(context)
       return nil unless lex.eql_lit?(ECMA262::ID_WHILE)
-      if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and e=exp(lex, context, {}) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
+      if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and e=exp(context, {}) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and s=statement(context)
         ECMA262::StWhile.new(e, s)
       else
         raise ParseError.new("unexpected token", lex)
       end
     end
 
-    def do_while_statement(lex, context)
+    def do_while_statement(context)
       return nil unless lex.eql_lit?(ECMA262::ID_DO)
-      if s=statement(lex, context) and lex.eql_lit?(ECMA262::ID_WHILE) and lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and e=exp(lex, context, {}) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and semicolon(lex, context)
+      if s=statement(context) and lex.eql_lit?(ECMA262::ID_WHILE) and lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and e=exp(context, {}) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and semicolon(context)
         ECMA262::StDoWhile.new(e, s)
       else
         raise ParseError.new("unexpected token", lex)
@@ -229,15 +231,15 @@ module Minjs
     # for ( LeftHandSideExpression in Expression ) Statement
     # for ( var VariableDeclarationNoIn in Expression ) Statement
     #
-    def for_statement(lex, context)
+    def for_statement(context)
       return nil unless lex.eql_lit?(ECMA262::ID_FOR)
       raise ParseError('unexpected token', lex) unless lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS)
       lex.eval_lit{
         # for(var i in a)
         if lex.eql_lit?(ECMA262::ID_VAR)
           lex.eval_lit{
-            if v=var_decl(lex, context, :no_in => true) and lex.eql_lit?(ECMA262::ID_IN)
-              if e=exp(lex, context, {}) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
+            if v=var_decl(context, :no_in => true) and lex.eql_lit?(ECMA262::ID_IN)
+              if e=exp(context, {}) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and s = statement(context)
                 #10.5
                 context.var_env.record.create_mutable_binding(v[0], nil)
                 context.var_env.record.set_mutable_binding(v[0], :undefined, nil)
@@ -250,7 +252,7 @@ module Minjs
             end
           } or lex.eval_lit {
             # for(var i ; cond ; exp)
-            if vl=var_decl_list(lex, context, :no_in =>true) and s1=lex.eql_lit?(ECMA262::PUNC_SEMICOLON) and (e=exp(lex, context, {})||true) and s2=lex.eql_lit?(ECMA262::PUNC_SEMICOLON) and (e2=exp(lex, context, {})||true) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
+            if vl=var_decl_list(context, :no_in =>true) and s1=lex.eql_lit?(ECMA262::PUNC_SEMICOLON) and (e=exp(context, {})||true) and s2=lex.eql_lit?(ECMA262::PUNC_SEMICOLON) and (e2=exp(context, {})||true) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and s=statement(context)
               e = nil if e == true
               e2 = nil if e2 == true
               #10.5
@@ -275,8 +277,8 @@ module Minjs
         else # => for(i in exp) / for(i ; cond; exp)
           lex.eval_lit{
             # for(i in exp)
-            if v=left_hand_side_exp(lex, context, {}) and lex.eql_lit?(ECMA262::ID_IN)
-              if e=exp(lex, context, {}) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
+            if v=left_hand_side_exp(context, {}) and lex.eql_lit?(ECMA262::ID_IN)
+              if e=exp(context, {}) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and s=statement(context)
                 ECMA262::StForIn.new(v, e, s)
               else
                 raise ParseError.new("unexpected token", lex)
@@ -284,7 +286,7 @@ module Minjs
             end
           } or lex.eval_lit{
             # for(i ; cond; exp)
-            if (v=exp(lex, context, :no_in => true) || true) and s1=lex.eql_lit?(ECMA262::PUNC_SEMICOLON) and (e=exp(lex, context, {}) || true) and s2=lex.eql_lit?(ECMA262::PUNC_SEMICOLON) and (e2=exp(lex, context, {})||true) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
+            if (v=exp(context, :no_in => true) || true) and s1=lex.eql_lit?(ECMA262::PUNC_SEMICOLON) and (e=exp(context, {}) || true) and s2=lex.eql_lit?(ECMA262::PUNC_SEMICOLON) and (e2=exp(context, {})||true) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and s=statement(context)
               v = nil if v == true
               e = nil if e == true
               e2 = nil if e2 == true
@@ -299,12 +301,12 @@ module Minjs
     #
     # 12.7
     #
-    def continue_statement(lex, context)
+    def continue_statement(context)
       return nil unless lex.eql_lit?(ECMA262::ID_CONTINUE)
 
-      if semicolon(lex, context)
+      if semicolon(context)
         ECMA262::StContinue.new
-      elsif e=identifier(lex, context) and semicolon(lex, context)
+      elsif e=identifier(context) and semicolon(context)
         ECMA262::StContinue.new(e)
       else
         if e
@@ -317,12 +319,12 @@ module Minjs
     #
     # 12.8
     #
-    def break_statement(lex, context)
+    def break_statement(context)
       return nil unless lex.eql_lit?(ECMA262::ID_BREAK)
 
-      if semicolon(lex, context)
+      if semicolon(context)
         ECMA262::StBreak.new
-      elsif e=identifier(lex, context) and semicolon(lex, context)
+      elsif e=identifier(context) and semicolon(context)
         ECMA262::StBreak.new(e)
       else
         if e
@@ -335,12 +337,12 @@ module Minjs
     #
     # 12.9
     #
-    def return_statement(lex, context)
+    def return_statement(context)
       return nil unless lex.eql_lit?(ECMA262::ID_RETURN)
 
-      if semicolon(lex, context)
+      if semicolon(context)
         ECMA262::StReturn.new
-      elsif e=exp(lex, context, {}) and semicolon(lex, context)
+      elsif e=exp(context, {}) and semicolon(context)
         ECMA262::StReturn.new(e)
       else
         raise ParseError.new("unexpected token", lex)
@@ -349,10 +351,10 @@ module Minjs
     #
     # 12.10
     #
-    def with_statement(lex, context)
+    def with_statement(context)
       return nil unless lex.eql_lit?(ECMA262::ID_WITH)
 
-      if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and e=exp(lex, context, {}) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and s=statement(lex, context)
+      if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and e=exp(context, {}) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and s=statement(context)
         ECMA262::StWith.new(context, e, s)
       else
         raise ParseError.new("unexpected token", lex)
@@ -361,30 +363,30 @@ module Minjs
     #
     # 12.11
     #
-    def switch_statement(lex, context)
+    def switch_statement(context)
       return nil unless lex.eql_lit?(ECMA262::ID_SWITCH)
 
-      if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and e=exp(lex, context, {}) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and  c = case_block(lex, context)
+      if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and e=exp(context, {}) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and  c = case_block(context)
         ECMA262::StSwitch.new(e, c)
       else
         raise ParseError.new("unexpected token", lex)
       end
     end
 
-    def case_block(lex, context)
+    def case_block(context)
       return nil unless lex.eql_lit?(ECMA262::PUNC_LCURLYBRAC)
       _case_block = []
       while true
         if lex.eql_lit?(ECMA262::ID_CASE)
-          if e = exp(lex, context, {}) and lex.eql_lit?(ECMA262::PUNC_COLON)
-            sl = statement_list(lex, context)
+          if e = exp(context, {}) and lex.eql_lit?(ECMA262::PUNC_COLON)
+            sl = statement_list(context)
             _case_block.push [e, sl]
           else
             raise ParseError.new("unexpected token", lex)
           end
         elsif lex.eql_lit?(ECMA262::ID_DEFAULT)
           if lex.eql_lit?(ECMA262::PUNC_COLON)
-            sl = statement_list(lex, context)
+            sl = statement_list(context)
             _case_block.push [nil, sl]
           else
             raise ParseError.new("unexpected token", lex)
@@ -398,10 +400,10 @@ module Minjs
     #
     # 12.12
     #
-    def labelled_statement(lex, context)
+    def labelled_statement(context)
       lex.eval_lit {
-        if i=identifier(lex, context) and s1=lex.eql_lit?(ECMA262::PUNC_COLON)
-          if s=statement(lex, context)
+        if i=identifier(context) and s1=lex.eql_lit?(ECMA262::PUNC_COLON)
+          if s=statement(context)
             ECMA262::StLabelled.new(i, s)
           else
             raise ParseError.new("unexpected token", lex)
@@ -414,12 +416,12 @@ module Minjs
     #
     # 12.13
     #
-    def throw_statement(lex, context)
+    def throw_statement(context)
       return nil unless lex.eql_lit?(ECMA262::ID_THROW)
 
-      if semicolon(lex, context)
+      if semicolon(context)
         raise ParseError.new("no line terminator here", lex)
-      elsif e=exp(lex, context, {}) and semi = semicolon(lex, context)
+      elsif e=exp(context, {}) and semi = semicolon(context)
         ECMA262::StThrow.new(e)
       else
         if e
@@ -432,17 +434,17 @@ module Minjs
     #
     # 12.14
     #
-    def try_statement(lex, context)
+    def try_statement(context)
       return nil unless lex.eql_lit?(ECMA262::ID_TRY)
       #
       # The catch argument context must be executable lexical environment.
       # See compress_var
       #
-      t = block(lex, context)
+      t = block(context)
       return nil unless t
 
-      c = try_catch(lex, context)
-      f = try_finally(lex, context)
+      c = try_catch(context)
+      f = try_finally(context)
       ECMA262::StTry.new(context, t, c, f)
     end
     # 12.14
@@ -452,19 +454,19 @@ module Minjs
     #
     # return [identigier, block]
     #
-    def try_catch(lex, context)
+    def try_catch(context)
       return nil unless lex.eql_lit?(ECMA262::ID_CATCH)
 
-      if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and i=identifier(lex, context) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and b=block(lex, context)
+      if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and i=identifier(context) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and b=block(context)
         [i, b]
       else
         raise ParseError.new("unexpected token", lex)
       end
     end
 
-    def try_finally(lex, context)
+    def try_finally(context)
       return nil unless lex.eql_lit?(ECMA262::ID_FINALLY)
-      b = block(lex, context)
+      b = block(context)
       raise ParseError.new("unexpected token", lex) if b.nil?
       b
     end
@@ -472,9 +474,9 @@ module Minjs
     #
     # 12.15
     #
-    def debugger_statement(lex, context)
+    def debugger_statement(context)
       return nil unless lex.eql_lit?(ECMA262::ID_DEBUGGER)
-      if semicolon(lex, context)
+      if semicolon(context)
         ECMA262::StDebugger.new
       else
         raise ParseError.new("no semicolon at end of debugger statement", lex)

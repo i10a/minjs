@@ -56,7 +56,7 @@ EOS
         js = test_parse <<-EOS
 continue this//this is not identifier
 EOS
-      }.to raise_error(Minjs::ParseError)
+      }.to raise_error(Minjs::Lex::ParseError)
     end
   end
 end

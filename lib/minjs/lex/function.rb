@@ -1,5 +1,6 @@
-module Minjs
-  module Func
+module Minjs::Lex
+  module Function
+    include Minjs
     #13
     #
     # FunctionDeclaration :
@@ -10,19 +11,19 @@ module Minjs
     # The function declaration in statement(block) is not permitted by ECMA262.
     # However, almost all implementation permit it.
     #
-    def func_declaration(lex, context)
+    def func_declaration(context)
       return nil if lex.eql_lit?(ECMA262::ID_FUNCTION).nil?
 
       new_context = ECMA262::Context.new
       new_context.lex_env = context.lex_env.new_declarative_env()
       new_context.var_env = context.var_env.new_declarative_env()
 
-      if id=identifier(lex, context) and
+      if id=identifier(context) and
         lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and
-        args = formal_parameter_list(lex, new_context) and
+        args = formal_parameter_list(new_context) and
         lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and
         lex.eql_lit?(ECMA262::PUNC_LCURLYBRAC) and
-        b=func_body(lex, new_context) and lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
+        b=func_body(new_context) and lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
         f = ECMA262::StFunc.new(new_context, id, args, b, {:decl => true})
 
         context.var_env.record.create_mutable_binding(id, nil)
@@ -44,20 +45,20 @@ module Minjs
     # FunctionExpression :
     # function Identifieropt ( FormalParameterListopt ) { FunctionBody }
     #
-    def func_exp(lex, context)
+    def func_exp(context)
       return nil if lex.eql_lit?(ECMA262::ID_FUNCTION).nil?
       @logger.debug "*** func_exp"
 
-      id_opt = identifier(lex, context)
+      id_opt = identifier(context)
       new_context = ECMA262::Context.new
       new_context.lex_env = context.lex_env.new_declarative_env()
       new_context.var_env = context.var_env.new_declarative_env()
 
       if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and
-        args = formal_parameter_list(lex, new_context) and
+        args = formal_parameter_list(new_context) and
         lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and
         lex.eql_lit?(ECMA262::PUNC_LCURLYBRAC) and
-        b = func_body(lex, new_context) and lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
+        b = func_body(new_context) and lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
         f = ECMA262::StFunc.new(new_context, id_opt, args, b)
         if id_opt
           new_context.var_env.record.create_mutable_binding(id_opt, nil)
@@ -76,11 +77,11 @@ module Minjs
       end
     end
 
-    def formal_parameter_list(lex, context)
+    def formal_parameter_list(context)
       ret = []
       unless lex.peek_lit(nil).eql? ECMA262::PUNC_RPARENTHESIS
         while true
-          if arg = identifier(lex, context)
+          if arg = identifier(context)
             ret.push(arg)
           else
             raise ParseError.new("unexpceted token", lex)
@@ -103,8 +104,8 @@ module Minjs
       ret
     end
 
-    def func_body(lex, context)
-      source_elements(lex, context)
+    def func_body(context)
+      source_elements(context)
     end
   end
 end
