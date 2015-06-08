@@ -3,18 +3,22 @@ require 'set'
 module Minjs
   module ECMA262
     class Literal < Base
+      #true if literal is white space
       def ws?
         false
       end
 
+      #true if literal is line terminator
       def lt?
         false
       end
 
+      #true if literal can convert to expression
       def to_exp?
         false
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_PRIMARY
       end
@@ -24,6 +28,7 @@ module Minjs
       def traverse(parent, &block)
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and self.val == obj.val
       end
@@ -48,6 +53,7 @@ module Minjs
         true
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class
       end
@@ -70,6 +76,7 @@ module Minjs
         true
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class
       end
@@ -84,6 +91,7 @@ module Minjs
       end
     end
 
+    # line feed ("\n") element
     LIT_LINE_FEED = LineFeed.get
 
     class This < Literal
@@ -105,6 +113,7 @@ module Minjs
         "this"
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class
       end
@@ -135,6 +144,7 @@ module Minjs
         "null"
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class
       end
@@ -164,6 +174,9 @@ module Minjs
         0
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :boolean
       def ecma262_typeof
         :boolean
       end
@@ -188,6 +201,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and
           @val == obj.val
@@ -229,6 +243,9 @@ module Minjs
         end
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :boolean
       def ecma262_typeof
         :boolean
       end
@@ -260,10 +277,14 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and @val == obj.val
       end
 
+      # convert self to JavaScript
+      #
+      # @return [String] JavaScript
       def to_js(options = {})
         dq = @val.to_s.each_codepoint.select{|x| x == 0x22}.length
         sq = @val.to_s.each_codepoint.select{|x| x == 0x27}.length
@@ -425,6 +446,9 @@ module Minjs
         ret
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :string
       def ecma262_typeof
         :string
       end
@@ -530,6 +554,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and self.to_ecma262_string == obj.to_ecma262_string
       end
@@ -657,6 +682,9 @@ module Minjs
         end
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :number
       def ecma262_typeof
         :number
       end
@@ -670,6 +698,8 @@ module Minjs
         end
       end
     end
+
+    #NaN element
     NUMERIC_NAN = ECMA262Numeric.new(:nan)
 
     class ECMA262RegExp < Literal
@@ -692,6 +722,7 @@ module Minjs
         true
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and @body == obj.body and @flags == obj.flags
       end
@@ -705,7 +736,9 @@ module Minjs
       end
     end
 
+    # true element
     LITERAL_TRUE = Boolean.new(:true)
+    # false element
     LITERAL_FALSE = Boolean.new(:false)
 
     class ECMA262Array < Literal
@@ -726,6 +759,7 @@ module Minjs
         end
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and @val == obj.val
       end
@@ -764,6 +798,7 @@ module Minjs
         end
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and @val == obj.val
       end
@@ -805,6 +840,7 @@ module Minjs
       def traverse(parent, &block)
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and
           @comment == obj.comment
@@ -830,6 +866,7 @@ module Minjs
       def traverse(parent, &block)
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and @comment == obj.comment
       end
@@ -895,6 +932,7 @@ module Minjs
         self.class.new(@context, @val)
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and self.val == obj.val
       end
@@ -926,37 +964,67 @@ module Minjs
       end
     end
 
+    # reserved word "this"
     ID_THIS = IdentifierName.get(nil, :this)
+    # reserved word "var"
     ID_VAR = IdentifierName.get(nil, :var)
+    # reserved word "in"
     ID_IN = IdentifierName.get(nil, :in)
+    # reserved word "instanceof"
     ID_INSTANCEOF = IdentifierName.get(nil, :instanceof)
+    # reserved word "function"
     ID_FUNCTION = IdentifierName.get(nil, :function)
+    # reserved word "null"
     ID_NULL = IdentifierName.get(nil, :null)
+    # reserved word "true"
     ID_TRUE = IdentifierName.get(nil, :true)
+    # reserved word "false"
     ID_FALSE = IdentifierName.get(nil, :false)
+    # reserved word "new"
     ID_NEW = IdentifierName.get(nil, :new)
+    # reserved word "delete"
     ID_DELETE = IdentifierName.get(nil, :delete)
+    # reserved word "void"
     ID_VOID = IdentifierName.get(nil, :void)
+    # reserved word "typeof"
     ID_TYPEOF = IdentifierName.get(nil, :typeof)
+    # reserved word "if"
     ID_IF = IdentifierName.get(nil, :if)
+    # reserved word "else"
     ID_ELSE = IdentifierName.get(nil, :else)
+    # reserved word "for"
     ID_FOR = IdentifierName.get(nil, :for)
+    # reserved word "while"
     ID_WHILE = IdentifierName.get(nil, :while)
+    # reserved word "do"
     ID_DO = IdentifierName.get(nil, :do)
+    # reserved word "continue"
     ID_CONTINUE = IdentifierName.get(nil, :continue)
+    # reserved word "break"
     ID_BREAK = IdentifierName.get(nil, :break)
+    # reserved word "return"
     ID_RETURN = IdentifierName.get(nil, :return)
+    # reserved word "with"
     ID_WITH = IdentifierName.get(nil, :with)
+    # reserved word "switch"
     ID_SWITCH = IdentifierName.get(nil, :switch)
+    # reserved word "throw"
     ID_THROW = IdentifierName.get(nil, :throw)
+    # reserved word "try"
     ID_TRY = IdentifierName.get(nil, :try)
+    # reserved word "catch"
     ID_CATCH = IdentifierName.get(nil, :catch)
+    # reserved word "finally"
     ID_FINALLY = IdentifierName.get(nil, :finally)
+    # reserved word "debugger"
     ID_DEBUGGER = IdentifierName.get(nil, :debugger)
+    # reserved word "case"
     ID_CASE = IdentifierName.get(nil, :case)
+    # reserved word "default"
     ID_DEFAULT = IdentifierName.get(nil, :default)
-    # Note: get and set are not reserved word
+    # get (non-reserved word)
     ID_GET = IdentifierName.get(nil, :get)
+    # set (non-reserved word)
     ID_SET = IdentifierName.get(nil, :set)
 
   end

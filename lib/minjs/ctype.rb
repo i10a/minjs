@@ -1,34 +1,48 @@
 # coding: utf-8
 module Minjs
   module Ctype
-    # Annex B
+    # Tests character _code_ is OctalDigit or not.
+    #
+    # @param [Fixnum] code
+    # @return _true_ if code is OctalDigit, otherwise _false_
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 Annex B.
     def octal_digit?(code)
       code >= 0x30 and code <= 0x37
     end
 
-    # 7.8.3
+    # Tests character _code_ is DecimalDigit or not.
+    #
+    # @param [Fixnum] code
+    # @return _true_ if code is DecimalDigit, otherwise _false_
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.8.3
     def decimal_digit?(code)
       code >= 0x30 and code <= 0x39
     end
 
-    # 7.8.3
+    # Tests character _code_ is HexDigit or not.
+    #
+    # @param [Fixnum] code
+    # @return _true_ if code is HexlDigit, otherwise _false_.
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.8.3
     def hex_digit?(code)
       code >= 0x30 && code <= 0x39 or
       code >= 0x41 && code <= 0x46 or
       code >= 0x61 && code <= 0x66
     end
 
-    # 7.2
+    # Tests character _code_ is WhiteSpace or not.
     #
-    # WhiteSpace ::
-    # <TAB>
-    # <VT>
-    # <FF>
-    # <SP>
-    # <NBSP>
-    # <BOM>
+    # WhiteSpace is    <TAB>,
+    # <VT>,
+    # <FF>,
+    # <SP>,
+    # <NBSP>,
+    # <BOM> and
     # <USP> any character in the Unicode category Zs
     #
+    # @param [Fixnum] code
+    # @return _true_ if code is WhiteSpace, otherwise _false_.
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.2
     def white_space?(code)
       code == 0x20 || code == 0x9 || code == 0xb || code == 0xc || code == 0xa0 || code == 0xfeff ||
         code == 0x1680 || # OGHAM SPACE MARK
@@ -38,32 +52,35 @@ module Minjs
         code == 0x3000  # IDEOGRAPHIC SPACE
     end
 
-    # 7.3
-    #
-    # LineTerminator ::
-    # <LF>
-    # <CR>
-    # <LS>
+    # Tests character _code_ is LineTerminator or not.
+    # LineTerminator is
+    # <LF>,
+    # <CR>,
+    # <LS> and
     # <PS>
     #
+    # @param [Fixnum] code
+    # @return _true_ if code is LineTerminator, otherwise _false_.
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.3
     def line_terminator?(code)
       code == 0x0a || code == 0x0d || code == 0x2028 || code == 0x2029
     end
 
-    # 7.6
+    # Test character _code_ is IdentifierStart or not.
     #
-    # IdentifierStart ::
-    # UnicodeLetter
-    # $
-    # _
-    # \ UnicodeEscapeSequence
+    # IdentifierStart is any character in the Unicode categories
     #
-    # UnicodeLetter ::
-    # any character in the Unicode categories “Uppercase letter
-    # (Lu)”, “Lowercase letter (Ll)”, “Titlecase letter (Lt)”,
-    # “Modifier letter (Lm)”, “Other letter (Lo)”, or “Letter
-    # number (Nl)”.
+    # * “Uppercase letter (Lu)
+    # * “Lowercase letter (Ll)”
+    # * “Titlecase letter (Lt)”
+    # * “Modifier letter (Lm)”
+    # * “Other letter (Lo)”
+    # * “Letter number (Nl)
     #
+    # @param [Fixnum] c
+    # @return _true_ if code is IdentifierStart, otherwise _false_.
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.6
+
     def identifier_start?(c)
       return false if c.nil?
       # almost all characters are ascii
@@ -622,6 +639,28 @@ module Minjs
         return false
       end
     end
+    # Test character _code_ is IdentifierPart or not.
+    #
+    # IdentifierPart is any character in the Unicode categories
+    #
+    # * “Uppercase letter (Lu)”
+    # * “Lowercase letter (Ll)”
+    # * “Titlecase letter (Lt)”
+    # * “Modifier letter (Lm)”
+    # * “Other letter (Lo)”
+    # * “Letter number (Nl)
+    # * “Non-spacing mark (Mn)”
+    # * “Combining spacing mark (Mc)”
+    # * “Decimal number (Nd)”
+    # * “Connector punctuation (Pc)
+    # * <ZWNJ>
+    # * <ZWJ>
+    # * IdentifierStart
+    #
+    # @param [Fixnum] c
+    # @return _true_ if code is IdentifierStart, otherwise _false_.
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.6
+    #
     def identifier_part?(c)
       return false if c.nil?
       if c == 0x24 ||
@@ -1267,6 +1306,9 @@ module Minjs
       end
     end
 
+    # Tests _name_ is IdentifierName or not.
+    #
+    # See ECMA262 7.5 for more detail
     def idname?(name)
       return false if name.length == 0
       s = name.codepoints

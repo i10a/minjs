@@ -2,10 +2,18 @@
 module Minjs::Lex
   module Expression
     include Minjs
+    # Tests next literal is PrimaryExpression or not.
     #
-    # Primary Expressions
-    # 11.1
+    # If literal is PrimaryExpression
+    # return ECMA262::Base object and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
+    # @param context [Context] Lexical Environment
+    #
+    # @return [ECMA262::ECMA262Object] expression
+    #
+    # @see ECMA262 11.1
     def primary_exp(context, options)
       @logger.debug "*** primary_exp"
 
@@ -34,18 +42,24 @@ module Minjs::Lex
       t
     end
 
-    # 7.8
-    # 7.8.1
-    # 7.8.2
+    # Tests next literal is Literal or not
     #
-    # Literal ::
-    # NullLiteral
-    # BooleanLiteral
-    # NumericLiteral
-    # StringLiteral
-    # RegularExpressionLiteral
+    # If literal is Literal,
+    # return ECMA262::Base object correspoding to expression and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
+    # @param context [Context] Lexical Environment
+    # @return [ECMA262::Base] expression
+    #
+    # @see ECMA262 7.8, 7.8.1, 7.8.2
     def literal(context)
+      # Literal ::
+      # NullLiteral
+      # BooleanLiteral
+      # NumericLiteral
+      # StringLiteral
+      # RegularExpressionLiteral
       a = lex.peek_lit(:regexp)
       if a.kind_of? ECMA262::ECMA262Numeric or a.kind_of? ECMA262::ECMA262String or a.kind_of? ECMA262::ECMA262RegExp
         lex.fwd_after_peek
@@ -64,9 +78,18 @@ module Minjs::Lex
       end
     end
 
+    # Tests next literal is Identifier or not.
     #
-    # 11.1.2
+    # If literal is Identifier
+    # return ECMA262::Lit object and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
+    # @param context [Context] Lexical Environment
+    #
+    # @return [ECMA262::Literal] expression
+    #
+    # @see ECMA262 11.1.2
     def identifier(context)
       a = lex.peek_lit(:regexp)
       if a.kind_of? ECMA262::IdentifierName and !a.reserved?
@@ -77,9 +100,18 @@ module Minjs::Lex
         nil
       end
     end
+    # Tests next literal is ArrayLiteral or not.
     #
-    # 11.1.4
+    # If literal is ArrayLiteral
+    # return ECMA262::ECMA262Array object and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
+    # @param context [Context] Lexical Environment
+    #
+    # @return [ECMA262::ECMA262Array] expression
+    #
+    # @see ECMA262 11.1.4
     def array_literal(context, options)
       return nil unless lex.eql_lit?(ECMA262::PUNC_LSQBRAC)
       t = []
@@ -97,15 +129,27 @@ module Minjs::Lex
       end
       ECMA262::ECMA262Array.new(t)
     end
+    # Tests next literal is ObjectLiteral or not.
     #
-    # 11.1.5
+    # If literal is ObjectLiteral
+    # return ECMA262::ECMA262Object object and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
-    # ObjectLiteral :
-    # { }
-    # { PropertyNameAndValueList }
-    # { PropertyNameAndValueList , }
+    # @param context [Context] Lexical Environment
     #
+    # @return [ECMA262::ECMA262Object] expression
+    #
+    # @see ECMA262 11.1.5
     def object_literal(context, options)
+      #
+      # 11.1.5
+      #
+      # ObjectLiteral :
+      # { }
+      # { PropertyNameAndValueList }
+      # { PropertyNameAndValueList , }
+      #
       return nil unless lex.eql_lit?(ECMA262::PUNC_LCURLYBRAC)
       #{}
       if lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
@@ -115,23 +159,28 @@ module Minjs::Lex
       end
     end
 
-    # 11.1.5
+    # Tests next literal is PropertyNameAndValueList or not.
     #
-    # PropertyNameAndValueList :
-    # PropertyAssignment
-    # PropertyNameAndValueList , PropertyAssignment
+    # If literal is PropertyNameAndValueList
+    # return Array object and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
-    # PropertyAssignment :
-    # PropertyName : AssignmentExpression
-    # get PropertyName ( ) { FunctionBody }
-    # set PropertyName ( PropertySetParameterList ) { FunctionBody }
+    # @param context [Context] Lexical Environment
     #
+    # @return [Array<Array>] expression
     #
-    # name: exp
-    # get name(){funcbody}
-    # set name(args){funcbody}
+    # @see ECMA262 11.1.5
     #
     def property_name_and_value_list(context, options)
+      # PropertyNameAndValueList :
+      # PropertyAssignment
+      # PropertyNameAndValueList , PropertyAssignment
+      #
+      # PropertyAssignment :
+      # PropertyName : AssignmentExpression
+      # get PropertyName ( ) { FunctionBody }
+      # set PropertyName ( PropertySetParameterList ) { FunctionBody }
       h = []
       while !lex.eof?
         #get
@@ -199,14 +248,26 @@ module Minjs::Lex
       h
     end
 
+    # Tests next literal is PropertyName or not.
+    #
+    # If literal is PropertyName
+    # return ECMA262::Base object and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
+    #
+    # @param context [Context] Lexical Environment
+    #
+    # @return [ECMA262::Base] expression
+    #
+    # @see ECMA262 11.1.5
     # 11.1.5
     #
-    # PropertyName :
-    # IdentifierName
-    # StringLiteral
-    # NumericLiteral
     #
     def property_name(context)
+      # PropertyName :
+      # IdentifierName
+      # StringLiteral
+      # NumericLiteral
       a = lex.fwd_lit(nil)
       if a.kind_of?(ECMA262::ECMA262String)
         a
@@ -221,12 +282,21 @@ module Minjs::Lex
       end
     end
 
-    # 11.1.5
+    # Tests next literal is PropertySetParameterList or not.
     #
-    # PropertySetParameterList :
-    # Identifier
+    # If literal is PropertySetParameterList
+    # return them and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
+    # @param context [Context] Lexical Environment
+    #
+    # @return [Array<ECMA262::Base>] arguments
+    #
+    # @see ECMA262 11.1.5
     def property_set_parameter_list(context)
+      # PropertySetParameterList :
+      # Identifier
       argName = identifier(context)
       context.var_env.record.create_mutable_binding(argName, nil)
       context.var_env.record.set_mutable_binding(argName, :undefined, nil, {:_parameter_list => true})
@@ -235,13 +305,23 @@ module Minjs::Lex
       [argName]
     end
 
-    # 11.2
+    # Tests next literal is LeftHandSideExpression or not.
     #
-    # LeftHandSideExpression :
-    # NewExpression
-    # CallExpression
+    # If literal is LeftHandSideExpression,
+    # return ECMA262::Base object correspoding to expression and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
+    # @param context [Context] Lexical Environment
+    # @return [ECMA262::Base] expression
+    #
+    # @see ECMA262 11.2
     def left_hand_side_exp(context, options)
+      #
+      # LeftHandSideExpression :
+      # NewExpression
+      # CallExpression
+      #
       @logger.debug "*** left_hand_side_exp"
 
       t = call_exp(context, options) || new_exp(context, options)
@@ -253,13 +333,12 @@ module Minjs::Lex
       t
     end
 
-    # 11.2
+    # Tests next literal is NewExpression or not.
     #
-    # NewExpression :
-    # MemberExpression
-    # new NewExpression
-    #
-    # NOTE:
+    # If literal is NewExpression,
+    # return ECMA262::Base object correspoding to expression and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
     # The NewExpression only matchs no-arguments-constructor because
     # member expression also has "new MemberExpression Arguments"
@@ -278,51 +357,58 @@ module Minjs::Lex
     # 5 's first new is NewExpression and second one is MemberExpression.
     # 6 is CallExpression
     #
-    # NewExpression can be rewritten as follows:
+    # In the results, NewExpression can be rewritten as follows:
     #
-    # NewExpression:
-    # MemberExpression [lookahead ∉ {(}]
-    # new NewExpression [lookahead ∉ {(}]
+    #      NewExpression :
+    #      MemberExpression [lookahead ∉ {(}]
+    #      new NewExpression [lookahead ∉ {(}]
     #
+    # @param context [Context] Lexical Environment
+    # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
+    #
+    # @return [ECMA262::Base] expression
+    #
+    # @see ECMA262 11.2
+    # @see #call_exp
     def new_exp(context, options)
-      lex.eval_lit {
-        if lex.eql_lit?(ECMA262::ID_NEW)
-          if a = new_exp(context, options)
-            if lex.eql_lit? ECMA262::PUNC_LPARENTHESIS
-              # minjs evaluate CallExpression first, so
-              # program never falls to here.
-              next nil # this is not NewExpression, may be MemberExpression.
-            end
-            #puts "new_exp> #{a.to_js}"
-            ECMA262::ExpNew.new(a, nil)
-          else
+      # NewExpression :
+      # MemberExpression
+      # new NewExpression
+      if lex.eql_lit?(ECMA262::ID_NEW)
+        if a = new_exp(context, options)
+          if lex.eql_lit? ECMA262::PUNC_LPARENTHESIS
             # minjs evaluate CallExpression first, so
-            # raise exception when program falls to here.
+            # program never falls to here.
             raise ParseError.new("unexpceted token", lex)
-            #nil
+            nil # this is not NewExpression, may be MemberExpression.
           end
+          #puts "new_exp> #{a.to_js}"
+          ECMA262::ExpNew.new(a, nil)
+        else
+          # minjs evaluate CallExpression first, so
+          # raise exception when program falls to here.
+          raise ParseError.new("unexpceted token", lex)
+          #nil
         end
-      } || member_exp(context, options)
-      # minjs evaluate CallExpression first, so
-      # there is no reason to check parenthesis.
-      #
-      # lex.eval_lit{
-      #   t = member_exp(context, options)
-      #   if lex.eql_lit? ECMA262::PUNC_LPARENTHESIS
-      #     break nil
-      #   end
-      #   t
-      # }
+      else
+        member_exp(context, options)
+      end
     end
-    # 11.2
+    # Tests next literal is CallExpression or not.
     #
-    # CallExpression :
-    # MemberExpression Arguments
-    # CallExpression Arguments
-    # CallExpression [ Expression ]
-    # CallExpression . IdentifierName
+    # If literal is CallExpression,
+    # return ECMA262::Base object correspoding to expression and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
+    # @see ECMA262 11.2
+    # @see #new_exp
     def call_exp(context, options)
+      # CallExpression :
+      # MemberExpression Arguments
+      # CallExpression Arguments
+      # CallExpression [ Expression ]
+      # CallExpression . IdentifierName
       if a = member_exp(context, options)
         if b = arguments(context, options)
           t = ECMA262::ExpCall.new(a, b)
@@ -356,16 +442,28 @@ module Minjs::Lex
       t
     end
 
-    # 11.2
+    # Tests next literal is MemberExpression or not.
     #
-    # MemberExpression :
-    # PrimaryExpression
-    # FunctionExpression
-    # MemberExpression [ Expression ]
-    # MemberExpression . IdentifierName
-    # new MemberExpression Arguments
+    # If literal is MemberExpression,
+    # return ECMA262::Base object correspoding to expression and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
+    #
+    # @param context [Context] Lexical Environment
+    # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
+    #
+    # @return [ECMA262::Base] expression
+    #
+    # @see ECMA262 11.2
     #
     def member_exp(context, options)
+      # MemberExpression :
+      # PrimaryExpression
+      # FunctionExpression
+      # MemberExpression [ Expression ]
+      # MemberExpression . IdentifierName
+      # new MemberExpression Arguments
+      #
       t = lex.eval_lit{
         if lex.eql_lit? ECMA262::ID_NEW
            if a = member_exp(context, options)
@@ -404,12 +502,22 @@ module Minjs::Lex
       end
       t
     end
-    # 11.2
-    # Arguments :
-    # ( )
-    # ( ArgumentList )
+    # Tests next literal is Arguments or not.
     #
+    # If literal is Arguments
+    # return them and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
+    #
+    # @param context [Context] Lexical Environment
+    #
+    # @return [Array<ECMA262::Base>] arguments
+    #
+    # @see ECMA262 11.2
     def arguments(context, options)
+      # Arguments :
+      # ( )
+      # ( ArgumentList )
       return nil if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS).nil?
       return [] if lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS)
 
@@ -430,9 +538,19 @@ module Minjs::Lex
       end
       args
     end
+
+    # Tests next literal is PostfixExpression or not.
     #
-    # 11.3
+    # If literal is PostfixExpression
+    # return ECMA262::Base object and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
+    # @param context [Context] Lexical Environment
+    #
+    # @return [ECMA262::ECMA262Object] expression
+    #
+    # @see ECMA262 11.3
     def postfix_exp(context, options)
       exp = left_hand_side_exp(context, options)
       return nil if exp.nil?
@@ -448,9 +566,18 @@ module Minjs::Lex
       end
     end
 
+    # Tests next literal is UnaryExpression or not.
     #
-    # 11.4
+    # If literal is UnaryExpression,
+    # return ECMA262::Base object correspoding to expression and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
+    # @param context [Context] Lexical Environment
+    # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
+    # @return [ECMA262::Base] expression
+    #
+    # see ECMA262 11.4
     def unary_exp(context, options)
       if punc = (lex.eql_lit?(ECMA262::ID_DELETE) ||
                  lex.eql_lit?(ECMA262::ID_VOID) ||
@@ -490,9 +617,19 @@ module Minjs::Lex
       end
     end
 
+    # Tests next literal is MultiplicativeExpression or not.
     #
-    # 11.5
+    # If literal is MultiplicativeExpression,
+    # return ECMA262::Base object correspoding to expression and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
+    # @param context [Context] Lexical Environment
+    # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
+    #
+    # @return [ECMA262::Base] expression
+    #
+    # @see ECMA262 11.5
     def multiplicative_exp(context, options)
       a = unary_exp(context, options)
       return nil if !a
@@ -516,10 +653,25 @@ module Minjs::Lex
       t
     end
 
+    # Tests next literal is AdditiveExpression or not.
     #
-    # 11.6
+    # If literal is AdditiveExpression,
+    # return ECMA262::Base object correspoding to expression and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
+    # @param context [Context] Lexical Environment
+    # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
+    #
+    # @return [ECMA262::Base] expression
+    #
+    # @see ECMA262 11.6
+
     def additive_exp(context, options)
+      # AdditiveExpression :
+      #   MultiplicativeExpression AdditiveExpression +
+      #   MultiplicativeExpression AdditiveExpression -
+      #   MultiplicativeExpression
       a = multiplicative_exp(context, options)
       return nil if !a
 
@@ -537,8 +689,18 @@ module Minjs::Lex
       end
       t
     end
+    # Tests next literal is ShiftExpression or not.
     #
-    # 11.7
+    # If literal is ShiftExpression,
+    # return ECMA262::Base object correspoding to expression and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
+    #
+    # @param context [Context] Lexical Environment
+    # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
+    # @return [ECMA262::Base] expression
+    #
+    # see ECMA262 11.8
     def shift_exp(context, options)
       a = additive_exp(context, options)
       return nil if !a
@@ -561,11 +723,27 @@ module Minjs::Lex
       end
       t
     end
+    # Tests next literal is RelationalExpression or not.
     #
+    # If literal is RelationalExpression,
+    # return ECMA262::Base object correspoding to expression and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
-    # 11.8
+    # @param context [Context] Lexical Environment
+    # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
+    # @return [ECMA262::Base] expression
     #
+    # see ECMA262 11.8
     def relational_exp(context, options)
+      #RelationalExpression :
+      # ShiftExpression
+      # RelationalExpression < ShiftExpression
+      # RelationalExpression > ShiftExpression
+      # RelationalExpression <= ShiftExpression
+      # RelationalExpression >= ShiftExpression
+      # RelationalExpression instanceof ShiftExpression
+      # RelationalExpression in ShiftExpression
       a = shift_exp(context, options)
       return nil if !a
 
@@ -594,14 +772,19 @@ module Minjs::Lex
       end
       t
     end
+    # Tests next literal is EqualityExpression or not.
     #
+    # If literal is EqualityExpression,
+    # return ECMA262::Base object correspoding to expression and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
-    # 11.9
-    # a == b
-    # a != b
-    # a === b
-    # a !== b
+    # @param context [Context] Lexical Environment
+    # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
     #
+    # @return [ECMA262::Base] expression
+    #
+    # @see ECMA262 11.9
     def equality_exp(context, options)
       a = relational_exp(context, options)
       return nil if !a
@@ -628,10 +811,19 @@ module Minjs::Lex
       t
     end
 
+    # Tests next literal is BitwiseAndExpression or not.
     #
-    # 11.10
-    # a & b
+    # If literal is BitwiseAndExpression,
+    # return ECMA262::Base object correspoding to expression and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
+    # @param context [Context] Lexical Environment
+    # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
+    #
+    # @return [ECMA262::Base] expression
+    #
+    # @see ECMA262 11.10
     def bitwise_and_exp(context, options)
       a = equality_exp(context, options)
       return nil if !a
@@ -647,9 +839,19 @@ module Minjs::Lex
       t
     end
 
+    # Tests next literal is BitwiseXorExpression or not.
     #
-    # a ^ b
+    # If literal is BitwiseXorExpression,
+    # return ECMA262::Base object correspoding to expression and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
+    # @param context [Context] Lexical Environment
+    # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
+    #
+    # @return [ECMA262::Base] expression
+    #
+    # @see ECMA262 11.10
     def bitwise_xor_exp(context, options)
       a = bitwise_and_exp(context, options)
       return nil if !a
@@ -666,9 +868,19 @@ module Minjs::Lex
       t
     end
 
+    # Tests next literal is BitwiseOrExpression or not.
     #
-    # a | b
+    # If literal is BitwiseOrExpression,
+    # return ECMA262::Base object correspoding to expression and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
+    # @param context [Context] Lexical Environment
+    # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
+    #
+    # @return [ECMA262::Base] expression
+    #
+    # @see ECMA262 11.10
     def bitwise_or_exp(context, options)
       a = bitwise_xor_exp(context, options)
       return nil if !a
@@ -683,10 +895,19 @@ module Minjs::Lex
       end
       t
     end
+
+    # Tests next literal is LogicalAndExpression or not
     #
-    # 11.11
-    # a && b
+    # If literal is LogicalAndExpression,
+    # return ECMA262::Base object correspoding to expression and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
+    # @param context [Context] Lexical Environment
+    # @return [ECMA262::Base] expression
+    # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
+    #
+    # @see ECMA262 11.11
     def logical_and_exp(context, options)
       a = bitwise_or_exp(context, options)
       return nil if !a
@@ -703,6 +924,18 @@ module Minjs::Lex
       t
     end
 
+    # Tests next literal is LogicalOrExpression or not
+    #
+    # If literal is LogicalOrExpression,
+    # return ECMA262::Base object correspoding to expression and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
+    #
+    # @param context [Context] Lexical Environment
+    # @return [ECMA262::Base] expression
+    # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
+    #
+    # @see ECMA262 11.12
     def logical_or_exp(context, options)
       a = logical_and_exp(context, options)
       return nil if !a
@@ -718,10 +951,18 @@ module Minjs::Lex
 
       t
     end
+    # Tests next literal is ConditionalExpression or not.
     #
-    # 11.12
-    # a ? b : c
+    # If literal is ConditionalExpression,
+    # return ECMA262::Base object correspoding to expression and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
+    # @param context [Context] Lexical Environment
+    #
+    # @return [ECMA262::Base] expression
+    #
+    # @see ECMA262 11.12
     def cond_exp(context, options)
       a = logical_or_exp(context, options)
       return nil if !a
@@ -736,14 +977,22 @@ module Minjs::Lex
         a
       end
     end
+    # Tests next literal is AssignmentExpression or not.
     #
-    #11.13
-    # AssignmentExpression :
-    # ConditionalExpression
-    # LeftHandSideExpression = AssignmentExpression
-    # LeftHandSideExpression AssignmentOperator AssignmentExpression
+    # If literal is AssignmentExpression,
+    # return ECMA262::Base object correspoding to expression and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
+    # @param context [Context] Lexical Environment
+    # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
+    #
+    # @see ECMA262 11.13
     def assignment_exp(context, options)
+      # AssignmentExpression :
+      #  ConditionalExpression
+      #  LeftHandSideExpression = AssignmentExpression
+      #  LeftHandSideExpression AssignmentOperator AssignmentExpression
       @logger.debug "*** assignment_exp"
 
       t = cond_exp(context, options)
@@ -807,13 +1056,23 @@ module Minjs::Lex
       end
     end
 
+    # Tests next literal is Expression or not.
     #
-    # 11.14
-    # Expression :
-    # AssignmentExpression
-    # Expression , AssignmentExpression
+    # If literal is Expression,
+    # return ECMA262::Base object correspoding to expression and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
+    # @param context [Context] Lexical Environment
+    # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
+    #
+    # @return [ECMA262::Base] expression
+    #
+    # @see ECMA262 11.14
     def exp(context, options)
+      # Expression :
+      # AssignmentExpression
+      # Expression , AssignmentExpression
       @logger.debug "*** expression"
 
       t = assignment_exp(context, options)

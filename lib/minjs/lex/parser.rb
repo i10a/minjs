@@ -3,6 +3,10 @@ require 'minjs/ctype'
 require 'minjs/ecma262'
 
 module Minjs::Lex
+  # ECMA262 Parser class
+  #
+  # This class parses ECMA262 script language's source text
+  # and convers it to elements (ECMA262::Base).
   class Parser
     include Minjs
     include Ctype
@@ -14,10 +18,12 @@ module Minjs::Lex
     attr_reader :pos
     attr_reader :codes
 
-    def initialize(str = "", options = {})
-      str = str.gsub(/\r\n/, "\n")
-      @codes = str.codepoints
-      if !str.match(/\n\z/)
+    # @param source_text [String] input source text
+    # @option options :logger [Logger] logger for debug
+    def initialize(source_text = "", options = {})
+      source_text = source_text.gsub(/\r\n/, "\n")
+      @codes = source_text.codepoints
+      if !source_text.match(/\n\z/)
         @codes.push(10)
       end
       @pos = 0
@@ -27,29 +33,28 @@ module Minjs::Lex
       @eval_nest = 0
     end
 
+    # return Parser itself
     def lex
       self
     end
 
+    # clear cache of ECMA262 elements
     def clear_cache
       @lit_cache = {}
       @lit_nextpos = {}
     end
 
+    # Fetch next literal and forward position.
     #
-    # Fetch next literal
+    # @param hint [Symbol] hint of parsing. The hint must be one of the
+    #   :regexp, :div, nil
+    #   The hint parameter is used to determine next literal is division-mark or
+    #   regular expression. because ECMA262 says:
     #
-    # hint:
-    #  :regexp
-    #  :div
-    #  nil
-    #
-    # ECMA262 says:
-    #
-    # There are no syntactic grammar contexts where both a leading division
-    # or division-assignment, and a leading RegularExpressionLiteral are permitted.
-    # This is not affected by semicolon insertion (see 7.9); in examples such as the following:
-    # To determine `/' is regular expression or not
+    #   There are no syntactic grammar contexts where both a leading division
+    #   or division-assignment, and a leading RegularExpressionLiteral are permitted.
+    #   This is not affected by semicolon insertion (see 7.9); in examples such as the following:
+    #   To determine `/' is regular expression or not
     #
     def next_input_element(hint)
       if ret = @lit_cache[@pos]
@@ -110,7 +115,19 @@ module Minjs::Lex
       end
     end
 
-    # 7.2
+    # Tests next literal is WhiteSpace or not.
+    #
+    # If literal is WhiteSpace
+    # return ECMA262::WhiteSpace object and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
+    #
+    # Even if next literal is sequence of two or more white spaces,
+    # this method returns only one white space.
+    #
+    # @return [ECMA262::WhiteSpace] element
+    #
+    # @see ECMA262 7.2
     def white_space
       if white_space?(@codes[@pos])
         begin
@@ -122,7 +139,19 @@ module Minjs::Lex
       end
     end
 
-    #7.3
+    # Tests next literal is LineTerminator or not.
+    #
+    # If literal is LineTerminator
+    # return ECMA262::LineTerminator object and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
+    #
+    # Even if next literal is sequence of two or more line terminators,
+    # this method returns only one line terminator.
+    #
+    # @return [ECMA262::LineTerminator] element
+    #
+    # @see ECMA262 7.3
     def line_terminator
       if line_terminator?(@codes[@pos])
         begin
@@ -134,11 +163,26 @@ module Minjs::Lex
       end
     end
 
-    #7.4
+    # Tests next literal is Comment or not.
+    #
+    # If literal is Comment
+    # return ECMA262::MultiLineComment or SingeLineComment object and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
+    #
+    # @see ECMA262 7.4
     def comment
       multi_line_comment || single_line_comment
     end
 
+    # Tests next literal is MultiLineComment or not.
+    #
+    # If literal is MultiLineComment
+    # return ECMA262::MultiLineComment object and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
+    #
+    # @see ECMA262 7.4
     def multi_line_comment
       # /*
       if @codes[@pos] == 0x2f and @codes[@pos + 1] == 0x2a
@@ -156,6 +200,14 @@ module Minjs::Lex
       end
     end
 
+    # Tests next literal is SinleLineComment or not.
+    #
+    # If literal is SingleLineComment
+    # return ECMA262::SingleLineComment object and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
+    #
+    # @see ECMA262 7.4
     def single_line_comment
       # //
       if @codes[@pos] == 0x2f and @codes[@pos + 1] == 0x2f
@@ -170,14 +222,18 @@ module Minjs::Lex
       end
     end
 
+    # Tests next literal is Token or not
     #
-    # 7.5 tokens
+    # If literal is Token
+    # return ECMA262::Base object and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
+    # @see ECMA262 7.5
     def token
       identifier_name || numeric_literal || punctuator || string_literal
     end
 
-    #
     def unicode_escape?
       # @codes[@pos] == 0x5c
       if @codes[@pos+1] == 0x75 #u
@@ -193,7 +249,16 @@ module Minjs::Lex
         nil
       end
     end
+    private :unicode_escape?
 
+    # Tests next literal is IdentifierName or not
+    #
+    # If literal is IdentifierName
+    # return ECMA262::IdentifierName object and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
+    #
+    # @see ECMA262 7.6
     def identifier_name
       return nil if (code = @codes[@pos]).nil?
 
@@ -224,6 +289,14 @@ module Minjs::Lex
       end
     end
 
+    # Tests next literal is Punctuator or not
+    #
+    # If literal is Punctuator
+    # return ECMA262::Punctuator object and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
+    #
+    # @see ECMA262 7.7
     def punctuator
       code0 = @codes[@pos]
       code1 = @codes[@pos+1]
@@ -655,29 +728,37 @@ module Minjs::Lex
       end
     end
 
-    #7.8.4
+    # Tests next literal is StringLiteral or not.
     #
-    # StringLiteral ::
-    # " DoubleStringCharactersopt "
-    # ' SingleStringCharactersopt '
+    # If literal is StringLiteral
+    # return ECMA262::ECMA262String object and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
-    # DoubleStringCharacters ::
-    # DoubleStringCharacter DoubleStringCharactersopt
-    #
-    # SingleStringCharacters ::
-    # SingleStringCharacter SingleStringCharactersopt
-    #
-    # DoubleStringCharacter ::
-    # SourceCharacter but not one of " or \ or LineTerminator
-    # \ EscapeSequence
-    # LineContinuation
-    #
-    # SingleStringCharacter ::
-    # SourceCharacter but not one of ' or \ or LineTerminator
-    # \ EscapeSequence
-    # LineContinuation
+    # @return [ECMA262::ECMA262String]
+    # @see ECMA262 7.8.4
     #
     def string_literal
+      # StringLiteral ::
+      # " DoubleStringCharactersopt "
+      # ' SingleStringCharactersopt '
+      #
+      # DoubleStringCharacters ::
+      # DoubleStringCharacter DoubleStringCharactersopt
+      #
+      # SingleStringCharacters ::
+      # SingleStringCharacter SingleStringCharactersopt
+      #
+      # DoubleStringCharacter ::
+      # SourceCharacter but not one of " or \ or LineTerminator
+      # \ EscapeSequence
+      # LineContinuation
+      #
+      # SingleStringCharacter ::
+      # SourceCharacter but not one of ' or \ or LineTerminator
+      # \ EscapeSequence
+      # LineContinuation
+      #
       if (code = @codes[@pos]) == 0x27 #'
         term = 0x27
       elsif code == 0x22 #"
@@ -820,11 +901,11 @@ module Minjs::Lex
     end
 
     #
-    # check next literal is strictly equal to 'l' or not.
+    # check next literal is strictly equal to _l_ or not.
     # white spaces and line terminators are skipped and ignored.
     #
-    # if next literal is not 'l', position is not forwarded
-    # if next literal is 'l', position is forwarded
+    # if next literal is not _l_, position is not forwarded
+    # if next literal is _l_, position is forwarded
     #
     def eql_lit?(l, hint = nil)
       lit = peek_lit(hint)
@@ -837,12 +918,12 @@ module Minjs::Lex
     end
 
     #
-    # check next literal is strictly equal to 'l' or not.
+    # check next literal is strictly equal to _l_ or not.
     # white spaces are skipped and ignored.
     # line terminators are not ignored.
     #
-    # if next literal is not 'l', position is not forwarded
-    # if next literal is 'l', position is forwarded
+    # if next literal is not _l_, position is not forwarded
+    # if next literal is _l_, position is forwarded
     #
     def eql_lit_nolt?(l, hint = nil)
       lit = peek_lit_nolt(hint)
@@ -855,11 +936,11 @@ module Minjs::Lex
     end
 
     #
-    # check next literal is equal to 'l' or not.
+    # check next literal is equal to _l_ or not.
     # white spaces and line terminators are skipped and ignored.
     #
-    # if next literal is not 'l', position is not forwarded
-    # if next literal is 'l', position is forwarded
+    # if next literal is not _l_, position is not forwarded
+    # if next literal is _l_, position is forwarded
     #
     def match_lit?(l, hint = nil)
       lit = peek_lit(hint)
@@ -872,12 +953,12 @@ module Minjs::Lex
     end
 
     #
-    # check next literal is equal to 'l' or not.
+    # check next literal is equal to _l_ or not.
     # white spaces are skipped and ignored.
     # line terminators are not ignored.
     #
-    # if next literal is not 'l', position is not forwarded
-    # if next literal is 'l', position is forwarded
+    # if next literal is not _l_, position is not forwarded
+    # if next literal is _l_, position is forwarded
     #
     def match_lit_nolt?(l, hint = nil)
       lit = peek_lit_nolt(hint)

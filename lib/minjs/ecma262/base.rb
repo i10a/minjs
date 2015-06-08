@@ -1,14 +1,24 @@
 module Minjs
   module ECMA262
+    #ECMA262 Elements
     class Base
+      # convert self to JavaScript
+      #
+      # @return [String] JavaScript
       def to_js(options = {})
         self.class.to_s + "??"
       end
 
+      # to string
       def to_s
         to_js({})
       end
 
+      # concatenate some of ECMA262 elements and convert it to JavaScript
+      #
+      # @param args ECMA262 element
+      # @option options :debug [Boolean] if set, output is easy to read.
+      #
       def concat(options, *args)
         prev = nil
         j = []
@@ -24,7 +34,8 @@ module Minjs
             if prev.match(/[\w\$]\z/) and js.match(/\A[\w\$]/)
               sep = ' '
             end
-            #';;' means 'empty statement' that must not be deleted
+            # ';;' means 'empty statement' or separator of 'for statement'
+            # that must not be deleted
             if prev.match(/;;\Z/)
               prev.sub!(/;;\Z/, ";")
             elsif prev.match(/;\Z/) and js == "}"
@@ -55,19 +66,28 @@ module Minjs
         j.join("")
       end
 
+      # replace child (if own it) object
+      #
+      # @param from [Base] from
+      # @param to [Base] to
       def replace(from, to)
         puts "warning: #{self.class}: replace not implement"
       end
 
+      # duplicate object
+      #
+      # duplicate this object's children (if own) and itself.
       def deep_dup
         puts "warning: #{self.class}: deep_dup not implement"
       end
 
+      # compare object
       def ==(obj)
         puts "warning: #{self.class}: == not implement"
         raise "warning: #{self.class}: == not implement"
       end
 
+      # add / remove parenthesis if need
       def add_remove_paren(node = self)
         node.traverse(nil) {|st, parent|
           if st.respond_to? :remove_paren
@@ -178,10 +198,12 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         @statement_list == obj.statement_list
       end
 
+      # convert element to JavaScript string
       def to_js(options = {})
         concat options, @statement_list
       end
@@ -242,6 +264,7 @@ module Minjs
         @statement_list = source_elements
       end
 
+      # compare object
       def ==(obj)
         statement_list == obj.statement_list
       end
@@ -271,6 +294,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and self.source_elements == obj.source_elements
       end

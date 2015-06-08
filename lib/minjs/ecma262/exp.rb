@@ -18,29 +18,32 @@ module Minjs
     PRIORITY_ASSIGNMENT = 130
     PRIORITY_COMMA = 140
 
+    # Base class of ECMA262 Expression
     class Exp < Base
+      # traverse this children and itself
       def traverse
         yield(self)
       end
 
-      def to_js(options = {})
-        raise "internal error"
-      end
-
+      # reduce expression if available
       def reduce(parent)
       end
 
+      # @return [Boolean] true if expression is kind of LeftHandSideExpression.
       def left_hand_side_exp?
         false
       end
 
+      # @return [Fixnum] expression priority
       def priority
         9999
       end
 
     end
 
+    # binary operation
     module BinaryOperation
+      # remove parenthesis if possible
       def remove_paren
         if @val.kind_of? ExpParen and @val.val.priority <= self.priority
           @val = @val.val if @val.remove_paren?
@@ -51,6 +54,7 @@ module Minjs
         self
       end
 
+      # add parenthesis if need
       def add_paren
         if @val.priority > self.priority
           @val = ExpParen.new(@val)
@@ -62,12 +66,15 @@ module Minjs
         self
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and self.val == obj.val and self.val2 == obj.val2
       end
     end
 
+    # unary operation
     module UnaryOperation
+      # remove parenthesis if possible
       def remove_paren
         if @val.kind_of? ExpParen and @val.val.priority <= self.priority
           @val = @val.val if @val.remove_paren?
@@ -75,6 +82,7 @@ module Minjs
         self
       end
 
+      # add parenthesis if need
       def add_paren
         if @val.priority > self.priority
           @val = ExpParen.new(@val)
@@ -83,12 +91,15 @@ module Minjs
         self
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and self.val == obj.val
       end
     end
 
+    # Assignment operation
     module AssignmentOperation
+      # remove parenthesis if possible
       def remove_paren
         if @val.kind_of? ExpParen and @val.val.priority <= PRIORITY_LEFT_HAND_SIDE
           @val = @val.val if @val.remove_paren?
@@ -99,6 +110,7 @@ module Minjs
         self
       end
 
+      # add parenthesis if need
       def add_paren
         if @val.priority > PRIORITY_LEFT_HAND_SIDE
           @val = ExpParen.new(@val)
@@ -109,10 +121,15 @@ module Minjs
         self
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and self.val == obj.val and self.val2 == obj.val2
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] type of right-side-hand expression
+      #   or nil if typeof value is undetermined.
       def ecma262_typeof
         if @val2.respond_to? :ecma262_typeof
           @val2.ecma262_typeof
@@ -213,6 +230,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and @val == obj.val
       end
@@ -225,6 +243,13 @@ module Minjs
         true
       end
 
+      # returns removing parenthesis is possible or not
+      #
+      # ECMA262 expression-statement should not start with
+      # "function" or "{". 
+      # This method checks inner of the parenthesis' first literal.
+      #
+      # @return [Boolean] true if possible
       def remove_paren?
         js = @val.to_js
         if js.match(/^function/) or js.match(/^{/)
@@ -234,6 +259,7 @@ module Minjs
         end
       end
 
+      # remove parenthesis if possible
       def remove_paren
         if @val.kind_of? ExpParen
           @val = @val.val if @val.remove_paren?
@@ -241,6 +267,7 @@ module Minjs
         self
       end
 
+      # add parenthesis if need
       def add_paren
         self
       end
@@ -277,6 +304,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and
           @val == obj.val and
@@ -291,6 +319,7 @@ module Minjs
         true
       end
 
+      # remove parenthesis if possible
       def remove_paren
         if @val.kind_of? ExpParen and @val.val.priority <= PRIORITY_LEFT_HAND_SIDE
           @val = @val.val if @val.remove_paren?
@@ -301,6 +330,7 @@ module Minjs
         self
       end
 
+      # add parenthesis if need
       def add_paren
         if @val.priority > PRIORITY_LEFT_HAND_SIDE
           @val = ExpParen.new(@val)
@@ -331,6 +361,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and
           @val == obj.val and
@@ -345,6 +376,7 @@ module Minjs
         true
       end
 
+      # remove parenthesis if possible
       def remove_paren
         if @val.kind_of? ExpParen and @val.val.priority <= PRIORITY_LEFT_HAND_SIDE
           @val = @val.val if @val.remove_paren?
@@ -352,6 +384,7 @@ module Minjs
         self
       end
 
+      # add parenthesis if need
       def add_paren
         if @val.priority > PRIORITY_LEFT_HAND_SIDE
           @val = ExpParen.new(@val)
@@ -402,6 +435,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and @name == obj.name and @args == obj.args
       end
@@ -415,6 +449,7 @@ module Minjs
         true
       end
 
+      # remove parenthesis if possible
       def remove_paren
         if @name.kind_of? ExpParen and @name.val.priority <= PRIORITY_LEFT_HAND_SIDE
           @name = @name.val if @name.remove_paren?
@@ -431,6 +466,7 @@ module Minjs
         self
       end
 
+      # add parenthesis if need
       def add_paren
         if @name.priority > PRIORITY_LEFT_HAND_SIDE
           @name = ExpParen.new(@name)
@@ -490,6 +526,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and @name == obj.name and @args == obj.args
       end
@@ -507,6 +544,7 @@ module Minjs
         true
       end
 
+      # remove parenthesis if possible
       def remove_paren
         if @name.kind_of? ExpParen and @name.val.priority <= PRIORITY_LEFT_HAND_SIDE
           @name = @name.val if @name.remove_paren?
@@ -523,6 +561,7 @@ module Minjs
         self
       end
 
+      # add parenthesis if need
       def add_paren
         if @name.priority > PRIORITY_LEFT_HAND_SIDE
           @name = ExpParen.new(@name)
@@ -1293,6 +1332,7 @@ module Minjs
         PRIORITY_CONDITIONAL
       end
 
+      # remove parenthesis if possible
       def remove_paren
         if @val.kind_of? ExpParen and @val.val.priority < PRIORITY_CONDITIONAL
           @val = @val.val if @val.remove_paren?
@@ -1306,6 +1346,7 @@ module Minjs
         self
       end
 
+      # add parenthesis if need
       def add_paren
         if @val.priority > PRIORITY_CONDITIONAL
           @val = ExpParen.new(@val)
@@ -1340,6 +1381,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and
           @val == obj.val and

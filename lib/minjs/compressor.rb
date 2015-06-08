@@ -97,35 +97,37 @@ module Minjs
       self
     end
 
-    def next_sym(s)
-      def c2i(c)
-        c = c.ord
-        if c >= 0x30 and c <= 0x39
-          c = c - 0x30
-        elsif c >= 0x61 and c <= 0x7a
-          c = c - 0x61 + 10
-        elsif c >= 0x41 and c <= 0x5a
-          c = c - 0x41 + 10 + 26
-        elsif c == 0x5f
-          c = 62
-        elsif c == 0x24
-          c = 63
-        end
+    def c2i(c)
+      c = c.ord
+      if c >= 0x30 and c <= 0x39
+        c = c - 0x30
+      elsif c >= 0x61 and c <= 0x7a
+        c = c - 0x61 + 10
+      elsif c >= 0x41 and c <= 0x5a
+        c = c - 0x41 + 10 + 26
+      elsif c == 0x5f
+        c = 62
+      elsif c == 0x24
+        c = 63
       end
-      def i2c(c)
-        if c < 10
-          c = "%c" % (0x30 + c)
-        elsif c < 10 + 26
-          c = "%c" % (0x61 + c - 10)
-        elsif c < 10 + 26 + 26
-          c = "%c" % (0x41 + c - 10 -  26)
-        elsif c < 63
-          c = "_"
-        elsif c < 64
-          c = "$"
-        end
-      end
+    end
 
+    def i2c(c)
+      if c < 10
+        c = "%c" % (0x30 + c)
+      elsif c < 10 + 26
+        c = "%c" % (0x61 + c - 10)
+      elsif c < 10 + 26 + 26
+        c = "%c" % (0x41 + c - 10 -  26)
+      elsif c < 63
+        c = "_"
+      elsif c < 64
+        c = "$"
+      end
+    end
+    private :c2i, :i2c
+
+    def next_sym(s)
       v = 0
       s.to_s.split("").each do |x|
         v *= 64
@@ -150,7 +152,6 @@ module Minjs
         end
       end
       ret.to_sym
-
     end
 
     def grouping_statement(node = @prog)

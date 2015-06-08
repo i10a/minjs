@@ -1,5 +1,8 @@
 module Minjs
   module ECMA262
+    #
+    # ECMA262 Element for Statement
+    #
     class St < Base
       def to_exp?
         false
@@ -48,6 +51,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and
           @statement_list == obj.statement_list
@@ -156,6 +160,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and @vars == obj.vars
       end
@@ -221,6 +226,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class
       end
@@ -257,6 +263,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and @exp == obj.exp
       end
@@ -318,6 +325,7 @@ module Minjs
         self.class.new(@cond.deep_dup, @then_st.deep_dup, @else_st ? @else_st.deep_dup : nil)
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and
           @cond == obj.cond and
@@ -445,6 +453,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and
           @exp == obj.exp and
@@ -496,6 +505,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and
           @exp == obj.exp and
@@ -564,6 +574,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and
           @exp1 == obj.exp1 and
@@ -579,7 +590,7 @@ module Minjs
           statement = @statement
         end
 
-        concat options, :for, "(", @exp1, ";", @exp2, ";", @exp3, ")", statement
+        concat options, :for, "(", @exp1, ";;", @exp2, ";;", @exp3, ")", statement
       end
 
       def remove_paren
@@ -668,6 +679,7 @@ module Minjs
         StFor.new(tt, @exp2, @exp3, @statement)
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and
           @var_decl_list == obj.var_decl_list and
@@ -690,7 +702,7 @@ module Minjs
             concat options, x[0]
           end
         }.join(",")
-        t = concat({:for_args => true}.merge(options), :for, "(var", _var_decl_list, ";", @exp2, ";", @exp3, ")")
+        t = concat(options, :for, "(var", _var_decl_list, ";;", @exp2, ";;", @exp3, ")")
         concat options, t, statement
       end
 
@@ -740,6 +752,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and
           @exp1 == obj.exp1 and
@@ -816,6 +829,7 @@ module Minjs
         StForIn.new(t, @exp2, @statement)
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and
           @var_decl == obj.var_decl and
@@ -872,6 +886,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and
           @exp == obj.exp
@@ -903,6 +918,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and
           @exp == obj.exp
@@ -948,6 +964,7 @@ module Minjs
         self
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and @exp == obj.exp
       end
@@ -999,6 +1016,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and
           @exp == obj.exp and
@@ -1061,6 +1079,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and
           @exp == obj.exp and
@@ -1121,6 +1140,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and
           @label == obj.label and
@@ -1148,6 +1168,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and
           @exp == obj.exp
@@ -1199,6 +1220,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and
           self.try == obj.try and
@@ -1227,6 +1249,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class
       end
@@ -1277,6 +1300,7 @@ module Minjs
         yield self, parent
       end
 
+      # compare object
       def ==(obj)
         self.class == obj.class and
           @name == obj.name and
