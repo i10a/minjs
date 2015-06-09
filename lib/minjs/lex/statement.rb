@@ -277,7 +277,7 @@ module Minjs::Lex
         else # => for(i in exp) / for(i ; cond; exp)
           lex.eval_lit{
             # for(i in exp)
-            if v=left_hand_side_exp(context, {}) and lex.eql_lit?(ECMA262::ID_IN)
+            if v=left_hand_side_exp(context) and lex.eql_lit?(ECMA262::ID_IN)
               if e=exp(context, {}) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS) and s=statement(context)
                 ECMA262::StForIn.new(v, e, s)
               else
