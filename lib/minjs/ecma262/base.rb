@@ -40,7 +40,7 @@ module Minjs
               prev.sub!(/;;\Z/, ";")
             elsif prev.match(/;\Z/) and js == "}"
               prev.sub!(/;\Z/, "")
-            elsif prev.match(/;\Z/) and js == ";" and !options[:for_args]
+            elsif prev.match(/;\Z/) and js == ";"
               prev.sub!(/;\Z/, "")
             elsif prev.match(/[\-]\Z/) and js.match(/^\-/)
               sep = ' '
@@ -51,10 +51,10 @@ module Minjs
           #for debug
           unless options[:no_debug]
             if (@logger and @logger.debug?) || options[:debug]
-              if js.match(/;\z/) and !options[:for_args]
+              if js.match(/;\z/)
                 nl = "\n"
               end
-              if js.match(/}\z/) and !options[:for_args]
+              if js.match(/}\z/)
                 nl = "\n"
               end
             end
