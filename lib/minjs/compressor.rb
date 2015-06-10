@@ -86,7 +86,7 @@ module Minjs
       while a = (@lex.comment || @lex.line_terminator || @lex.white_space)
         @heading_comments.push(a)
       end
-      while @heading_comments.last == ECMA262::LIT_LINE_FEED and
+      while @heading_comments.last == ECMA262::LIT_LINE_TERMINATOR and
             !(@heading_comments[-2].kind_of?(ECMA262::SingleLineComment))
         @heading_comments.pop
       end

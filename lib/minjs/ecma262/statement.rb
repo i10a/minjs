@@ -40,6 +40,8 @@ module Minjs
         end
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@statement_list.deep_dup)
       end
@@ -141,6 +143,8 @@ module Minjs
         @context = context
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@context,
                        @vars.collect{|x,y|
@@ -233,6 +237,8 @@ module Minjs
       def initialize()
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new()
       end
@@ -268,6 +274,8 @@ module Minjs
         @exp = exp
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@exp.deep_dup)
       end
@@ -348,6 +356,8 @@ module Minjs
         yield parent, self
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@cond.deep_dup, @then_st.deep_dup, @else_st ? @else_st.deep_dup : nil)
       end
@@ -469,6 +479,8 @@ module Minjs
         @exp, @statement = exp, statement
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@exp.deep_dup, @statement.deep_dup)
       end
@@ -527,6 +539,8 @@ module Minjs
         @exp, @statement = exp, statement
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@exp.deep_dup, @statement.deep_dup)
       end
@@ -588,6 +602,8 @@ module Minjs
         @statement = statement
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@exp1 && @exp1.deep_dup,
                        @exp2 && @exp2.deep_dup,
@@ -674,6 +690,8 @@ module Minjs
         @statement = statement
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@context,
                        @var_decl_list.collect{|x,y|
@@ -785,6 +803,8 @@ module Minjs
         @statement = statement
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@exp1.deep_dup, @exp2.deep_dup, @statement.deep_dup)
       end
@@ -855,6 +875,8 @@ module Minjs
         @statement = statement
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@context,
                        [@var_decl[0].deep_dup, @var_decl[1] ? @var_decl[1].deep_dup : nil],
@@ -938,6 +960,8 @@ module Minjs
         @exp = exp
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@exp ? @exp.deep_dup : nil)
       end
@@ -975,6 +999,8 @@ module Minjs
         @exp = exp
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@exp ? @exp.deep_dup : nil)
       end
@@ -1012,6 +1038,8 @@ module Minjs
         @exp = exp
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(exp ? exp.deep_dup : nil)
       end
@@ -1075,6 +1103,8 @@ module Minjs
         @statement = statement
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@context, @exp.deep_dup, @statement.deep_dup)
       end
@@ -1133,6 +1163,8 @@ module Minjs
         @blocks = blocks
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@exp.deep_dup,
                        @blocks.collect{|x, y|
@@ -1211,6 +1243,8 @@ module Minjs
         @statement = statement
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@label.deep_dup, @statement.deep_dup)
       end
@@ -1254,6 +1288,8 @@ module Minjs
         @exp = exp
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@exp.deep_dup)
       end
@@ -1291,6 +1327,8 @@ module Minjs
         @finally = finally
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@context,
                        @try.deep_dup,
@@ -1346,6 +1384,8 @@ module Minjs
     #
     # @see http://www.ecma-international.org/ecma-262 ECMA262 12.15
     class StDebugger < Statement
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new
       end
@@ -1391,6 +1431,8 @@ module Minjs
         10
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@context, @name ? @name.deep_dup : nil,
                        @args.collect{|args|args.deep_dup},

@@ -17,13 +17,13 @@ module Minjs::Lex
       elsif a == ECMA262::PUNC_RCURLYBRAC
         a
       # line feed?
-      elsif a == ECMA262::LIT_LINE_FEED
+      elsif a == ECMA262::LIT_LINE_TERMINATOR
         lex.fwd_after_peek
         a
       # end of program
       elsif a.nil?
         lex.fwd_after_peek
-        ECMA262::LIT_LINE_FEED
+        ECMA262::LIT_LINE_TERMINATOR
       # line terminator?
       elsif a.lt?
         lex.fwd_after_peek

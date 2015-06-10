@@ -157,7 +157,7 @@ module Minjs::Lex
         begin
           @pos += 1
         end until !line_terminator?(@codes[@pos])
-        return ECMA262::LineFeed.get
+        return ECMA262::LineTerminator.get
       else
         nil
       end

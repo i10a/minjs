@@ -141,6 +141,8 @@ module Minjs
         @val = val
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@val.deep_dup)
       end
@@ -172,6 +174,8 @@ module Minjs
         @val2 = val2
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@val.deep_dup, @val2.deep_dup)
       end
@@ -212,6 +216,8 @@ module Minjs
         PRIORITY_PRIMARY
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@val.deep_dup)
       end
@@ -239,6 +245,7 @@ module Minjs
         "(#{@val.to_js(options)})"
       end
 
+      # @return [Boolean] true if expression is kind of LeftHandSideExpression.
       def left_hand_side_exp?
         true
       end
@@ -318,6 +325,7 @@ module Minjs
         "#{@val.to_js(options)}[#{@val2.to_js(options)}]"
       end
 
+      # @return [Boolean] true if expression is kind of LeftHandSideExpression.
       def left_hand_side_exp?
         true
       end
@@ -378,6 +386,7 @@ module Minjs
         "#{@val.to_js(options)}.#{@val2.val}"
       end
 
+      # @return [Boolean] true if expression is kind of LeftHandSideExpression.
       def left_hand_side_exp?
         true
       end
@@ -414,6 +423,8 @@ module Minjs
         PRIORITY_LEFT_HAND_SIDE
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@name.deep_dup,
                        @args ? @args.collect{|x| x.deep_dup} : nil)
@@ -454,6 +465,7 @@ module Minjs
         "#{@name.to_js(options)}(#{args})"
       end
 
+      # @return [Boolean] true if expression is kind of LeftHandSideExpression.
       def left_hand_side_exp?
         true
       end
@@ -510,6 +522,8 @@ module Minjs
         PRIORITY_LEFT_HAND_SIDE + ((args == nil) ? 1 : 0)
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@name,
                        @args ? @args.collect{|x| x.deep_dup} : nil)
@@ -552,6 +566,7 @@ module Minjs
         end
       end
 
+      # @return [Boolean] true if expression is kind of LeftHandSideExpression.
       def left_hand_side_exp?
         true
       end
@@ -1376,6 +1391,8 @@ module Minjs
         self
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@val.deep_dup, @val2.deep_dup, @val3.deep_dup)
       end

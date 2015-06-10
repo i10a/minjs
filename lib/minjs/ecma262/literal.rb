@@ -22,6 +22,8 @@ module Minjs
 
     class DivOrRegexpLiteral < Literal
       # Traverses this children and itself with given block.
+      #
+      # @see Base#traverse
       def traverse(parent, &block)
       end
 
@@ -38,14 +40,22 @@ module Minjs
 
     LIT_DIV_OR_REGEXP_LITERAL = DivOrRegexpLiteral.get
 
-    # ECMA262 white space element
+    # Class of ECMA262 WhiteSpace element
+    #
+    # Every WhiteSpace characters in source elements is
+    # converted to this class object.
+    #
+    # This class is singleton and representation string is \u0020.
     #
     # @see http://www.ecma-international.org/ecma-262 ECMA262 7.2
     class WhiteSpace < Literal
       # Traverses this children and itself with given block.
+      #
+      # @see Base#traverse
       def traverse(parent, &block)
       end
 
+      #true if literal is white space
       def ws?
         true
       end
@@ -68,11 +78,22 @@ module Minjs
       private_class_method :new
     end
 
-    class LineFeed < Literal
+    # Class of ECMA262 LineTerminator element
+    #
+    # Every LineTerminator characters in source elements is
+    # converted to this class object.
+    #
+    # This class is singleton and representation string is \u000A.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.3
+    class LineTerminator < Literal
       # Traverses this children and itself with given block.
+      #
+      # @see Base#traverse
       def traverse(parent, &block)
       end
 
+      #true if literal is line terminator
       def lt?
         true
       end
@@ -96,8 +117,11 @@ module Minjs
     end
 
     # line feed ("\n") element
-    LIT_LINE_FEED = LineFeed.get
+    LIT_LINE_TERMINATOR = LineTerminator.get
 
+    # Class of ECMA262 'this' element
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.1.1
     class This < Literal
       attr_reader :context
 
@@ -105,11 +129,15 @@ module Minjs
         @context = context
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@context)
       end
 
       # Traverses this children and itself with given block.
+      #
+      # @see Base#traverse
       def traverse(parent, &block)
         yield parent, self
       end
@@ -129,21 +157,34 @@ module Minjs
         "this"
       end
 
+      # @return [Boolean] true if expression is kind of LeftHandSideExpression.
       def left_hand_side_exp?
         true
       end
     end
 
+    # Class of ECMA262 Null element
+    #
+    # Every Null literal in source elements is
+    # converted to this class object.
+    #
+    # This class is singleton
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.8.1
     class Null < Literal
       def initialize(val)
         @val = :null
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self #not dup
       end
 
       # Traverses this children and itself with given block.
+      #
+      # @see Base#traverse
       def traverse(parent, &block)
         yield parent, self
       end
@@ -163,6 +204,7 @@ module Minjs
         "null"
       end
 
+      # @return [Boolean] true if expression is kind of LeftHandSideExpression.
       def left_hand_side_exp?
         true
       end
@@ -190,8 +232,12 @@ module Minjs
       def ecma262_typeof
         :boolean
       end
+      private_class_method :new
     end
 
+    # Class of ECMA262 Boolean element
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.8.2
     class Boolean < Literal
       attr_reader :val
 
@@ -203,11 +249,15 @@ module Minjs
         end
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self #//not dup
       end
 
       # Traverses this children and itself with given block.
+      #
+      # @see Base#traverse
       def traverse(parent, &block)
         yield parent, self
       end
@@ -224,6 +274,7 @@ module Minjs
         @val.to_s
       end
 
+      # @return [Boolean] true if expression is kind of LeftHandSideExpression.
       def left_hand_side_exp?
         true
       end
@@ -273,7 +324,17 @@ module Minjs
         end
       end
     end
+    # *true* literal
+    LITERAL_TRUE = Boolean.new(:true)
+    # *false* literal
+    LITERAL_FALSE = Boolean.new(:false)
+    Boolean.class_eval {
+      private_class_method :new
+    }
 
+    # Class of ECMA262 String element
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.8.4
     class ECMA262String < Literal
       include Ctype
       attr_reader :val
@@ -282,11 +343,15 @@ module Minjs
         @val = val
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@val)
       end
 
       # Traverses this children and itself with given block.
+      #
+      # @see Base#traverse
       def traverse(parent)
         yield parent, self
       end
@@ -343,6 +408,7 @@ module Minjs
         end
       end
 
+      # @return [Boolean] true if expression is kind of LeftHandSideExpression.
       def left_hand_side_exp?
         true
       end
@@ -467,8 +533,7 @@ module Minjs
       end
     end
 
-    #
-    # 8.5 The Number Type
+    # Class of ECMA262 Numeric element
     #
     # ECMA262 say:
     #
@@ -481,6 +546,7 @@ module Minjs
     # To simplify the implementation,
     # Minjs assumes that ruby has IEEE754 dobule precision.
     #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.8.3
     class ECMA262Numeric < Literal
       attr_reader :integer, :decimal, :exp, :number
 
@@ -559,11 +625,15 @@ module Minjs
         end
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@number)
       end
 
       # Traverses this children and itself with given block.
+      #
+      # @see Base#traverse
       def traverse(parent, &block)
         yield parent, self
       end
@@ -613,6 +683,7 @@ module Minjs
         t.length <= t0.length ? t : t0
       end
 
+      # @return [Boolean] true if expression is kind of LeftHandSideExpression.
       def left_hand_side_exp?
         true
       end
@@ -718,6 +789,9 @@ module Minjs
     #NaN element
     NUMERIC_NAN = ECMA262Numeric.new(:nan)
 
+    # Class of ECMA262 RegExp element
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.8.5
     class ECMA262RegExp < Literal
       attr_reader :body, :flags
 
@@ -726,11 +800,15 @@ module Minjs
         @flags = flags
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@body, @flags)
       end
 
       # Traverses this children and itself with given block.
+      #
+      # @see Base#traverse
       def traverse(parent)
         yield parent, self
       end
@@ -750,16 +828,15 @@ module Minjs
         "/#{@body}/#{@flags}"
       end
 
+      # @return [Boolean] true if expression is kind of LeftHandSideExpression.
       def left_hand_side_exp?
         true
       end
     end
 
-    # true element
-    LITERAL_TRUE = Boolean.new(:true)
-    # false element
-    LITERAL_FALSE = Boolean.new(:false)
-
+    # Class of ECMA262 Array element
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.1.4
     class ECMA262Array < Literal
       attr_reader :val
 
@@ -767,11 +844,15 @@ module Minjs
         @val = val # val is Array
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@val.collect{|x| x ? x.deep_dup : nil})
       end
 
       # Traverses this children and itself with given block.
+      #
+      # @see Base#traverse
       def traverse(parent, &block)
         yield parent, self
         @val.each do |k|
@@ -790,6 +871,7 @@ module Minjs
         "[" + @val.collect{|x| x.to_s}.join(",") + "]"
       end
 
+      # @return [Boolean] true if expression is kind of LeftHandSideExpression.
       def left_hand_side_exp?
         true
       end
@@ -799,6 +881,9 @@ module Minjs
       end
     end
 
+    # Class of ECMA262 Array element
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.1.5
     class ECMA262Object < Literal
       include Ctype
       attr_reader :val
@@ -808,11 +893,15 @@ module Minjs
         @val = val
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@val.collect{|x, y| [x.deep_dup, y ? y.deep_dup : y]})
       end
 
       # Traverses this children and itself with given block.
+      #
+      # @see Base#traverse
       def traverse(parent, &block)
         yield parent, self
         @val.each do |k, v|
@@ -848,6 +937,7 @@ module Minjs
                }.join(","), "}")
       end
 
+      # @return [Boolean] true if expression is kind of LeftHandSideExpression.
       def left_hand_side_exp?
         true
       end
@@ -857,11 +947,17 @@ module Minjs
       end
     end
 
+    # Class of ECMA262 SingleLineComment Element
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.4
     class SingleLineComment < Literal
       def initialize(comment)
         @comment = comment
       end
 
+      # Traverses this children and itself with given block.
+      #
+      # @see Base#traverse
       def traverse(parent, &block)
       end
 
@@ -882,6 +978,9 @@ module Minjs
       end
     end
 
+    # Class of ECMA262 MultiLineComment Element
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.4
     class MultiLineComment < Literal
       attr_reader :comment, :has_lf
       include Ctype
@@ -890,6 +989,9 @@ module Minjs
         @comment = comment
       end
 
+      # Traverses this children and itself with given block.
+      #
+      # @see Base#traverse
       def traverse(parent, &block)
       end
 
@@ -916,6 +1018,9 @@ module Minjs
       end
     end
 
+    # Class of ECMA262 IdentifierName Element
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.6
     class IdentifierName < Literal
       attr_accessor :context
       attr_reader :val
@@ -953,10 +1058,15 @@ module Minjs
         RESERVED_WORD.include?(val)
       end
 
+      # Traverses this children and itself with given block.
+      #
+      # @see Base#traverse
       def traverse(parent)
         yield parent, self
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@context, @val)
       end
@@ -972,6 +1082,7 @@ module Minjs
         val.to_s
       end
 
+      # @return [Boolean] true if expression is kind of LeftHandSideExpression.
       def left_hand_side_exp?
         true
       end
