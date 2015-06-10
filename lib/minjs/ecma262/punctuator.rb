@@ -1,5 +1,8 @@
 module Minjs
   module ECMA262
+    # ECMA262 punctuator element
+    #
+    # @see http://www.ecma-international.org/ecma-262 7.7
     class Punctuator < Literal
       attr_reader :val
 

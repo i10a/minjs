@@ -1,9 +1,7 @@
 module Minjs
   module ECMA262
-    #
     # ECMA262 Element for Statement
-    #
-    class St < Base
+    class Statement < Base
       def to_exp?
         false
       end
@@ -24,7 +22,7 @@ module Minjs
     #
     # 12.1
     #
-    class StBlock < St
+    class StBlock < Statement
       attr_reader :statement_list
 
       #statement_list:StatementList
@@ -119,7 +117,7 @@ module Minjs
     #
     # 12.2
     #
-    class StVar < St
+    class StVar < Statement
       attr_reader :vars
       attr_reader :context
       #
@@ -214,7 +212,7 @@ module Minjs
     end
 
     #12.3 empty
-    class StEmpty < St
+    class StEmpty < Statement
       def initialize()
       end
 
@@ -241,7 +239,7 @@ module Minjs
     end
 
     #12.4
-    class StExp < St
+    class StExp < Statement
       attr_reader :exp
 
       def initialize(exp)
@@ -293,7 +291,7 @@ module Minjs
     end
 
     #12.5
-    class StIf < St
+    class StIf < Statement
       attr_reader :then_st, :else_st, :cond
 
       def initialize(cond, then_st, else_st)
@@ -430,7 +428,7 @@ module Minjs
     end
 
     #12.6
-    class StWhile < St
+    class StWhile < Statement
       attr_reader :exp, :statement
 
       def initialize(exp, statement)
@@ -482,7 +480,7 @@ module Minjs
       end
     end
 
-    class StDoWhile < St
+    class StDoWhile < Statement
       attr_reader :exp, :statement
 
       def initialize(exp, statement)
@@ -537,7 +535,7 @@ module Minjs
     #
     # 12.6.3 the for statement
     #
-    class StFor < St
+    class StFor < Statement
       attr_reader :exp1, :exp2, :exp3, :statement
 
       def initialize(exp1, exp2, exp3, statement)
@@ -614,7 +612,7 @@ module Minjs
     #
     # for(var i=0,... ; ; )
     #
-    class StForVar < St
+    class StForVar < Statement
       attr_reader :context
       attr_reader :var_decl_list, :exp2, :exp3, :statement
 
@@ -726,7 +724,7 @@ module Minjs
       end
     end
 
-    class StForIn < St
+    class StForIn < Statement
       attr_reader :exp1, :exp2, :statement
 
       def initialize(exp1, exp2, statement)
@@ -788,7 +786,7 @@ module Minjs
       end
     end
 
-    class StForInVar < St
+    class StForInVar < Statement
       attr_reader :context
       attr_reader :var_decl, :exp2, :statement
 
@@ -870,7 +868,7 @@ module Minjs
 
 
     #12.7
-    class StContinue < St
+    class StContinue < Statement
       attr_reader :exp
 
       def initialize(exp = nil)
@@ -902,7 +900,7 @@ module Minjs
     end
 
     #12.8
-    class StBreak < St
+    class StBreak < Statement
       attr_reader :exp
 
       def initialize(exp = nil)
@@ -934,7 +932,7 @@ module Minjs
     end
 
     #12.9
-    class StReturn < St
+    class StReturn < Statement
       attr_reader :exp
 
       def initialize(exp = nil)
@@ -989,7 +987,7 @@ module Minjs
       end
     end
     #12.10
-    class StWith < St
+    class StWith < Statement
       attr_reader :exp, :statement, :context
 
       def initialize(context, exp, statement)
@@ -1039,7 +1037,7 @@ module Minjs
       end
     end
     #12.11
-    class StSwitch < St
+    class StSwitch < Statement
       attr_reader :exp, :blocks
 
       #
@@ -1114,7 +1112,7 @@ module Minjs
       end
     end
     #12.12
-    class StLabelled < St
+    class StLabelled < Statement
       attr_reader :label, :statement
 
       def initialize(label, statement)
@@ -1152,7 +1150,7 @@ module Minjs
     end
 
     #12.13
-    class StThrow < St
+    class StThrow < Statement
       attr_reader :exp
 
       def initialize(exp)
@@ -1180,7 +1178,7 @@ module Minjs
     end
 
     #12.14
-    class StTry < St
+    class StTry < Statement
       attr_reader :context
       attr_reader :try, :catch, :finally
 
@@ -1240,7 +1238,7 @@ module Minjs
     end
 
     #12.15
-    class StDebugger < St
+    class StDebugger < Statement
       def deep_dup
         self.class.new
       end
@@ -1264,7 +1262,7 @@ module Minjs
     # 13 function expression
     # 11.1.5 getter/setter
     #
-    class StFunc < St
+    class StFunc < Statement
       attr_reader :name
       attr_reader :args
       attr_reader :statements

@@ -2,6 +2,7 @@
 require 'set'
 module Minjs
   module ECMA262
+    # Base class of ECMA262 Literal
     class Literal < Base
       #true if literal is white space
       def ws?

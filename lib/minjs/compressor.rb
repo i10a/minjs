@@ -850,7 +850,7 @@ module Minjs
 
     def reduce_exp(node = @prog)
       node.traverse(nil) {|st, parent|
-        if st.kind_of? ECMA262::Exp
+        if st.kind_of? ECMA262::Expression
           st.reduce(parent)
         end
       }

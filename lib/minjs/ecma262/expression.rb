@@ -19,7 +19,7 @@ module Minjs
     PRIORITY_COMMA = 140
 
     # Base class of ECMA262 Expression
-    class Exp < Base
+    class Expression < Base
       # traverse this children and itself
       def traverse
         yield(self)
@@ -77,7 +77,7 @@ module Minjs
       # remove parenthesis if possible
       def remove_paren
         if @val.kind_of? ExpParen and @val.val.priority <= self.priority
-          @val = @val.val #if @val.remove_paren?
+          @val = @val.val
         end
         self
       end
@@ -139,7 +139,7 @@ module Minjs
       end
     end
 
-    class ExpArg1 < Exp
+    class ExpArg1 < Expression
       attr_reader :val
 
       def initialize(val)
@@ -166,7 +166,7 @@ module Minjs
       end
     end
 
-    class ExpArg2 < Exp
+    class ExpArg2 < Expression
       attr_reader :val, :val2
 
       def initialize(val, val2)
@@ -200,7 +200,7 @@ module Minjs
     #
     # 11.1 primary expression
     #
-    class ExpParen < Exp
+    class ExpParen < Expression
       attr_reader :val
 
       def initialize(val)
@@ -391,7 +391,7 @@ module Minjs
     #11.2
     #  => name(args)
     #
-    class ExpCall < Exp
+    class ExpCall < Expression
       attr_reader :name
       attr_reader :args
 
@@ -485,7 +485,7 @@ module Minjs
     # new M
     # new M(a,b,c...)
     #
-    class ExpNew < Exp
+    class ExpNew < Expression
       attr_reader :name, :args
 
       def initialize(name, args)
@@ -1314,7 +1314,7 @@ module Minjs
     #
     # val ? val2 : val3
     #
-    class ExpCond < Exp
+    class ExpCond < Expression
       attr_reader :val, :val2, :val3
       alias :cond :val
 
