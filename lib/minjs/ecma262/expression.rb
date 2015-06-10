@@ -20,11 +20,6 @@ module Minjs
 
     # Base class of ECMA262 Expression
     class Expression < Base
-      # traverse this children and itself
-      def traverse
-        yield(self)
-      end
-
       # reduce expression if available
       def reduce(parent)
       end
@@ -36,7 +31,7 @@ module Minjs
 
       # @return [Fixnum] expression priority
       def priority
-        9999
+        999
       end
 
     end
@@ -156,11 +151,14 @@ module Minjs
         end
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @val.traverse(self, &block)
-        yield self, parent
+        yield parent, self
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         concat options, sym, @val
       end
@@ -186,12 +184,15 @@ module Minjs
         end
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @val.traverse(self, &block)
         @val2.traverse(self, &block)
-        yield self, parent
+        yield parent, self
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         concat options, @val, sym, @val2
       end
@@ -221,9 +222,10 @@ module Minjs
         end
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @val.traverse(self, &block)
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -231,6 +233,8 @@ module Minjs
         self.class == obj.class and @val == obj.val
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         "(#{@val.to_js(options)})"
       end
@@ -294,10 +298,11 @@ module Minjs
         PRIORITY_LEFT_HAND_SIDE
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @val.traverse(self, &block)
         @val2.traverse(self, &block)
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -307,6 +312,8 @@ module Minjs
           @val2 == obj.val2
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         "#{@val.to_js(options)}[#{@val2.to_js(options)}]"
       end
@@ -351,10 +358,11 @@ module Minjs
         PRIORITY_LEFT_HAND_SIDE
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @val.traverse(self, &block)
         @val2.traverse(self, &block)
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -364,6 +372,8 @@ module Minjs
           @val2 == obj.val2
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         "#{@val.to_js(options)}.#{@val2.val}"
       end
@@ -423,12 +433,13 @@ module Minjs
         end
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @name.traverse(self, &block)
         @args.each do |x|
           x.traverse(self, &block)
         end
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -436,6 +447,8 @@ module Minjs
         self.class == obj.class and @name == obj.name and @args == obj.args
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         args = @args.collect{|x| x.to_js(options)}.join(",")
         "#{@name.to_js(options)}(#{args})"
@@ -512,6 +525,7 @@ module Minjs
         end
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @name.traverse(self, &block)
         if @args
@@ -519,7 +533,7 @@ module Minjs
             arg.traverse(self, &block)
           end
         end
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -527,6 +541,8 @@ module Minjs
         self.class == obj.class and @name == obj.name and @args == obj.args
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         if @args
           args = @args.collect{|x| x.to_js(options)}.join(",")
@@ -588,6 +604,8 @@ module Minjs
         PRIORITY_POSTFIX
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         concat options, @val, sym
       end
@@ -602,6 +620,8 @@ module Minjs
         PRIORITY_POSTFIX
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         concat options, @val, sym
       end
@@ -1370,11 +1390,12 @@ module Minjs
         end
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @val.traverse(self, &block)
         @val2.traverse(self, &block)
         @val3.traverse(self, &block)
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -1385,6 +1406,8 @@ module Minjs
           @val3 == obj.val3
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         "#{@val.to_js(options)}?#{@val2.to_js(options)}:#{@val3.to_js(options)}"
       end

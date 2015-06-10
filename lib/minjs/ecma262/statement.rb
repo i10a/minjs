@@ -1,31 +1,37 @@
 module Minjs
   module ECMA262
-    # ECMA262 Element for Statement
+    # Base class of ECMA262 statement element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12
     class Statement < Base
+      # return true if statement can convert to expression.
       def to_exp?
         false
       end
 
+      # return true if statement can convert to return statement.
       def to_return?
         false
       end
 
+      # @return [Fixnum] expression priority
       def priority
         999
       end
 
+      # return true if statement can convert to empty statement.
       def empty?
         false
       end
     end
 
+    # Base class of ECMA262 Block element.
     #
-    # 12.1
-    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.1
     class StBlock < Statement
       attr_reader :statement_list
 
-      #statement_list:StatementList
+      # @param statement_list [StatementList] statement list
       def initialize(statement_list)
         if statement_list.kind_of? Array
           @statement_list = StatementList.new(statement_list)
@@ -44,9 +50,12 @@ module Minjs
         end
       end
 
+      # Traverses this children and itself with given block.
+      #
+      # @see Base#traverse
       def traverse(parent, &block)
         @statement_list.traverse(self, &block)
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -55,10 +64,13 @@ module Minjs
           @statement_list == obj.statement_list
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         concat(options, "{", @statement_list, "}")
       end
 
+      # true if statement can convert to expression
       def to_exp?
         t = @statement_list.statement_list.select{|s|
           s.class != StEmpty
@@ -114,9 +126,9 @@ module Minjs
         statement_list.remove_empty_statement
       end
     end
+    # Base class of ECMA262 VariableStatement element.
     #
-    # 12.2
-    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.2
     class StVar < Statement
       attr_reader :vars
       attr_reader :context
@@ -148,6 +160,7 @@ module Minjs
         end
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @vars.each do |x|
           x[0].traverse(self, &block)
@@ -155,7 +168,7 @@ module Minjs
             x[1].traverse(self, &block)
           end
         end
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -163,6 +176,8 @@ module Minjs
         self.class == obj.class and @vars == obj.vars
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
           t = concat(options, :var, @vars.collect{|x|
                        if x[1]
@@ -211,7 +226,9 @@ module Minjs
       end
     end
 
-    #12.3 empty
+    # Base class of ECMA262 EmptyStatement element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.2
     class StEmpty < Statement
       def initialize()
       end
@@ -220,8 +237,9 @@ module Minjs
         self.class.new()
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -229,6 +247,8 @@ module Minjs
         self.class == obj.class
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         ";;"
       end
@@ -238,7 +258,9 @@ module Minjs
       end
     end
 
-    #12.4
+    # Base class of ECMA262 ExpressionStatement element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.4
     class StExp < Statement
       attr_reader :exp
 
@@ -256,9 +278,10 @@ module Minjs
         end
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @exp.traverse(self, &block)
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -266,6 +289,8 @@ module Minjs
         self.class == obj.class and @exp == obj.exp
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         concat(options, @exp, ";")
       end
@@ -274,6 +299,7 @@ module Minjs
         @exp.deep_dup
       end
 
+      # true if statement can convert to expression
       def to_exp?
         true
       end
@@ -290,7 +316,9 @@ module Minjs
       end
     end
 
-    #12.5
+    # Base class of ECMA262 IfStatement element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.5
     class StIf < Statement
       attr_reader :then_st, :else_st, :cond
 
@@ -310,13 +338,14 @@ module Minjs
         end
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @cond.traverse(self, &block)
         @then_st.traverse(self, &block)
         if @else_st
           @else_st.traverse(self, &block)
         end
-        yield self, parent
+        yield parent, self
       end
 
       def deep_dup
@@ -331,6 +360,8 @@ module Minjs
           @else_st == obj.else_st
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         if @else_st
           concat options, :if, "(", @cond, ")", @then_st, :else, @else_st
@@ -367,6 +398,7 @@ module Minjs
         ret
       end
 
+      # true if statement can convert to expression
       def to_exp?
         if !@else_st
           return false if @then_st.to_exp? == false
@@ -427,7 +459,9 @@ module Minjs
       end
     end
 
-    #12.6
+    # Base class of ECMA262 'while' IterationStatement element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.6.2
     class StWhile < Statement
       attr_reader :exp, :statement
 
@@ -445,10 +479,11 @@ module Minjs
         end
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @exp.traverse(self, &block)
         @statement.traverse(self, &block)
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -458,6 +493,8 @@ module Minjs
           @statement == obj.statement
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         if @statement.kind_of? StBlock and @statement.statement_list.length == 1
           statement = @statement.statement_list.statement_list[0]
@@ -480,6 +517,9 @@ module Minjs
       end
     end
 
+    # Base class of ECMA262 'do-while' IterationStatement element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.6.1
     class StDoWhile < Statement
       attr_reader :exp, :statement
 
@@ -497,10 +537,11 @@ module Minjs
         end
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @exp.traverse(self, &block)
         @statement.traverse(self, &block)
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -510,6 +551,8 @@ module Minjs
           @statement == obj.statement
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         if @statement.kind_of? StBlock and @statement.statement_list.length == 1
           statement = @statement.statement_list.statement_list[0]
@@ -532,9 +575,9 @@ module Minjs
       end
     end
 
+    # Base class of ECMA262 'for(;;)' IterationStatement element.
     #
-    # 12.6.3 the for statement
-    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.6.3
     class StFor < Statement
       attr_reader :exp1, :exp2, :exp3, :statement
 
@@ -564,12 +607,13 @@ module Minjs
         end
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @exp1.traverse(self, &block) if @exp1
         @exp2.traverse(self, &block) if @exp2
         @exp3.traverse(self, &block) if @exp3
         @statement.traverse(self, &block)
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -581,6 +625,8 @@ module Minjs
           @statement == obj.statement
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         if @statement.kind_of? StBlock and @statement.statement_list.length == 1
           statement = @statement.statement_list.statement_list[0]
@@ -609,9 +655,9 @@ module Minjs
       end
     end
 
+    # Base class of ECMA262 'for(var;;)' IterationStatement element.
     #
-    # for(var i=0,... ; ; )
-    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.6.3
     class StForVar < Statement
       attr_reader :context
       attr_reader :var_decl_list, :exp2, :exp3, :statement
@@ -644,6 +690,7 @@ module Minjs
         end
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @var_decl_list.each do |x|
           x[0].traverse(self, &block)
@@ -654,7 +701,7 @@ module Minjs
         @exp2.traverse(self, &block) if @exp2
         @exp3.traverse(self, &block) if @exp3
         @statement.traverse(self, &block)
-        yield self, parent
+        yield parent, self
       end
 
       #
@@ -686,6 +733,8 @@ module Minjs
           @statement == obj.statement
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         if @statement.kind_of? StBlock and @statement.statement_list.length == 1
           statement = @statement.statement_list.statement_list[0]
@@ -724,6 +773,9 @@ module Minjs
       end
     end
 
+    # Base class of ECMA262 'for(in)' IterationStatement element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.6.4
     class StForIn < Statement
       attr_reader :exp1, :exp2, :statement
 
@@ -743,11 +795,12 @@ module Minjs
         end
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @exp1.traverse(self, &block)
         @exp2.traverse(self, &block)
         @statement.traverse(self, &block)
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -758,6 +811,8 @@ module Minjs
           @statement == obj.statement
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         if @statement.kind_of? StBlock and @statement.statement_list.length == 1
           statement = @statement.statement_list.statement_list[0]
@@ -786,6 +841,9 @@ module Minjs
       end
     end
 
+    # Base class of ECMA262 'for(var in)' IterationStatement element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.6.4
     class StForInVar < Statement
       attr_reader :context
       attr_reader :var_decl, :exp2, :statement
@@ -804,12 +862,13 @@ module Minjs
                        @statement.deep_dup)
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @var_decl[0].traverse(self, &block)
         @var_decl[1].traverse(self, &block) if @var_decl[1]
         @exp2.traverse(self, &block)
         @statement.traverse(self, &block)
-        yield self, parent
+        yield parent, self
       end
 
       def replace(from, to)
@@ -835,6 +894,8 @@ module Minjs
           @statement == obj.statement
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         if @statement.kind_of? StBlock and @statement.statement_list.length == 1
           statement = @statement.statement_list.statement_list[0]
@@ -867,7 +928,9 @@ module Minjs
     end
 
 
-    #12.7
+    # Base class of ECMA262 ContinueStatement element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.7
     class StContinue < Statement
       attr_reader :exp
 
@@ -879,9 +942,10 @@ module Minjs
         self.class.new(@exp ? @exp.deep_dup : nil)
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @exp.traverse(self, &block) if @exp
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -890,6 +954,8 @@ module Minjs
           @exp == obj.exp
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         if @exp
           concat options, :continue, @exp, ";"
@@ -899,7 +965,9 @@ module Minjs
       end
     end
 
-    #12.8
+    # Base class of ECMA262 BreakStatement element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.8
     class StBreak < Statement
       attr_reader :exp
 
@@ -911,9 +979,10 @@ module Minjs
         self.class.new(@exp ? @exp.deep_dup : nil)
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @exp.traverse(self, &block) if @exp
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -922,6 +991,8 @@ module Minjs
           @exp == obj.exp
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         if @exp
           concat options, :break, @exp, ";"
@@ -931,7 +1002,9 @@ module Minjs
       end
     end
 
-    #12.9
+    # Base class of ECMA262 ReturnStatement element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.9
     class StReturn < Statement
       attr_reader :exp
 
@@ -949,9 +1022,10 @@ module Minjs
         end
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @exp.traverse(self, &block) if @exp
-        yield self, parent
+        yield parent, self
       end
 
       def to_return?
@@ -967,6 +1041,8 @@ module Minjs
         self.class == obj.class and @exp == obj.exp
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         if @exp
           concat options, :return, @exp, ";"
@@ -986,7 +1062,10 @@ module Minjs
         self
       end
     end
-    #12.10
+
+    # Base class of ECMA262 WithStatement element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.10
     class StWith < Statement
       attr_reader :exp, :statement, :context
 
@@ -1008,10 +1087,11 @@ module Minjs
         end
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @exp.traverse(self, &block)
         @statement.traverse(self, &block)
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -1021,6 +1101,8 @@ module Minjs
           @statement == obj.statement
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         concat options, :with, "(", @exp, ")", @statement
       end
@@ -1036,7 +1118,10 @@ module Minjs
         self
       end
     end
-    #12.11
+
+    # Base class of ECMA262 SwitchStatement element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.11
     class StSwitch < Statement
       attr_reader :exp, :blocks
 
@@ -1066,6 +1151,7 @@ module Minjs
         end
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &blocks)
         @exp.traverse(self, &blocks)
         @blocks.each do |b|
@@ -1074,7 +1160,7 @@ module Minjs
           end
           b[1].traverse(self, &blocks)
         end
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -1083,6 +1169,9 @@ module Minjs
           @exp == obj.exp and
           @blocks == obj.blocks
       end
+
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         t = concat(options, :switch, "(", @exp, ")", "{")
         @blocks.each do |b|
@@ -1111,7 +1200,9 @@ module Minjs
         self
       end
     end
-    #12.12
+    # Base class of ECMA262 LabelledStatement element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.12
     class StLabelled < Statement
       attr_reader :label, :statement
 
@@ -1132,10 +1223,11 @@ module Minjs
         end
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @label.traverse(self, &block)
         @statement.traverse(self, &block)
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -1144,12 +1236,17 @@ module Minjs
           @label == obj.label and
           @statement == obj.statement
       end
+
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         concat options, @label, ":", @statement
       end
     end
 
-    #12.13
+    # Base class of ECMA262 ThrowStatement element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.13
     class StThrow < Statement
       attr_reader :exp
 
@@ -1161,9 +1258,10 @@ module Minjs
         self.class.new(@exp.deep_dup)
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @exp.traverse(self, &block)
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -1172,12 +1270,16 @@ module Minjs
           @exp == obj.exp
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         concat options, :throw, @exp, ";"
       end
     end
 
-    #12.14
+    # Base class of ECMA262 TryStatement element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.14
     class StTry < Statement
       attr_reader :context
       attr_reader :try, :catch, :finally
@@ -1208,6 +1310,7 @@ module Minjs
         end
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @try.traverse(self, &block)
         if @catch
@@ -1215,7 +1318,7 @@ module Minjs
           @catch[1].traverse(self, &block)
         end
         @finally.traverse(self, &block) if @finally
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -1226,6 +1329,8 @@ module Minjs
           self.finally == obj.finally
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         if @catch and @finally
           concat(options, :try, @try, :catch, "(", @catch[0], ")", @catch[1], :finally, @finally)
@@ -1237,14 +1342,17 @@ module Minjs
       end
     end
 
-    #12.15
+    # Base class of ECMA262 DebuggerStatement element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.15
     class StDebugger < Statement
       def deep_dup
         self.class.new
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -1252,16 +1360,17 @@ module Minjs
         self.class == obj.class
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         concat options, :debugger, ";"
       end
     end
 
+    # Base class of ECMA262 FunctionDeclaration / FunctionExpression
+    # element
     #
-    # 13 function declaration
-    # 13 function expression
-    # 11.1.5 getter/setter
-    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 13, 11.1.5
     class StFunc < Statement
       attr_reader :name
       attr_reader :args
@@ -1289,13 +1398,14 @@ module Minjs
                        {decl: @decl, getter: @getter, setter: @setter})
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @name.traverse(self, &block) if @name
         @args.each do |arg|
           arg.traverse(self, &block)
         end
         @statements.traverse(self, &block)
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -1306,6 +1416,8 @@ module Minjs
           @statements == obj.statements
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         _args = @args.collect{|x|x.to_js(options)}.join(",")
         if @getter

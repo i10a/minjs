@@ -2,42 +2,37 @@ module Minjs
   module ECMA262
     # ECMA262 punctuator element
     #
-    # @see http://www.ecma-international.org/ecma-262 7.7
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.7
     class Punctuator < Literal
       attr_reader :val
 
       @@sym = {}
+
       def initialize(val)
         @val = val.to_sym
       end
 
+      # Returns punctuator object representation of string.
+      #
+      # @param val [String] punctuator
       def self.get(val)
         @@sym[val] ||= self.new(val)
       end
 
-      def self.punctuator?(val)
-        val = val.to_s
-        if val == ">>>=" ||
-           val == "===" || val == "!==" || val == ">>>" || val == "<<=" || val == ">>=" ||
-           val == ">>" || val == "<=" || val == ">=" || val == "== " || val == "!=" ||
-           val == "++" || val == "--" || val == "<<" || val == ">>" || val == "&&" ||
-           val == "||" || val == "+=" || val == "-=" || val == "*=" || val == "%=" ||
-           val == "&=" || val == "|=" || val == "^=" || val == "/="
-           val.match(/\A[\{\}\(\)\[\]\.\;\,\<\>\+\-\*\%\&\|\^\!\~\?\:\=\/]/)
-          true
-        else
-          false
-        end
-      end
-
+      # Returns a string containg the representation of punctuator.
       def to_s
         val.to_s
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js
         val.to_s
       end
 
+      # Return true if punctuator equals to other.
+      #
+      # @param obj other element.
       def ==(obj)
         self.class == obj.class and self.val == obj.val
       end
@@ -138,5 +133,9 @@ module Minjs
     PUNC_SEMICOLON = Punctuator.get(';')
     #punctuator
     PUNC_PERIOD = Punctuator.get('.')
+
+    Punctuator.class_eval {
+      private_class_method :new
+    }
   end
 end

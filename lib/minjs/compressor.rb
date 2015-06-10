@@ -30,7 +30,7 @@ module Minjs
     end
 
     def remove_empty_statement(node = @prog)
-      node.traverse(nil) {|st, parent|
+      node.traverse(nil) {|parent, st|
         if st.kind_of? ECMA262::StatementList
           st.remove_empty_statement
         end
@@ -155,7 +155,7 @@ module Minjs
     end
 
     def grouping_statement(node = @prog)
-      node.traverse(nil) {|st, parent|
+      node.traverse(nil) {|parent, st|
         if st.kind_of? ECMA262::StatementList
           st.grouping
         end
@@ -166,14 +166,14 @@ module Minjs
 
     def reorder_function_decl(node = @prog)
       flist = []
-      node.traverse(nil) {|st, parent|
+      node.traverse(nil) {|parent, st|
         if st.kind_of? ECMA262::StFunc and parent.kind_of? ECMA262::StatementList and st.decl?
           if parent.index(st)
-            flist.push([st, parent])
+            flist.push([parent, st])
           end
         end
       }
-      flist.reverse.each do |st, parent|
+      flist.reverse.each do |parent, st|
         parent.remove(st)
         sl = parent.statement_list
         if sl[0].kind_of? ECMA262::StExp and sl[0].exp.kind_of? ECMA262::ECMA262String and sl[0].exp.val == "use strict"
@@ -186,7 +186,7 @@ module Minjs
     end
 
     def reorder_var(node = @prog)
-      node.traverse(nil) {|st, parent|
+      node.traverse(nil) {|parent, st|
         if st.kind_of? ECMA262::Prog
           vars = nil
           context = st.context
@@ -203,7 +203,7 @@ module Minjs
           # traverse block and convert var statement to assignment expression
           # if variable has initializer
           #
-          st.traverse(parent){|st2, parent2|
+          st.traverse(parent){|parent2, st2|
             if st2.kind_of? ECMA262::StVar and st2.context.var_env == context.var_env
               exp = nil
               st2.vars.each do |name, initializer|
@@ -243,7 +243,7 @@ module Minjs
               elsif e.kind_of? ECMA262::StExp and e.exp.kind_of? ECMA262::ECMA262String and e.exp.val == "use strict"
                 ;
               else
-                e.traverse(nil){|ee, pp|
+                e.traverse(nil){|pp, ee|
                   if ee.kind_of? ECMA262::IdentifierName and var_vars[ee.val.to_sym]
                     found = true
                     break
@@ -268,7 +268,7 @@ module Minjs
     end
 
     def add_remove_paren(node = @prog)
-      node.traverse(nil) {|st, parent|
+      node.traverse(nil) {|parent, st|
         if st.respond_to? :remove_paren
           st.remove_paren
           st.add_paren
@@ -314,7 +314,7 @@ module Minjs
     # except then-clause can be removed safety.
     #
     def then_to_block(node = @prog)
-      node.traverse(nil) {|st, parent|
+      node.traverse(nil) {|parent, st|
         if st.kind_of? ECMA262::StIf
           if !st.then_st.kind_of?(ECMA262::StBlock)
             st.replace(st.then_st, ECMA262::StBlock.new([st.then_st]))
@@ -326,7 +326,7 @@ module Minjs
     def block_to_statement(node = @prog)
       remove_empty_statement
       then_to_block
-      node.traverse(nil) {|st, parent|
+      node.traverse(nil) {|parent, st|
         if st.kind_of? ECMA262::StBlock and !parent.kind_of?(ECMA262::StTry) and !parent.kind_of?(ECMA262::StIf)
             if st.to_statement?
               parent.replace(st, st.to_statement)
@@ -339,7 +339,7 @@ module Minjs
     def if_block_to_statement(node = @prog)
       remove_empty_statement
       # The "else" cluase's block can be removed always
-      node.traverse(nil) {|st, parent|
+      node.traverse(nil) {|parent, st|
         if st.kind_of? ECMA262::StIf
           if st.else_st and st.else_st.kind_of? ECMA262::StBlock
             st.else_st.remove_empty_statement
@@ -350,7 +350,7 @@ module Minjs
           end
         end
       }
-      node.traverse(nil) {|st, parent|
+      node.traverse(nil) {|parent, st|
         if st.kind_of? ECMA262::StIf
           if st.then_st and st.then_st.kind_of? ECMA262::StBlock
             st.then_st.remove_empty_statement
@@ -390,37 +390,6 @@ module Minjs
           end
         end
       }
-=begin
-      node.traverse(nil) {|st0, parent|
-        st = st0.deep_dup
-        if st.kind_of? ECMA262::StIf
-          if st.then_st and st.then_st.kind_of? ECMA262::StBlock
-            st.then_st.remove_empty_statement
-          end
-
-          if st.then_st and st.then_st.kind_of? ECMA262::StBlock and st.then_st.to_statement?
-            st.replace(st.then_st, st.then_st.to_statement)
-          end
-
-          _lex = Minjs::Lex.new(st.to_js)
-          _context = ECMA262::Context.new
-          _if = if_statement(_lex, _context)
-          reduce_exp(_if)
-          if _if == st #
-            if st0.then_st and st0.then_st.kind_of? ECMA262::StBlock
-              st0.then_st.remove_empty_statement
-            end
-            if st0.then_st and st0.then_st.kind_of? ECMA262::StBlock and st0.then_st.to_statement?
-              st0.replace(st0.then_st, st0.then_st.to_statement)
-            end
-          else
-            p '!='
-            puts st.to_js
-            puts _if.to_js
-          end
-        end
-      }
-=end
       self
     end
 
@@ -439,7 +408,7 @@ module Minjs
     # priority is lower than almost all other expressions.
     #
     def if_to_cond(node = @prog)
-      node.traverse(nil) {|st, parent|
+      node.traverse(nil) {|parent, st|
         if st.kind_of? ECMA262::StIf
           if st.to_exp?
             t = ECMA262::StExp.new(st.to_exp({}))
@@ -464,7 +433,7 @@ module Minjs
     # => return a?b:c;
     #
     def if_to_return(node = @prog)
-      node.traverse(nil) {|st, parent|
+      node.traverse(nil) {|parent, st|
         if st.kind_of? ECMA262::StIf
           if st.to_return?
             t = st.to_return
@@ -486,7 +455,7 @@ module Minjs
     # => return a?b:c;
     #
     def optimize_if_return(node = @prog)
-      node.traverse(nil) {|st0, parent0|
+      node.traverse(nil) {|parent0, st0|
         if st0.kind_of? ECMA262::StatementList
           st0.remove_empty_statement
           st = st0.deep_dup
@@ -541,7 +510,7 @@ module Minjs
     # if(a)return b;c;
     #
     def optimize_if_return2(node = @prog)
-      node.traverse(nil) {|st, parent|
+      node.traverse(nil) {|parent, st|
         if st.kind_of? ECMA262::StIf and st.else_st and parent.kind_of? ECMA262::StatementList
           st.remove_empty_statement
           if (st.then_st.kind_of? ECMA262::StBlock and st.then_st[-1].kind_of? ECMA262::StReturn) or
@@ -577,13 +546,13 @@ module Minjs
       #  TryStatement and a new Lexical Environment is created each
       #  time such code is evaluated.
       #
-      node.traverse(nil) {|st, parent|
+      node.traverse(nil) {|parent, st|
         if st.kind_of? ECMA262::StFunc
-          func_scopes.push([st, parent])
+          func_scopes.push([parent, st])
         elsif st.kind_of? ECMA262::StTry
-          catch_scopes.push([st, parent])
+          catch_scopes.push([parent, st])
         elsif st.kind_of? ECMA262::StWith
-          with_scopes.push([st, parent])
+          with_scopes.push([parent, st])
         end
       }
       #
@@ -626,7 +595,7 @@ module Minjs
       #console.log(eee); 	//=>global
       #test();
       #
-      catch_scopes.each{|st, parent|
+      catch_scopes.each{|parent, st|
         if st.catch
           catch_context = ECMA262::Context.new
           catch_context.lex_env = st.context.lex_env.new_declarative_env()
@@ -635,12 +604,12 @@ module Minjs
           catch_context.lex_env.record.set_mutable_binding(st.catch[0], :undefined, nil)
           st.catch[0].context = catch_context
 
-          st.catch[1].traverse(parent){|st2|
+          st.catch[1].traverse(parent){|parent2, st2|
             if st2.kind_of? ECMA262::IdentifierName and st2 == st.catch[0] and st2.binding_env == st.catch[0].binding_env
               st2.context = catch_context
             end
           }
-          func_scopes.unshift([st, parent])
+          func_scopes.unshift([parent, st])
         end
       }
 #      with_scopes.each{|st, parent|
@@ -656,7 +625,7 @@ module Minjs
 #        }
 #      }
       func_scopes.reverse!
-      func_scopes.each {|st, parent|
+      func_scopes.each {|parent, st|
         if st.kind_of? ECMA262::StFunc
           context = st.context
         elsif st.kind_of? ECMA262::StTry
@@ -673,7 +642,7 @@ module Minjs
         nesting_vars = {}
         nesting_vars_list = []
 
-        st.traverse(parent) {|st2|
+        st.traverse(parent) {|parent2, st2|
           #
           # Next, tring to rename var_vars(see bellow) to
           # new name.
@@ -732,7 +701,7 @@ module Minjs
         }
         unless var_vars[:eval]
           eval_flag = false
-          st.traverse(parent) {|st2|
+          st.traverse(parent) {|parent2, st2|
             if st2.kind_of? ECMA262::ExpCall and st2.name.to_js({}) == "eval"
               eval_flag = true
               break
@@ -849,7 +818,7 @@ module Minjs
     end
 
     def reduce_exp(node = @prog)
-      node.traverse(nil) {|st, parent|
+      node.traverse(nil) {|parent, st|
         if st.kind_of? ECMA262::Expression
           st.reduce(parent)
         end
@@ -858,7 +827,7 @@ module Minjs
     end
 
     def simple_replacement(node = @prog)
-      node.traverse(nil) {|st, parent|
+      node.traverse(nil) {|parent, st|
         #
         #true => !0
         #false => !1
@@ -949,7 +918,7 @@ module Minjs
       retry_flag = true
       while retry_flag
         retry_flag = false
-        node.traverse(nil) {|st, parent|
+        node.traverse(nil) {|parent, st|
           if st.kind_of? ECMA262::StIf
             # if(a)
             #   if(b) ...;
@@ -1048,7 +1017,7 @@ module Minjs
       retry_flag = true
       while retry_flag
         retry_flag = false
-        node.traverse(nil) {|st, parent|
+        node.traverse(nil) {|parent, st|
           if st.kind_of? ECMA262::StVar and parent.kind_of? ECMA262::SourceElements
             catch(:break){
               idx = parent.index(st) + 1

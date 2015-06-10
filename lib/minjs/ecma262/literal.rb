@@ -14,11 +14,6 @@ module Minjs
         false
       end
 
-      #true if literal can convert to expression
-      def to_exp?
-        false
-      end
-
       # @return [Fixnum] expression priority
       def priority
         PRIORITY_PRIMARY
@@ -26,16 +21,13 @@ module Minjs
     end
 
     class DivOrRegexpLiteral < Literal
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
       end
 
       # compare object
       def ==(obj)
         self.class == obj.class and self.val == obj.val
-      end
-
-      def to_js(options = {})
-        "??"
       end
 
       @@instance = self.new()
@@ -46,7 +38,11 @@ module Minjs
 
     LIT_DIV_OR_REGEXP_LITERAL = DivOrRegexpLiteral.get
 
+    # ECMA262 white space element
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.2
     class WhiteSpace < Literal
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
       end
 
@@ -59,6 +55,8 @@ module Minjs
         self.class == obj.class
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         " "
       end
@@ -67,9 +65,11 @@ module Minjs
       def self.get
         @@instance
       end
+      private_class_method :new
     end
 
     class LineFeed < Literal
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
       end
 
@@ -82,6 +82,8 @@ module Minjs
         self.class == obj.class
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         "\n"
       end
@@ -90,6 +92,7 @@ module Minjs
       def self.get
         @@instance
       end
+      private_class_method :new
     end
 
     # line feed ("\n") element
@@ -106,8 +109,9 @@ module Minjs
         self.class.new(@context)
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
-        yield self, parent
+        yield parent, self
       end
 
       def to_s
@@ -119,6 +123,8 @@ module Minjs
         self.class == obj.class
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         "this"
       end
@@ -137,8 +143,9 @@ module Minjs
         self #not dup
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
-        yield self, parent
+        yield parent, self
       end
 
       def to_s
@@ -150,6 +157,8 @@ module Minjs
         self.class == obj.class
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         "null"
       end
@@ -198,8 +207,9 @@ module Minjs
         self #//not dup
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -208,6 +218,8 @@ module Minjs
           @val == obj.val
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         @val.to_s
       end
@@ -274,8 +286,9 @@ module Minjs
         self.class.new(@val)
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent)
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -283,9 +296,8 @@ module Minjs
         self.class == obj.class and @val == obj.val
       end
 
-      # convert self to JavaScript
-      #
-      # @return [String] JavaScript
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         dq = @val.to_s.each_codepoint.select{|x| x == 0x22}.length
         sq = @val.to_s.each_codepoint.select{|x| x == 0x27}.length
@@ -551,8 +563,9 @@ module Minjs
         self.class.new(@number)
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -560,6 +573,8 @@ module Minjs
         self.class == obj.class and self.to_ecma262_string == obj.to_ecma262_string
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         if nan?
           return "NaN"
@@ -715,8 +730,9 @@ module Minjs
         self.class.new(@body, @flags)
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent)
-        yield self, parent
+        yield parent, self
       end
 
       def to_ecma262_boolean
@@ -728,6 +744,8 @@ module Minjs
         self.class == obj.class and @body == obj.body and @flags == obj.flags
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         "/#{@body}/#{@flags}"
       end
@@ -753,8 +771,9 @@ module Minjs
         self.class.new(@val.collect{|x| x ? x.deep_dup : nil})
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
-        yield self, parent
+        yield parent, self
         @val.each do |k|
           k.traverse(parent, &block) if k
         end
@@ -765,6 +784,8 @@ module Minjs
         self.class == obj.class and @val == obj.val
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         "[" + @val.collect{|x| x.to_s}.join(",") + "]"
       end
@@ -791,8 +812,9 @@ module Minjs
         self.class.new(@val.collect{|x, y| [x.deep_dup, y ? y.deep_dup : y]})
       end
 
+      # Traverses this children and itself with given block.
       def traverse(parent, &block)
-        yield self, parent
+        yield parent, self
         @val.each do |k, v|
           k.traverse(parent, &block)
           v.traverse(parent, &block)
@@ -804,6 +826,8 @@ module Minjs
         self.class == obj.class and @val == obj.val
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         concat(options, "{" + @val.collect{|x, y|
                  if y.kind_of? StFunc and (y.getter? || y.setter?)
@@ -847,6 +871,8 @@ module Minjs
           @comment == obj.comment
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options)
         "//#{@comment}"
       end
@@ -872,6 +898,8 @@ module Minjs
         self.class == obj.class and @comment == obj.comment
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options)
         "/*#{@comment}*/"
       end
@@ -926,7 +954,7 @@ module Minjs
       end
 
       def traverse(parent)
-        yield self, parent
+        yield parent, self
       end
 
       def deep_dup
@@ -938,6 +966,8 @@ module Minjs
         self.class == obj.class and self.val == obj.val
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         val.to_s
       end

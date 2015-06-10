@@ -2,9 +2,9 @@ module Minjs
   module ECMA262
     #ECMA262 Elements
     class Base
-      # convert self to JavaScript
-      #
-      # @return [String] JavaScript
+      # Returns a ECMAScript string containg the representation of element.
+      # @param options [Hash] options for Base#concat
+      # @return [String] ECMAScript string.
       def to_js(options = {})
         self.class.to_s + "??"
       end
@@ -14,7 +14,7 @@ module Minjs
         to_js({})
       end
 
-      # concatenate some of ECMA262 elements and convert it to JavaScript
+      # concatenate some of ECMA262 elements and convert it to ECMAScript
       #
       # @param args ECMA262 element
       # @option options :debug [Boolean] if set, output is easy to read.
@@ -96,6 +96,19 @@ module Minjs
           end
         }
         node
+      end
+
+      # Traverses this children and itself with given block.
+      #
+      # If this element has children, traverse children first,
+      # then yield block with parent and self.
+      #
+      # @param parent [Base] parent element.
+      # @yield [parent, self] parent and this element.
+      # @yieldparam [Base] self this element.
+      # @yieldparam [Base] parent parent element.
+      def traverse(parent, &block)
+
       end
     end
 
@@ -190,12 +203,14 @@ module Minjs
         }
       end
 
+      # Traverses this children and itself with given block.
+      # @see Base#traverse
       def traverse(parent, &block)
         _self = self
         @statement_list.each do|st|
           st.traverse(self, &block)
         end
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
@@ -289,9 +304,11 @@ module Minjs
         end
       end
 
+      # Traverses this children and itself with given block.
+      # @see Base#traverse
       def traverse(parent, &block)
         @source_elements.traverse(self, &block)
-        yield self, parent
+        yield parent, self
       end
 
       # compare object
