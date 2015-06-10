@@ -77,7 +77,7 @@ module Minjs
       # remove parenthesis if possible
       def remove_paren
         if @val.kind_of? ExpParen and @val.val.priority <= self.priority
-          @val = @val.val if @val.remove_paren?
+          @val = @val.val #if @val.remove_paren?
         end
         self
       end
@@ -163,10 +163,6 @@ module Minjs
 
       def to_js(options = {})
         concat options, sym, @val
-      end
-
-      def left_hand_side_exp?
-        true
       end
     end
 
