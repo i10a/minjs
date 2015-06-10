@@ -214,6 +214,14 @@ module Minjs
         @@instance
       end
 
+      # Returns results of ToBoolean()
+      #
+      # Returns _true_ or _false if trivial,
+      # otherwise nil.
+      #
+      # @return [Boolean]
+      #
+      # @see http://www.ecma-international.org/ecma-262 ECMA262 9.2
       def to_ecma262_boolean
         false
       end
@@ -291,6 +299,14 @@ module Minjs
         end
       end
 
+      # Returns results of ToBoolean()
+      #
+      # Returns _true_ or _false if trivial,
+      # otherwise nil.
+      #
+      # @return [Boolean]
+      #
+      # @see http://www.ecma-international.org/ecma-262 ECMA262 9.2
       def to_ecma262_boolean
         if @val == :false
           false
@@ -413,6 +429,14 @@ module Minjs
         true
       end
 
+      # Returns results of ToBoolean()
+      #
+      # Returns _true_ or _false if trivial,
+      # otherwise nil.
+      #
+      # @return [Boolean]
+      #
+      # @see http://www.ecma-international.org/ecma-262 ECMA262 9.2
       def to_ecma262_boolean
         if @val.length == 0
           false
@@ -749,6 +773,14 @@ module Minjs
         end
       end
 
+      # Returns results of ToBoolean()
+      #
+      # Returns _true_ or _false if trivial,
+      # otherwise nil.
+      #
+      # @return [Boolean]
+      #
+      # @see http://www.ecma-international.org/ecma-262 ECMA262 9.2
       def to_ecma262_boolean
         if @val == :nan or to_ecma262_string == "0"
           false
@@ -813,6 +845,14 @@ module Minjs
         yield parent, self
       end
 
+      # Returns results of ToBoolean()
+      #
+      # Returns _true_ or _false if trivial,
+      # otherwise nil.
+      #
+      # @return [Boolean]
+      #
+      # @see http://www.ecma-international.org/ecma-262 ECMA262 9.2
       def to_ecma262_boolean
         true
       end
@@ -876,6 +916,14 @@ module Minjs
         true
       end
 
+      # Returns results of ToBoolean()
+      #
+      # Returns _true_ or _false if trivial,
+      # otherwise nil.
+      #
+      # @return [Boolean]
+      #
+      # @see http://www.ecma-international.org/ecma-262 ECMA262 9.2
       def to_ecma262_boolean
         true
       end
@@ -942,6 +990,14 @@ module Minjs
         true
       end
 
+      # Returns results of ToBoolean()
+      #
+      # Returns _true_ or _false if trivial,
+      # otherwise nil.
+      #
+      # @return [Boolean]
+      #
+      # @see http://www.ecma-international.org/ecma-262 ECMA262 9.2
       def to_ecma262_boolean
         true
       end
@@ -973,6 +1029,7 @@ module Minjs
         "//#{@comment}"
       end
 
+      #true if literal is white space
       def ws?
         true
       end
@@ -1006,10 +1063,16 @@ module Minjs
         "/*#{@comment}*/"
       end
 
+      #true if literal is white space
       def ws?
         !lt?
       end
 
+      #true if literal is line terminator
+      #
+      # If MultiLineComment has one more LineTerminator,
+      # This comment is kind of line terminator.
+      # otherwise, this comment is kind of white space.
       def lt?
         @comment.codepoints.each{|char|
           return true if line_terminator?(char)
@@ -1050,10 +1113,14 @@ module Minjs
         :interface, :package, :protected, :static,
         :null, :false, :true
       ]
+
+      # Returns true if this literal is reserved word.
       def reserved?
         RESERVED_WORD.include?(val)
       end
 
+      # Returns true if *val* is reserved word.
+      # @param val [String] value
       def self.reserved?(val)
         RESERVED_WORD.include?(val)
       end

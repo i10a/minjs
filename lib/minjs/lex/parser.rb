@@ -127,7 +127,7 @@ module Minjs::Lex
     #
     # @return [ECMA262::WhiteSpace] element
     #
-    # @see ECMA262 7.2
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.2
     def white_space
       if white_space?(@codes[@pos])
         begin
@@ -151,7 +151,7 @@ module Minjs::Lex
     #
     # @return [ECMA262::LineTerminator] element
     #
-    # @see ECMA262 7.3
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.3
     def line_terminator
       if line_terminator?(@codes[@pos])
         begin
@@ -170,7 +170,7 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @see ECMA262 7.4
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.4
     def comment
       multi_line_comment || single_line_comment
     end
@@ -182,7 +182,7 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @see ECMA262 7.4
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.4
     def multi_line_comment
       # /*
       if @codes[@pos] == 0x2f and @codes[@pos + 1] == 0x2a
@@ -207,7 +207,7 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @see ECMA262 7.4
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.4
     def single_line_comment
       # //
       if @codes[@pos] == 0x2f and @codes[@pos + 1] == 0x2f
@@ -229,7 +229,7 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @see ECMA262 7.5
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.5
     def token
       identifier_name || numeric_literal || punctuator || string_literal
     end
@@ -258,7 +258,7 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @see ECMA262 7.6
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.6
     def identifier_name
       return nil if (code = @codes[@pos]).nil?
 
@@ -296,7 +296,7 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @see ECMA262 7.7
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.7
     def punctuator
       code0 = @codes[@pos]
       code1 = @codes[@pos+1]
@@ -328,7 +328,7 @@ module Minjs::Lex
           return ECMA262::PUNC_EQ
         end
         @pos += 1 # =
-        return ECMA262::PUNC_LET
+        return ECMA262::PUNC_ASSIGN
       elsif code0 == 0x21 # !
         if code1 == 0x3d and code2 == 0x3d # !==
           @pos += 3
@@ -343,14 +343,14 @@ module Minjs::Lex
       elsif code0 == 0x25 # %
         if code1 == 0x3d # %=
           @pos += 2
-          return ECMA262::PUNC_MODLET
+          return ECMA262::PUNC_MODASSIGN
         end
         @pos += 1 # %
         return ECMA262::PUNC_MOD
       elsif code0 == 0x26 # &
         if code1 == 0x3d # &=
           @pos += 2
-          return ECMA262::PUNC_ANDLET
+          return ECMA262::PUNC_ANDASSIGN
         end
         if code1 == 0x26 # &&
           @pos += 2
@@ -361,14 +361,14 @@ module Minjs::Lex
       elsif code0 == 0x2a # *
         if code1 == 0x3d # *=
           @pos += 2
-          return ECMA262::PUNC_MULLET
+          return ECMA262::PUNC_MULASSIGN
         end
         @pos += 1 # *
         return ECMA262::PUNC_MUL
       elsif code0 == 0x2b # +
         if code1 == 0x3d # +=
           @pos += 2
-          return ECMA262::PUNC_ADDLET
+          return ECMA262::PUNC_ADDASSIGN
         end
         if code1 == 0x2b # ++
           @pos += 2
@@ -382,7 +382,7 @@ module Minjs::Lex
       elsif code0 == 0x2d # -
         if code1 == 0x3d # -=
           @pos += 2
-          return ECMA262::PUNC_SUBLET
+          return ECMA262::PUNC_SUBASSIGN
         end
         if code1 == 0x2d # --
           @pos += 2
@@ -403,7 +403,7 @@ module Minjs::Lex
         end
         if code1 == 0x3c and code2 == 0x3d # <<=
           @pos += 3
-          return ECMA262::PUNC_LSHIFTLET
+          return ECMA262::PUNC_LSHIFTASSIGN
         end
         if code1 == 0x3c # <<
           @pos += 2
@@ -414,7 +414,7 @@ module Minjs::Lex
       elsif code0 == 0x3e # >
         if code1 == 0x3e and code2 == 0x3e and code3 == 0x3d # >>>=
           @pos += 4
-          return ECMA262::PUNC_URSHIFTLET
+          return ECMA262::PUNC_URSHIFTASSIGN
         end
         if code1 == 0x3e and code2 == 0x3e # >>>
           @pos += 3
@@ -422,7 +422,7 @@ module Minjs::Lex
         end
         if code1 == 0x3e and code2 == 0x3d # >>=
           @pos += 3
-          return ECMA262::PUNC_RSHIFTLET
+          return ECMA262::PUNC_RSHIFTASSIGN
         end
         if code1 == 0x3e # >>
           @pos += 2
@@ -446,7 +446,7 @@ module Minjs::Lex
       elsif code0 == 0x5e # ^
         if code1 == 0x3d # ^=
           @pos += 2
-          return ECMA262::PUNC_XORLET
+          return ECMA262::PUNC_XORASSIGN
         end
         @pos += 1 # ^
         return ECMA262::PUNC_XOR
@@ -457,7 +457,7 @@ module Minjs::Lex
         end
         if code1 == 0x3d # |=
           @pos += 2
-          return ECMA262::PUNC_ORLET
+          return ECMA262::PUNC_ORASSIGN
         end
         @pos += 1 # |
         return ECMA262::PUNC_OR
@@ -468,11 +468,19 @@ module Minjs::Lex
       nil
     end
 
+    # Tests next literal is DivPunctuator or not.
+    #
+    # If literal is DivPunctuator
+    # return ECMA262::PUNC_DIV or ECMA262::PUNC_DIVASSIGN object and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.7
     def div_punctuator
       if @codes[@pos] == 0x2f
         if @codes[@pos+1] == 0x3d
           @pos += 2
-          return ECMA262::PUNC_DIVLET
+          return ECMA262::PUNC_DIVASSIGN
         else
           @pos += 1
           return ECMA262::PUNC_DIV
@@ -481,13 +489,18 @@ module Minjs::Lex
       nil
     end
 
+    # Tests next literal is RegExp or not.
     #
-    # 7.8.5
+    # If literal is RegExp
+    # return ECMA262::ECMA262RegExp object and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
-    # RegularExpressionLiteral::
-    # 	/ RegularExpressionBody / RegularExpressionFlags
-    #
+    # @return [ECMA262::RegExp]
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.8.5
     def regexp_literal
+      # RegularExpressionLiteral::
+      # 	/ RegularExpressionBody / RegularExpressionFlags
       pos0 = @pos
       return nil unless @codes[@pos] == 0x2f
 
@@ -558,8 +571,17 @@ module Minjs::Lex
       return @codes[pos0...@pos].pack("U*")
     end
 
-    #7.8.3
-    #B.1.1
+    private :regexp_flags, :regexp_class, :regexp_body
+
+    # Tests next literal is NumericLiteral or not.
+    #
+    # If literal is NumericLiteral
+    # return ECMA262::ECMA262Numeric object and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
+    #
+    # @return [ECMA262::ECMA262Numeric]
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.8.3
     def numeric_literal
       hex_integer_literal || octal_integer_literal || decimal_literal
     end
@@ -727,6 +749,8 @@ module Minjs::Lex
         nil
       end
     end
+    private :hex_integer_literal, :octal_integer_literal, :decimal_literal,
+            :exponent_part, :decimal_digits
 
     # Tests next literal is StringLiteral or not.
     #
@@ -736,7 +760,7 @@ module Minjs::Lex
     # Otherwise return nil and position is not changed.
     #
     # @return [ECMA262::ECMA262String]
-    # @see ECMA262 7.8.4
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 7.8.4
     #
     def string_literal
       # StringLiteral ::
@@ -895,7 +919,9 @@ module Minjs::Lex
         end
       end
     end
+    private :escape_sequence
 
+    # Returns true if posision is at end of file
     def eof?
       peek_lit(nil).nil?
     end
@@ -983,8 +1009,8 @@ module Minjs::Lex
       lit
     end
 
-    #
     # fetch next literal.
+    #
     # position is not forwarded.
     # white spaces are skipped and ignored.
     # line terminators are not ignored.
@@ -997,6 +1023,9 @@ module Minjs::Lex
       lit
     end
 
+    # Forwards position after calling peek_lit.
+    #
+    # This method quickly forward position after calling peek_lit.
     def fwd_after_peek
       @pos = @head_pos
     end

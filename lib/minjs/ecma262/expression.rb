@@ -18,9 +18,10 @@ module Minjs
     PRIORITY_ASSIGNMENT = 130
     PRIORITY_COMMA = 140
 
-    # Base class of ECMA262 Expression
+    # Base class of ECMA262 expression element
     class Expression < Base
       # reduce expression if available
+      # @param parent [Base] parent element
       def reduce(parent)
       end
 
@@ -36,8 +37,13 @@ module Minjs
 
     end
 
-    # binary operation
+    # Module of typically binary operation expression.
+    #
+    # Typically binary operation expression has two
+    # values(val, val2) and operation symbol.
     module BinaryOperation
+      attr_reader :val, :val2
+
       # remove parenthesis if possible
       def remove_paren
         if @val.kind_of? ExpParen and @val.val.priority <= self.priority
@@ -65,10 +71,46 @@ module Minjs
       def ==(obj)
         self.class == obj.class and self.val == obj.val and self.val2 == obj.val2
       end
+
+      # duplicate object
+      # @see Base#deep_dup
+      def deep_dup
+        self.class.new(@val.deep_dup, @val2.deep_dup)
+      end
+
+      # Replaces children object.
+      # @see Base#replace
+      def replace(from, to)
+        if @val .eql? from
+          @val = to
+        elsif @val2 .eql? from
+          @val2 = to
+        end
+      end
+
+      # Traverses this children and itself with given block.
+      # @see Base#traverse
+      def traverse(parent, &block)
+        @val.traverse(self, &block)
+        @val2.traverse(self, &block)
+        yield parent, self
+      end
+
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
+      def to_js(options = {})
+        concat options, @val, sym, @val2
+      end
     end
 
-    # unary operation
+    # Module of typically unary operation expression.
+    #
+    # Typically unary operation expression has one
+    # values(val) and operation symbol.
+    #
     module UnaryOperation
+      attr_reader :val
+
       # remove parenthesis if possible
       def remove_paren
         if @val.kind_of? ExpParen and @val.val.priority <= self.priority
@@ -90,10 +132,42 @@ module Minjs
       def ==(obj)
         self.class == obj.class and self.val == obj.val
       end
+
+      # duplicate object
+      # @see Base#deep_dup
+      def deep_dup
+        self.class.new(@val.deep_dup)
+      end
+
+      # Replaces children object.
+      # @see Base#replace
+      def replace(from, to)
+        if @val .eql? from
+          @val = to
+        end
+      end
+
+      # Traverses this children and itself with given block.
+      # @see Base#traverse
+      def traverse(parent, &block)
+        @val.traverse(self, &block)
+        yield parent, self
+      end
+
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
+      def to_js(options = {})
+        concat options, sym, @val
+      end
     end
 
-    # Assignment operation
+    # Module of typically Assignment operation.
+    #
+    # Typically unary operation expression has left-hand value(val)
+    # and right-hand value(val2)
     module AssignmentOperation
+      attr_reader :val, :val2
+
       # remove parenthesis if possible
       def remove_paren
         if @val.kind_of? ExpParen and @val.val.priority <= PRIORITY_LEFT_HAND_SIDE
@@ -132,54 +206,14 @@ module Minjs
           nil
         end
       end
-    end
-
-    class ExpArg1 < Expression
-      attr_reader :val
-
-      def initialize(val)
-        @val = val
-      end
-
-      # duplicate object
-      # @see Base#deep_dup
-      def deep_dup
-        self.class.new(@val.deep_dup)
-      end
-
-      def replace(from, to)
-        if @val .eql? from
-          @val = to
-        end
-      end
-
-      # Traverses this children and itself with given block.
-      def traverse(parent, &block)
-        @val.traverse(self, &block)
-        yield parent, self
-      end
-
-      # Returns a ECMAScript string containg the representation of element.
-      # @see Base#to_js
-      def to_js(options = {})
-        concat options, sym, @val
-      end
-    end
-
-    class ExpArg2 < Expression
-      attr_reader :val, :val2
-
-      def initialize(val, val2)
-        @val = val
-        @val2 = val2
-      end
-
       # duplicate object
       # @see Base#deep_dup
       def deep_dup
         self.class.new(@val.deep_dup, @val2.deep_dup)
       end
 
+      # Replaces children object.
+      # @see Base#replace
       def replace(from, to)
         if @val .eql? from
           @val = to
@@ -189,6 +223,7 @@ module Minjs
       end
 
       # Traverses this children and itself with given block.
+      # @see Base#traverse
       def traverse(parent, &block)
         @val.traverse(self, &block)
         @val2.traverse(self, &block)
@@ -200,11 +235,63 @@ module Minjs
       def to_js(options = {})
         concat options, @val, sym, @val2
       end
-    end
 
+      # reduce expression if available
+      # @param parent [Base] parent element
+      def reduce(parent)
+        #
+        # a = a / b => a /= b
+        #
+        if @val2.kind_of? ExpDiv and @val2.val == @val
+          parent.replace(self,
+                         ExpParen.new(
+                           ExpDivAssign.new(@val, @val2.val2)))
+        elsif @val2.kind_of? ExpMul and @val2.val == @val
+          parent.replace(self,
+                         ExpParen.new(
+                           ExpMulAssign.new(@val, @val2.val2)))
+        elsif @val2.kind_of? ExpMod and @val2.val == @val
+          parent.replace(self,
+                         ExpParen.new(
+                           ExpModAssign.new(@val, @val2.val2)))
+        elsif @val2.kind_of? ExpAdd and @val2.val == @val
+          parent.replace(self,
+                         ExpParen.new(
+                           ExpAddAssign.new(@val, @val2.val2)))
+        elsif @val2.kind_of? ExpSub and @val2.val == @val
+          parent.replace(self,
+                         ExpParen.new(
+                           ExpSubAssign.new(@val, @val2.val2)))
+        elsif @val2.kind_of? ExpLShift and @val2.val == @val
+          parent.replace(self,
+                         ExpParen.new(
+                           ExpLShiftAssign.new(@val, @val2.val2)))
+        elsif @val2.kind_of? ExpRShift and @val2.val == @val
+          parent.replace(self,
+                         ExpParen.new(
+                           ExpRShiftAssign.new(@val, @val2.val2)))
+        elsif @val2.kind_of? ExpURShift and @val2.val == @val
+          parent.replace(self,
+                         ExpParen.new(
+                           ExpURShiftAssign.new(@val, @val2.val2)))
+        elsif @val2.kind_of? ExpAnd and @val2.val == @val
+          parent.replace(self,
+                         ExpParen.new(
+                           ExpAndAssign.new(@val, @val2.val2)))
+        elsif @val2.kind_of? ExpOr and @val2.val == @val
+          parent.replace(self,
+                         ExpParen.new(
+                           ExpOrAssign.new(@val, @val2.val2)))
+        elsif @val2.kind_of? ExpXor and @val2.val == @val
+          parent.replace(self,
+                         ExpParen.new(
+                           ExpXorAssign.new(@val, @val2.val2)))
+        end
+      end
+    end
+    # Class of the Grouping operator expression element.
     #
-    # 11.1 primary expression
-    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.1.6
     class ExpParen < Expression
       attr_reader :val
 
@@ -212,6 +299,7 @@ module Minjs
         @val = val
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_PRIMARY
       end
@@ -222,6 +310,8 @@ module Minjs
         self.class.new(@val.deep_dup)
       end
 
+      # Replaces children object.
+      # @see Base#replace
       def replace(from, to)
         if @val .eql? from
           @val = to
@@ -229,6 +319,7 @@ module Minjs
       end
 
       # Traverses this children and itself with given block.
+      # @see Base#traverse
       def traverse(parent, &block)
         @val.traverse(self, &block)
         yield parent, self
@@ -253,7 +344,7 @@ module Minjs
       # returns removing parenthesis is possible or not
       #
       # ECMA262 expression-statement should not start with
-      # "function" or "{". 
+      # "function" or "{".
       # This method checks inner of the parenthesis' first literal.
       #
       # @return [Boolean] true if possible
@@ -279,12 +370,23 @@ module Minjs
         self
       end
 
+      # Returns results of ToBoolean()
+      #
+      # Returns _true_ or _false if trivial,
+      # otherwise nil.
+      #
+      # @return [Boolean]
+      #
+      # @see http://www.ecma-international.org/ecma-262 ECMA262 9.2
       def to_ecma262_boolean
         return nil unless @val.respond_to? :to_ecma262_boolean
         return nil if @val.to_ecma262_boolean.nil?
         @val.to_ecma262_boolean
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] type of val
       def ecma262_typeof
         if @val.respond_to? :ecma262_typeof
           @val.ecma262_typeof
@@ -293,19 +395,44 @@ module Minjs
         end
       end
     end
+    # Class of the Property Accessors expression element.
     #
-    # 11.2 Left-Hand-Side Expressions
+    # This is another expression of ExpProp.
+    # This class uses bracket instead of period.
     #
-    # function expression: see st.rb:StFunc
-    #
-    # 11.2.1 Property Accessors val[val2]
-    #
-    class ExpPropBrac < ExpArg2
+    # @see ExpProp
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.2.1
+    class ExpPropBrac < Expression
+      attr_reader :val, :val2
+
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # duplicate object
+      # @see Base#deep_dup
+      def deep_dup
+        self.class.new(@val.deep_dup, @val2.deep_dup)
+      end
+
+      # Replaces children object.
+      # @see Base#replace
+      def replace(from, to)
+        if @val .eql? from
+          @val = to
+        elsif @val2 .eql? from
+          @val2 = to
+        end
+      end
+
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_LEFT_HAND_SIDE
       end
 
       # Traverses this children and itself with given block.
+      # @see Base#traverse
       def traverse(parent, &block)
         @val.traverse(self, &block)
         @val2.traverse(self, &block)
@@ -349,10 +476,16 @@ module Minjs
         self
       end
     end
+    # Class of the Property Accessors expression element.
     #
-    # => val.val2
+    # This is another expression of ExpPropBrac.
+    # This class uses period insted of bracket.
     #
-    class ExpProp < ExpArg2
+    # @see ExpPropBrac
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.2.1
+    class ExpProp < Expression
+      attr_reader :val, :val2
+
       def initialize(val, val2)
         @val = val
         if val2.kind_of? IdentifierName
@@ -362,11 +495,29 @@ module Minjs
         end
       end
 
+      # duplicate object
+      # @see Base#deep_dup
+      def deep_dup
+        self.class.new(@val.deep_dup, @val2.deep_dup)
+      end
+
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_LEFT_HAND_SIDE
       end
 
+      # Replaces children object.
+      # @see Base#replace
+      def replace(from, to)
+        if @val .eql? from
+          @val = to
+        elsif @val2 .eql? from
+          @val2 = to
+        end
+      end
+
       # Traverses this children and itself with given block.
+      # @see Base#traverse
       def traverse(parent, &block)
         @val.traverse(self, &block)
         @val2.traverse(self, &block)
@@ -407,9 +558,9 @@ module Minjs
         self
       end
     end
-    #11.2
-    #  => name(args)
+    # Class of the Call expression element.
     #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.2
     class ExpCall < Expression
       attr_reader :name
       attr_reader :args
@@ -419,6 +570,7 @@ module Minjs
         @args = args
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_LEFT_HAND_SIDE
       end
@@ -430,6 +582,8 @@ module Minjs
                        @args ? @args.collect{|x| x.deep_dup} : nil)
       end
 
+      # Replaces children object.
+      # @see Base#replace
       def replace(from, to)
         if @name .eql? from
           @name = to
@@ -506,10 +660,9 @@ module Minjs
 
     end
 
+    # Class of the New expression element.
     #
-    # new M
-    # new M(a,b,c...)
-    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.2
     class ExpNew < Expression
       attr_reader :name, :args
 
@@ -518,6 +671,7 @@ module Minjs
         @args = args
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_LEFT_HAND_SIDE + ((args == nil) ? 1 : 0)
       end
@@ -529,6 +683,8 @@ module Minjs
                        @args ? @args.collect{|x| x.deep_dup} : nil)
       end
 
+      # Replaces children object.
+      # @see Base#replace
       def replace(from, to)
         if @name .eql? from
           @name = from
@@ -540,6 +696,7 @@ module Minjs
       end
 
       # Traverses this children and itself with given block.
+      # @see Base#traverse
       def traverse(parent, &block)
         @name.traverse(self, &block)
         if @args
@@ -606,15 +763,21 @@ module Minjs
       end
     end
 
+    # Class of the Postfix increment operator expression element.
     #
-    # 11.3 Postfix Expressions
-    #
-    class ExpPostInc < ExpArg1
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.3.1
+    class ExpPostInc < Expression
       include UnaryOperation
+      def initialize(val)
+        @val = val
+      end
+
+      # symbol of expression
       def sym
         "++"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_POSTFIX
       end
@@ -625,12 +788,22 @@ module Minjs
         concat options, @val, sym
       end
     end
-    class ExpPostDec < ExpArg1
+
+    # Class of the Postfix decrement operator expression element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.3.2
+    class ExpPostDec < Expression
       include UnaryOperation
+      def initialize(val)
+        @val = val
+      end
+
+      # symbol of expression
       def sym
         "--"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_POSTFIX
       end
@@ -641,108 +814,187 @@ module Minjs
         concat options, @val, sym
       end
     end
+    # Class of the Delete operator expression element.
     #
-    # 11.4
-    # unary expression
-    #
-    class ExpDelete < ExpArg1
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.4
+    class ExpDelete < Expression
       include UnaryOperation
+      def initialize(val)
+        @val = val
+      end
+
+      # symbol of expression
       def sym
         "delete"
       end
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_UNARY
       end
     end
-    class ExpVoid < ExpArg1
+    # Class of the Void operator expression element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.4
+    class ExpVoid < Expression
       include UnaryOperation
 
+      def initialize(val)
+        @val = val
+      end
+      # symbol of expression
       def sym
         "void"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_UNARY
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :undefined
       def ecma262_typeof
         :undefined
       end
-
     end
-    class ExpTypeof < ExpArg1
+
+    # Class of the Typeof operator expression element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.4
+    class ExpTypeof < Expression
       include UnaryOperation
+      def initialize(val)
+        @val = val
+      end
+
+      # symbol of expression
       def sym
         "typeof"
       end
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_UNARY
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :string
       def ecma262_typeof
         :string
       end
     end
 
-    class ExpPreInc < ExpArg1
+    # Class of the Prefix Increment operator expression element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.4
+    class ExpPreInc < Expression
       include UnaryOperation
+      def initialize(val)
+        @val = val
+      end
+
+      # symbol of expression
       def sym
         "++"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_UNARY
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :number
       def ecma262_typeof
         :number
       end
     end
-    class ExpPreDec < ExpArg1
+
+    # Class of the Prefix Decrement operator expression element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.4
+    class ExpPreDec < Expression
       include UnaryOperation
+      def initialize(val)
+        @val = val
+      end
+
+      # symbol of expression
       def sym
         "--"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_UNARY
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :number
       def ecma262_typeof
         :number
       end
     end
-    class ExpPositive < ExpArg1
+
+    # Class of the Positive operator expression element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.4
+    class ExpPositive < Expression
       include UnaryOperation
+      def initialize(val)
+        @val = val
+      end
+
+      # symbol of expression
       def sym
         "+"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_UNARY
       end
 
+      # reduce expression if available
+      # @param parent [Base] parent element
       def reduce(parent)
         if @val.kind_of? ECMA262Numeric
           parent.replace(self, @val)
         end
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :number
       def ecma262_typeof
         :number
       end
     end
 
-    class ExpNegative < ExpArg1
+    # Class of the Negative operator expression element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.4
+    class ExpNegative < Expression
       include UnaryOperation
+      def initialize(val)
+        @val = val
+      end
+
+      # symbol of expression
       def sym
         "-"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_UNARY
       end
 
+      # reduce expression if available
+      # @param parent [Base] parent element
       def reduce(parent)
         if @val.kind_of? ECMA262Numeric
           if @val.integer.match(/^\-/)
@@ -755,35 +1007,62 @@ module Minjs
         end
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :number
       def ecma262_typeof
         :number
       end
     end
 
-    class ExpBitwiseNot < ExpArg1
+    # Class of the Bitwise Not operator expression element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.4
+    class ExpBitwiseNot < Expression
       include UnaryOperation
+      def initialize(val)
+        @val = val
+      end
+
+      # symbol of expression
       def sym
         "~"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_UNARY
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :number
       def ecma262_typeof
         :number
       end
     end
-    class ExpLogicalNot < ExpArg1
+
+    # Class of the Logical Not operator expression element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.4
+    class ExpLogicalNot < Expression
       include UnaryOperation
+      def initialize(val)
+        @val = val
+      end
+
+      # symbol of expression
       def sym
         "!"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_UNARY
       end
 
+      # reduce expression if available
+      # @param parent [Base] parent element
       def reduce(parent)
         if @val.kind_of? ECMA262Numeric and (@val.to_js == "0" || @val.to_js == "1")
           return
@@ -802,6 +1081,14 @@ module Minjs
         end
       end
 
+      # Returns results of ToBoolean()
+      #
+      # Returns _true_ or _false if trivial,
+      # otherwise nil.
+      #
+      # @return [Boolean]
+      #
+      # @see http://www.ecma-international.org/ecma-262 ECMA262 9.2
       def to_ecma262_boolean
         return nil unless @val.respond_to? :to_ecma262_boolean
         return nil if @val.to_ecma262_boolean.nil?
@@ -829,20 +1116,31 @@ module Minjs
         end
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :boolean
       def ecma262_typeof
         :boolean
       end
     end
+
+    # Class of the Multiprication operator expression element.
     #
-    # 11.5.1 Applying the * Operator
-    #
-    class ExpMul < ExpArg2
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.5
+    class ExpMul < Expression
       include BinaryOperation
 
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "*"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_MULTIPLICATIVE
       end
@@ -853,6 +1151,8 @@ module Minjs
         @val2 = t
       end
 
+      # reduce expression if available
+      # @param parent [Base] parent element
       def reduce(parent)
         # A * B
         if @val.respond_to? :to_ecma262_number and @val2.respond_to? :to_ecma262_number
@@ -864,51 +1164,79 @@ module Minjs
         end
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :number
       def ecma262_typeof
         :number
       end
     end
 
+    # Class of the Division operator expression element.
     #
-    # 11.5.2 Applying the / Operator
-    #
-    class ExpDiv < ExpArg2
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.5
+    class ExpDiv < Expression
       include BinaryOperation
+
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "/"
       end
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_MULTIPLICATIVE
       end
     end
 
+    # Class of the Remainder operator expression element.
     #
-    # 11.5.3 Applying the % Operator
-    #
-    class ExpMod < ExpArg2
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.5
+    class ExpMod < Expression
       include BinaryOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "%"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_MULTIPLICATIVE
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :number
       def ecma262_typeof
         :number
       end
     end
 
+    # Class of the Additionr operator expression element.
     #
-    #11.6.1 The Addition operator ( + )
-    #
-    class ExpAdd < ExpArg2
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.6
+    class ExpAdd < Expression
       include BinaryOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "+"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_ADDITIVE
       end
@@ -919,6 +1247,8 @@ module Minjs
         @val2 = t
       end
 
+      # reduce expression if available
+      # @param parent [Base] parent element
       def reduce(parent)
         #
         # String + String/
@@ -948,20 +1278,28 @@ module Minjs
         end
       end
     end
+    # Class of the Subtraction operator expression element.
     #
-    # 11.6.2 The Subtraction Operator ( - )
-    #
-    class ExpSub < ExpArg2
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.6
+    class ExpSub < Expression
       include BinaryOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
 
+      # symbol of expression
       def sym
         "-"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_ADDITIVE
       end
 
+      # reduce expression if available
+      # @param parent [Base] parent element
       def reduce(parent)
         # A - B
         if @val.respond_to? :to_ecma262_number and @val2.respond_to? :to_ecma262_number
@@ -973,212 +1311,334 @@ module Minjs
         end
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :number
       def ecma262_typeof
         :number
       end
     end
 
+    # Class of the Left Shift operator expression element.
     #
-    # 11.7.1 The Left Shift Operator ( << )
-    #
-    class ExpLShift < ExpArg2
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.7
+    class ExpLShift < Expression
       include BinaryOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "<<"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_SHIFT
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :number
       def ecma262_typeof
         :number
       end
     end
+    # Class of the Right Shift operator expression element.
     #
-    # 11.7.2 The Signed Right Shift Operator ( >> )
-    #
-    class ExpRShift < ExpArg2
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.7
+    class ExpRShift < Expression
       include BinaryOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         ">>"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_SHIFT
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :number
       def ecma262_typeof
         :number
       end
     end
+    # Class of the Unsigned Right Shift operator expression element.
     #
-    # 11.7.3 The Unsigned Right Shift Operator ( >>> )
-    #
-    class ExpURShift < ExpArg2
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.7
+    class ExpURShift < Expression
       include BinaryOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         ">>>"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_SHIFT
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :number
       def ecma262_typeof
         :number
       end
     end
+    # Class of the Less-than operator expression element.
     #
-    # 11.8.1 The Less-than Operator ( < )
-    #
-    class ExpLt < ExpArg2
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.8
+    class ExpLt < Expression
       include BinaryOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "<"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_RELATIONAL
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :boolean
       def ecma262_typeof
         :boolean
       end
     end
 
+    # Class of the Greater-than operator expression element.
     #
-    # 11.8.2 The Greater-than Operator ( > )
-    #
-    class ExpGt < ExpArg2
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.8
+    class ExpGt < Expression
       include BinaryOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         ">"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_RELATIONAL
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :boolean
       def ecma262_typeof
         :boolean
       end
     end
+    # Class of the Less-than-or-equal operator expression element.
     #
-    # 11.8.3 The Less-than-or-equal Operator ( <= )
-    #
-    class ExpLtEq < ExpArg2
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.8
+    class ExpLtEq < Expression
       include BinaryOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "<="
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_RELATIONAL
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :boolean
       def ecma262_typeof
         :boolean
       end
     end
+    # Class of the Greater-than-or-equal operator expression element.
     #
-    # 11.8.4 The Greater-than-or-equal Operator ( >= )
-    #
-    class ExpGtEq < ExpArg2
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.8
+    class ExpGtEq < Expression
       include BinaryOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         ">="
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_RELATIONAL
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :boolean
       def ecma262_typeof
         :boolean
       end
     end
+    # Class of the instanceof operator expression element.
     #
-    # 11.8.6 The instanceof operator
-    #
-    class ExpInstanceOf < ExpArg2
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.8
+    class ExpInstanceOf < Expression
       include BinaryOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "instanceof"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_RELATIONAL
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :boolean
       def ecma262_typeof
         :boolean
       end
     end
+    # Class of the in operator expression element.
     #
-    # 11.8.7 The in operator
-    #
-    class ExpIn < ExpArg2
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.8
+    class ExpIn < Expression
       include BinaryOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "in"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_RELATIONAL
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :boolean
       def ecma262_typeof
         :boolean
       end
     end
+    # Class of the Equals operator expression element.
     #
-    # 11.9.1 The Equals Operator ( == )
-    #
-    class ExpEq < ExpArg2
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.9
+    class ExpEq < Expression
       include BinaryOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "=="
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_EQUALITY
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :boolean
       def ecma262_typeof
         :boolean
       end
     end
+    # Class of the Does-not-equals operator expression element.
     #
-    # 11.9.2 The Does-not-equals Operator ( != )
-    #
-    class ExpNotEq < ExpArg2
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.9
+    class ExpNotEq < Expression
       include BinaryOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "!="
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_EQUALITY
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :boolean
       def ecma262_typeof
         :boolean
       end
     end
+    # Class of the Strict Equals operator expression element.
     #
-    # 11.9.4 The Strict Equals Operator ( === )
-    #
-    class ExpStrictEq < ExpArg2
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.9
+    class ExpStrictEq < Expression
       include BinaryOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "==="
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_EQUALITY
       end
 
+      # reduce expression if available
+      # @param parent [Base] parent element
       def reduce(parent)
         if @val.respond_to?(:ecma262_typeof) and @val2.respond_to?(:ecma262_typeof) and
            (t = @val.ecma262_typeof) == @val2.ecma262_typeof and !t.nil?
@@ -1186,23 +1646,35 @@ module Minjs
         end
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :boolean
       def ecma262_typeof
         :boolean
       end
     end
+    # Class of the Strict Does-not-equals operator expression element.
     #
-    # 11.9.5 The Strict Does-not-equal Operator ( !== )
-    #
-    class ExpStrictNotEq < ExpArg2
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.9
+    class ExpStrictNotEq < Expression
       include BinaryOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "!=="
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_EQUALITY
       end
 
+      # reduce expression if available
+      # @param parent [Base] parent element
       def reduce(parent)
         if @val.respond_to?(:ecma262_typeof) and @val2.respond_to?(:ecma262_typeof) and
            (t = @val.ecma262_typeof) == @val2.ecma262_typeof and !t.nil?
@@ -1210,19 +1682,29 @@ module Minjs
         end
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :boolean
       def ecma262_typeof
         :boolean
       end
     end
+    # Class of the Bitwise And operator expression element.
     #
-    # 11.10 Binary Bitwise Operators
-    #
-    class ExpAnd < ExpArg2
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.10
+    class ExpAnd < Expression
       include BinaryOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "&"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_BITWISE_AND
       end
@@ -1233,17 +1715,30 @@ module Minjs
         @val2 = t
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :number
       def ecma262_typeof
         :number
       end
     end
-    # ^
-    class ExpXor < ExpArg2
+
+    # Class of the Bitwise Xor operator expression element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.10
+    class ExpXor < Expression
       include BinaryOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "^"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_BITWISE_XOR
       end
@@ -1254,18 +1749,30 @@ module Minjs
         @val2 = t
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :number
       def ecma262_typeof
         :number
       end
     end
 
-    # |
-    class ExpOr < ExpArg2
+    # Class of the Bitwise Or operator expression element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.10
+    class ExpOr < Expression
       include BinaryOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "|"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_BITWISE_OR
       end
@@ -1276,25 +1783,43 @@ module Minjs
         @val2 = t
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] :number
       def ecma262_typeof
         :number
       end
     end
+
+    # Class of the Bitwise Logical And operator expression element.
     #
-    # 11.11 Binary Logical Operators
-    #
-    # &&
-    class ExpLogicalAnd < ExpArg2
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.11
+    class ExpLogicalAnd < Expression
       include BinaryOperation
 
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "&&"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_LOGICAL_AND
       end
 
+      # Returns results of ToBoolean()
+      #
+      # Returns _true_ or _false if trivial,
+      # otherwise nil.
+      #
+      # @return [Boolean]
+      #
+      # @see http://www.ecma-international.org/ecma-262 ECMA262 9.2
       def to_ecma262_boolean
         return nil if !(@val.respond_to? :to_ecma262_boolean)
         return nil if @val.to_ecma262_boolean == nil
@@ -1305,6 +1830,9 @@ module Minjs
         true
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] typeof val if typeof val equals to val2
       def ecma262_typeof
         if @val.respond_to? :ecma262_typeof and @val2.respond_to? :ecma262_typeof
            if @val.ecma262_typeof == @val2.ecma262_typeof
@@ -1314,17 +1842,34 @@ module Minjs
         nil
       end
     end
-    # ||
-    class ExpLogicalOr < ExpArg2
+    # Class of the Bitwise Logical Or operator expression element.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.11
+    class ExpLogicalOr < Expression
       include BinaryOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "||"
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_LOGICAL_OR
       end
 
+      # Returns results of ToBoolean()
+      #
+      # Returns _true_ or _false if trivial,
+      # otherwise nil.
+      #
+      # @return [Boolean]
+      #
+      # @see http://www.ecma-international.org/ecma-262 ECMA262 9.2
       def to_ecma262_boolean
         return nil if !(@val.respond_to? :to_ecma262_boolean)
         return nil if @val.to_ecma262_boolean == nil
@@ -1335,6 +1880,9 @@ module Minjs
         false
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] typeof val if typeof val equals to val2
       def ecma262_typeof
         if @val.respond_to? :ecma262_typeof and @val2.respond_to? :ecma262_typeof
           if @val.ecma262_typeof == @val2.ecma262_typeof
@@ -1344,11 +1892,9 @@ module Minjs
         nil
       end
     end
+    # Class of the Conditional operator expression element.
     #
-    # 11.12 Conditional Operator ( ? : )
-    #
-    # val ? val2 : val3
-    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.12
     class ExpCond < Expression
       attr_reader :val, :val2, :val3
       alias :cond :val
@@ -1359,6 +1905,7 @@ module Minjs
         @val3 = val3
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_CONDITIONAL
       end
@@ -1397,6 +1944,8 @@ module Minjs
         self.class.new(@val.deep_dup, @val2.deep_dup, @val3.deep_dup)
       end
 
+      # Replaces children object.
+      # @see Base#replace
       def replace(from, to)
         if from .eql? @val
           @val = to
@@ -1408,6 +1957,7 @@ module Minjs
       end
 
       # Traverses this children and itself with given block.
+      # @see Base#traverse
       def traverse(parent, &block)
         @val.traverse(self, &block)
         @val2.traverse(self, &block)
@@ -1429,6 +1979,9 @@ module Minjs
         "#{@val.to_js(options)}?#{@val2.to_js(options)}:#{@val3.to_js(options)}"
       end
 
+      # return results of 'typeof' operator.
+      #
+      # @return [Symbol] typeof val2 if typeof val2 equals to val3
       def ecma262_typeof
         if @val2.respond_to? :ecma262_typeof and @val3.respond_to? :ecma262_typeof
           if @val2.ecma262_typeof == @val3.ecma262_typeof
@@ -1438,178 +1991,263 @@ module Minjs
         nil
       end
     end
+
+    # Class of '=' operator
     #
-    # 11.13 Assignment Operators
-    #
-    class ExpAssign < ExpArg2
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.13
+    class ExpAssign < Expression
       include AssignmentOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "="
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_ASSIGNMENT
       end
-
-      def reduce(parent)
-        #
-        # a = a / b => a /= b
-        #
-        if @val2.kind_of? ExpDiv and @val2.val == @val
-          parent.replace(self,
-                         ExpParen.new(
-                           ExpDivAssign.new(@val, @val2.val2)))
-        elsif @val2.kind_of? ExpMul and @val2.val == @val
-          parent.replace(self,
-                         ExpParen.new(
-                           ExpMulAssign.new(@val, @val2.val2)))
-        elsif @val2.kind_of? ExpMod and @val2.val == @val
-          parent.replace(self,
-                         ExpParen.new(
-                           ExpModAssign.new(@val, @val2.val2)))
-        elsif @val2.kind_of? ExpAdd and @val2.val == @val
-          parent.replace(self,
-                         ExpParen.new(
-                           ExpAddAssign.new(@val, @val2.val2)))
-        elsif @val2.kind_of? ExpSub and @val2.val == @val
-          parent.replace(self,
-                         ExpParen.new(
-                           ExpSubAssign.new(@val, @val2.val2)))
-        elsif @val2.kind_of? ExpLShift and @val2.val == @val
-          parent.replace(self,
-                         ExpParen.new(
-                           ExpLShiftAssign.new(@val, @val2.val2)))
-        elsif @val2.kind_of? ExpRShift and @val2.val == @val
-          parent.replace(self,
-                         ExpParen.new(
-                           ExpRShiftAssign.new(@val, @val2.val2)))
-        elsif @val2.kind_of? ExpURShift and @val2.val == @val
-          parent.replace(self,
-                         ExpParen.new(
-                           ExpURShiftAssign.new(@val, @val2.val2)))
-        elsif @val2.kind_of? ExpAnd and @val2.val == @val
-          parent.replace(self,
-                         ExpParen.new(
-                           ExpAndAssign.new(@val, @val2.val2)))
-        elsif @val2.kind_of? ExpOr and @val2.val == @val
-          parent.replace(self,
-                         ExpParen.new(
-                           ExpOrAssign.new(@val, @val2.val2)))
-        elsif @val2.kind_of? ExpXor and @val2.val == @val
-          parent.replace(self,
-                         ExpParen.new(
-                           ExpXorAssign.new(@val, @val2.val2)))
-        end
-      end
     end
-    class ExpDivAssign < ExpAssign
+
+    # Class of '/=' operator
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.13
+    class ExpDivAssign < Expression
       include AssignmentOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "/="
       end
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_ASSIGNMENT
       end
     end
-    class ExpMulAssign < ExpAssign
+
+    # Class of '*=' operator
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.13
+    class ExpMulAssign < Expression
       include AssignmentOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "*="
       end
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_ASSIGNMENT
       end
     end
-    class ExpModAssign < ExpAssign
+
+    # Class of '%=' operator
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.13
+    class ExpModAssign < Expression
       include AssignmentOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "%="
       end
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_ASSIGNMENT
       end
     end
-    class ExpAddAssign < ExpAssign
+
+    # Class of '+=' operator
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.13
+    class ExpAddAssign < Expression
       include AssignmentOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "+="
       end
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_ASSIGNMENT
       end
     end
-    class ExpSubAssign < ExpAssign
+
+    # Class of '-=' operator
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.13
+    class ExpSubAssign < Expression
       include AssignmentOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "-="
       end
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_ASSIGNMENT
       end
     end
-    class ExpLShiftAssign < ExpAssign
+
+    # Class of '<<=' operator
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.13
+    class ExpLShiftAssign < Expression
       include AssignmentOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "<<="
       end
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_ASSIGNMENT
       end
     end
-    class ExpRShiftAssign < ExpAssign
+
+    # Class of '>>=' operator
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.13
+    class ExpRShiftAssign < Expression
       include AssignmentOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         ">>="
       end
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_ASSIGNMENT
       end
     end
-    class ExpURShiftAssign < ExpAssign
+
+    # Class of '>>>=' operator
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.13
+    class ExpURShiftAssign < Expression
       include AssignmentOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         ">>>="
       end
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_ASSIGNMENT
       end
     end
-    class ExpAndAssign < ExpAssign
+
+    # Class of '&=' operator
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.13
+    class ExpAndAssign < Expression
       include AssignmentOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "&="
       end
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_ASSIGNMENT
       end
     end
-    class ExpOrAssign < ExpAssign
+
+    # Class of '|=' operator
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.13
+    class ExpOrAssign < Expression
       include AssignmentOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "|="
       end
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_ASSIGNMENT
       end
     end
-    class ExpXorAssign < ExpAssign
+
+    # Class of '^=' operator
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.13
+    class ExpXorAssign < Expression
       include AssignmentOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         "^="
       end
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_ASSIGNMENT
       end
     end
+    # Class of comma operator ( , )
     #
-    # Comma Operator ( , )
-    #
-    class ExpComma < ExpArg2
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 11.14
+    class ExpComma < Expression
       include BinaryOperation
+      def initialize(val, val2)
+        @val = val
+        @val2 = val2
+      end
+
+      # symbol of expression
       def sym
         ","
       end
 
+      # @return [Fixnum] expression priority
       def priority
         PRIORITY_COMMA
       end

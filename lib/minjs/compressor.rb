@@ -6,6 +6,7 @@ require 'minjs/version'
 require 'logger'
 
 module Minjs
+  # Compressor class
   class Compressor
     attr_reader :prog
 
@@ -20,15 +21,18 @@ module Minjs
       end
     end
 
+    # debuging method
     def debug
       puts @prog.to_js()
     end
 
+    # Returns a ECMAScript string
     def to_js(options = {})
       remove_empty_statement
       @prog.to_js(options).sub(/;;\Z/, ";")
     end
 
+    # Removes empty statement
     def remove_empty_statement(node = @prog)
       node.traverse(nil) {|parent, st|
         if st.kind_of? ECMA262::StatementList
@@ -38,6 +42,7 @@ module Minjs
       self
     end
 
+    # Compresses ECMAScript
     def compress(data, options = {})
       @logger.info '* parse'
       parse(data)
@@ -78,6 +83,10 @@ module Minjs
       self
     end
 
+    # parses input elements and create node element tree
+    #
+    # @param data [String] ECMAScript input element
+    # @return self
     def parse(data)
       @lex = Minjs::Lex::Parser.new(data, :logger => @logger)
       @global_context = ECMA262::Context.new
@@ -125,7 +134,6 @@ module Minjs
         c = "$"
       end
     end
-    private :c2i, :i2c
 
     def next_sym(s)
       v = 0
@@ -153,7 +161,9 @@ module Minjs
       end
       ret.to_sym
     end
+    private :c2i, :i2c, :next_sym
 
+    # Groups statements in the block and reduce number of them as few as posibble.
     def grouping_statement(node = @prog)
       node.traverse(nil) {|parent, st|
         if st.kind_of? ECMA262::StatementList
@@ -231,7 +241,7 @@ module Minjs
             v = ECMA262::StVar.new(
               context,
               var_vars.collect do |k, v|
-                [ECMA262::IdentifierName.new(context, k)]
+                [ECMA262::IdentifierName.get(context, k)]
               end
             )
 
@@ -267,6 +277,7 @@ module Minjs
       self
     end
 
+    # Removes parenthesis if possible and add parentesis if need.
     def add_remove_paren(node = @prog)
       node.traverse(nil) {|parent, st|
         if st.respond_to? :remove_paren
@@ -277,12 +288,10 @@ module Minjs
       self
     end
 
-    def remove_paren(node = @prog)
-      add_remove_paren(node)
-    end
-
+    # Converts every statement of 'then' to block even if
+    # it contain only one statement.
     #
-    # To determine removing "block" is available or not is difficult.
+    # To determine removing "block" is posibble or not is difficult.
     # For example, next code's if-block must not be removed, because
     # "else" cluase combined to second "if" statement.
     #
@@ -310,7 +319,7 @@ module Minjs
     #  }
     #
     # To solve this problem, first, every then-clause without block
-    # converts to block statement. After converted, all blocks 
+    # converts to block statement. After converted, all blocks
     # except then-clause can be removed safety.
     #
     def then_to_block(node = @prog)
@@ -323,6 +332,7 @@ module Minjs
       }
     end
 
+    # Converts Block to single statement if possible
     def block_to_statement(node = @prog)
       remove_empty_statement
       then_to_block
@@ -336,6 +346,7 @@ module Minjs
       if_block_to_statement
     end
 
+    # Converts If statement's block to single statement if possible
     def if_block_to_statement(node = @prog)
       remove_empty_statement
       # The "else" cluase's block can be removed always
@@ -393,19 +404,22 @@ module Minjs
       self
     end
 
+    # Convers if statement to expression statement if possible.
     #
-    # if(a)b;else c;
-    # =>
-    # a?b:c
+    #   if(a)b;else c;
+    #   =>
+    #   a?b:c
     #
-    # if(a)b
-    # =>
-    # a&&b; or a?b:0;
+    #   if(a)b
+    #   =>
+    #   a&&b;
+    #     or
+    #   a?b:0;
     #
-    # NOTE:
-    # Sometimes, "conditional operator" will be shorter than
-    # "logical and operator", because "conditional operator"'s
-    # priority is lower than almost all other expressions.
+    # @note
+    #   Sometimes, "conditional operator" will be shorter than
+    #   "logical and operator", because "conditional operator"'s
+    #   priority is lower than almost all other expressions.
     #
     def if_to_cond(node = @prog)
       node.traverse(nil) {|parent, st|
@@ -428,9 +442,15 @@ module Minjs
       if_to_return(node)
       self
     end
+    # Converts 'if statement' to 'return statement'
     #
-    # if(a)return b;else return c;
-    # => return a?b:c;
+    # The condition is:
+    # 'if statement' which has 'return statement' in its then-clause
+    # or else-cluase to 'return statement'
+    #
+    #   if(a)return b;else return c;
+    #   =>
+    #   return a?b:c;
     #
     def if_to_return(node = @prog)
       node.traverse(nil) {|parent, st|
@@ -448,11 +468,16 @@ module Minjs
       self
     end
 
+    # Optimize 'if statement'.
     #
-    # if(a)return b;
-    # return c;
+    # The condition is:
+    # 'if statement' which has 'return statement' in its then-clause and
+    # its next statement is 'return statement'
     #
-    # => return a?b:c;
+    #   if(a)return b;
+    #   return c;
+    #   =>
+    #   return a?b:c;
     #
     def optimize_if_return(node = @prog)
       node.traverse(nil) {|parent0, st0|
@@ -496,7 +521,7 @@ module Minjs
             st.replace(ls2, ret)
             st.remove(ls)
           end
-          if st0.to_js.length > st.to_js.length 
+          if st0.to_js.length > st.to_js.length
             parent0.replace(st0, st)
           end
         end
@@ -504,10 +529,15 @@ module Minjs
       self
     end
 
+    # Optimize 'if statement'.
     #
-    # if(a)return b;else c;
-    # =>
-    # if(a)return b;c;
+    # The condition is:
+    # 'if statement' which has 'return statement' in its then-clause and
+    # its else-caluse has no 'return statement'
+    #
+    #   if(a)return b;else c;
+    #   =>
+    #   if(a)return b;c;
     #
     def optimize_if_return2(node = @prog)
       node.traverse(nil) {|parent, st|
@@ -533,7 +563,8 @@ module Minjs
       self
     end
 
-    def compress_var(node = @prog, options = {})
+    # Compresses variable name as short as possible.
+    def compress_var(node = @prog)
       func_scopes = []
       catch_scopes = []
       with_scopes = []
@@ -999,21 +1030,30 @@ module Minjs
       self
     end
 
-    def assignment_after_var(node = @prog)
-      def rewrite_var(var_st, name, initializer)
-        var_st.normalization
-        i = 0
-        var_st.vars.each do |_name, _initializer|
-          if _name == name and _initializer.nil?
-            var_st.vars[i] = [name, initializer]
-            var_st.normalization
-            return true
-          end
-          i += 1
+    def rewrite_var(var_st, name, initializer)
+      var_st.normalization
+      i = 0
+      var_st.vars.each do |_name, _initializer|
+        if _name == name and _initializer.nil?
+          var_st.vars[i] = [name, initializer]
+          var_st.normalization
+          return true
         end
-        false
+        i += 1
       end
+      false
+    end
+    private :rewrite_var
 
+    # Moves assignment expression to variable statement's initialiser
+    # if possible.
+    #
+    #   var a, b, c;
+    #   c = 1; a = 2;
+    #   =>
+    #   var c=1, a=2, b;
+    #
+    def assignment_after_var(node = @prog)
       retry_flag = true
       while retry_flag
         retry_flag = false

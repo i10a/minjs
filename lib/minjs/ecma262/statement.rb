@@ -46,6 +46,8 @@ module Minjs
         self.class.new(@statement_list.deep_dup)
       end
 
+      # Replaces children object.
+      # @see Base#replace
       def replace(from, to)
         if from == @statement_list
           @statement_list = to
@@ -80,6 +82,7 @@ module Minjs
         t.length == 1 and t[0].to_exp?
       end
 
+      # Converts block to expression and returns it.
       def to_exp(options = {})
         @statement_list.statement_list.select{|s|
           s.class != StEmpty
@@ -152,6 +155,8 @@ module Minjs
                        })
       end
 
+      # Replaces children object.
+      # @see Base#replace
       def replace(from, to)
         @vars.each do |x|
           if x[0] .eql? from
@@ -280,6 +285,8 @@ module Minjs
         self.class.new(@exp.deep_dup)
       end
 
+      # Replaces children object.
+      # @see Base#replace
       def replace(from, to)
         if @exp .eql? from
           @exp = to
@@ -303,6 +310,7 @@ module Minjs
         concat(options, @exp, ";")
       end
 
+      # Converts statement to expression and returns it.
       def to_exp(options = {})
         @exp.deep_dup
       end
@@ -336,6 +344,8 @@ module Minjs
         @else_st = else_st
       end
 
+      # Replaces children object.
+      # @see Base#replace
       def replace(from, to)
         if from .eql? @cond
           @cond = to
@@ -419,6 +429,7 @@ module Minjs
         return true
       end
 
+      # Converts statement to expression and returns it.
       def to_exp(options = {})
         cond = @cond.deep_dup
         if !@else_st
@@ -485,6 +496,8 @@ module Minjs
         self.class.new(@exp.deep_dup, @statement.deep_dup)
       end
 
+      # Replaces children object.
+      # @see Base#replace
       def replace(from, to)
         if from .eql? @statement
           @statement = to
@@ -545,6 +558,8 @@ module Minjs
         self.class.new(@exp.deep_dup, @statement.deep_dup)
       end
 
+      # Replaces children object.
+      # @see Base#replace
       def replace(from, to)
         if from .eql? @statement
           @statement = to
@@ -611,6 +626,8 @@ module Minjs
                        @statement.deep_dup)
       end
 
+      # Replaces children object.
+      # @see Base#replace
       def replace(from, to)
         if from .eql? @exp1
           @exp1 = to
@@ -702,6 +719,8 @@ module Minjs
                        @statement.deep_dup)
       end
 
+      # Replaces children object.
+      # @see Base#replace
       def replace(from, to)
         if from .eql? @statement
           @statement = to
@@ -809,6 +828,8 @@ module Minjs
         self.class.new(@exp1.deep_dup, @exp2.deep_dup, @statement.deep_dup)
       end
 
+      # Replaces children object.
+      # @see Base#replace
       def replace(from, to)
         if from .eql? @statement
           @statement = to
@@ -893,6 +914,8 @@ module Minjs
         yield parent, self
       end
 
+      # Replaces children object.
+      # @see Base#replace
       def replace(from, to)
         if from .eql? @statement
           @statement = to
@@ -1044,6 +1067,8 @@ module Minjs
         self.class.new(exp ? exp.deep_dup : nil)
       end
 
+      # Replaces children object.
+      # @see Base#replace
       def replace(from, to)
         if from .eql? @exp
           @exp = to
@@ -1109,6 +1134,8 @@ module Minjs
         self.class.new(@context, @exp.deep_dup, @statement.deep_dup)
       end
 
+      # Replaces children object.
+      # @see Base#replace
       def replace(from, to)
         if @exp .eql? from
           @exp = to
@@ -1175,6 +1202,8 @@ module Minjs
                        })
       end
 
+      # Replaces children object.
+      # @see Base#replace
       def replace(from, to)
         if @exp .eql? from
           @exp = to
@@ -1249,6 +1278,8 @@ module Minjs
         self.class.new(@label.deep_dup, @statement.deep_dup)
       end
 
+      # Replaces children object.
+      # @see Base#replace
       def replace(from, to)
         if from .eql? @label
           @label = to
@@ -1336,6 +1367,8 @@ module Minjs
                        @finally ? @finally.deep_dup : nil)
       end
 
+      # Replaces children object.
+      # @see Base#replace
       def replace(from, to)
         if from .eql? @try
           @try = to
@@ -1427,8 +1460,9 @@ module Minjs
         @setter = options[:setter]
       end
 
+      # @return [Fixnum] expression priority
       def priority
-        10
+        PRIORITY_PRIMARY
       end
 
       # duplicate object
@@ -1471,18 +1505,22 @@ module Minjs
         end
       end
 
+      # @return [Boolean] true if expression is kind of LeftHandSideExpression.
       def left_hand_side_exp?
         true
       end
 
+      # Returns true if this object is setter in object
       def getter?
         @getter
       end
 
+      # Returns true if this object is setter in object
       def setter?
         @setter
       end
 
+      # Returns true if this object is function declaration
       def decl?
         @decl
       end

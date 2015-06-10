@@ -1,17 +1,23 @@
 module Minjs::Lex
   module Function
     include Minjs
-    #13
+    # Tests next literal is FunctionDeclaration or not.
     #
-    # FunctionDeclaration :
-    # function Identifier ( FormalParameterListopt ) { FunctionBody }
+    # If literal is FunctionDeclaration
+    # return ECMA262::StFunc object and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
     #
-    # NOTE:
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 13
     #
-    # The function declaration in statement(block) is not permitted by ECMA262.
-    # However, almost all implementation permit it.
+    # @note
+    #   The function declaration in statement(block) is not permitted by ECMA262.
+    #   However, almost all implementation permit it, so minjs cannot raise
+    #   exception even if function declarataion in block.
     #
     def func_declaration(context)
+      # FunctionDeclaration :
+      # function Identifier ( FormalParameterListopt ) { FunctionBody }
       return nil if lex.eql_lit?(ECMA262::ID_FUNCTION).nil?
 
       new_context = ECMA262::Context.new
@@ -40,12 +46,22 @@ module Minjs::Lex
       end
     end
 
-    #13
+    # Tests next literal is FunctionExpression or not.
     #
-    # FunctionExpression :
-    # function Identifieropt ( FormalParameterListopt ) { FunctionBody }
+    # If literal is FunctionExpression
+    # return ECMA262::StFunc object and
+    # forward lexical parser position.
+    # Otherwise return nil and position is not changed.
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 13
+    #
+    # @note
+    #   The function expression and declaration uses same class
+    #   for convenience.
     #
     def func_exp(context)
+      # FunctionExpression :
+      # function Identifieropt ( FormalParameterListopt ) { FunctionBody }
       return nil if lex.eql_lit?(ECMA262::ID_FUNCTION).nil?
       @logger.debug "*** func_exp"
 
@@ -107,5 +123,7 @@ module Minjs::Lex
     def func_body(context)
       source_elements(context)
     end
+
+    private :func_body, :formal_parameter_list
   end
 end

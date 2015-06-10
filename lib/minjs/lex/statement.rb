@@ -4,9 +4,7 @@ module Minjs::Lex
   #
   module Statement
     include Minjs
-    #
-    # check next literal is ';' or '}' or LT
-    #
+    # Tests next literal is ';' or '}' or LT
     def semicolon(context)
       a = lex.peek_lit_nolt(nil)
       # ; ?
@@ -33,7 +31,7 @@ module Minjs::Lex
       end
     end
 
-    #12
+    # Tests next literals sequence is Statement or not.
     def statement(context)
       (
         block(context) or		#12.1
@@ -54,9 +52,9 @@ module Minjs::Lex
         empty_statement(context) 	#12.3
       )
     end
+    # Tests next literals sequence is Block or not.
     #
-    #12.1
-    # block
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.1
     def block(context)
       pos0 = lex.pos
       return nil unless lex.eql_lit?(ECMA262::PUNC_LCURLYBRAC)
@@ -78,10 +76,11 @@ module Minjs::Lex
       end
       ECMA262::StatementList.new(t)
     end
+    private :statement_list
+
+    # Tests next literals sequence is VariableStatement or not.
     #
-    #12.2
-    # variable_statement
-    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.2
     def var_statement(context)
       raise 'internal error' if context.nil?
       return nil unless lex.eql_lit?(ECMA262::ID_VAR)
@@ -139,7 +138,7 @@ module Minjs::Lex
     # = AssignmentExpression
     #
     def initialiser(context, options)
-      if lex.eql_lit?(ECMA262::PUNC_LET)
+      if lex.eql_lit?(ECMA262::PUNC_ASSIGN)
         if a = assignment_exp(context, options)
           return a
         else
@@ -148,9 +147,11 @@ module Minjs::Lex
       end
       nil
     end
+    private :var_decl_list, :var_decl, :initialiser
+
+    # Tests next literals sequence is EmptyStatement or not.
     #
-    #12.3
-    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.3
     def empty_statement(context)
       a = lex.peek_lit(nil)
       if a == ECMA262::PUNC_SEMICOLON
@@ -160,9 +161,9 @@ module Minjs::Lex
         nil
       end
     end
+    # Tests next literals sequence is ExpressionStatement or not.
     #
-    #12.4
-    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.4
     def exp_statement(context)
       if (a = lex.peek_lit(nil)).eql? ECMA262::PUNC_LCURLYBRAC
         return block(context)
@@ -184,9 +185,9 @@ module Minjs::Lex
         nil
       end
     end
+    # Tests next literals sequence is IfStatement or not.
     #
-    #12.5
-    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.5
     def if_statement(context)
       return nil unless lex.eql_lit?(ECMA262::ID_IF)
       unless(lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS) and cond=exp(context, {}) and
@@ -199,9 +200,9 @@ module Minjs::Lex
         ECMA262::StIf.new(cond, s, nil)
       end
     end
+    # Tests next literals sequence is IterationStatement or not.
     #
-    # 12.6
-    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.6
     def iteration_statement(context)
       for_statement(context) or while_statement(context) or do_while_statement(context)
     end
@@ -298,9 +299,11 @@ module Minjs::Lex
         end
       }
     end
+    private :while_statement, :do_while_statement, :for_statement
+
+    # Tests next literals sequence is ContinueStatement or not.
     #
-    # 12.7
-    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.7
     def continue_statement(context)
       return nil unless lex.eql_lit?(ECMA262::ID_CONTINUE)
 
@@ -316,9 +319,10 @@ module Minjs::Lex
         end
       end
     end
+
+    # Tests next literals sequence is BreakStatement or not.
     #
-    # 12.8
-    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.8
     def break_statement(context)
       return nil unless lex.eql_lit?(ECMA262::ID_BREAK)
 
@@ -334,9 +338,9 @@ module Minjs::Lex
         end
       end
     end
+    # Tests next literals sequence is ReturnStatement or not.
     #
-    # 12.9
-    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.9
     def return_statement(context)
       return nil unless lex.eql_lit?(ECMA262::ID_RETURN)
 
@@ -348,9 +352,9 @@ module Minjs::Lex
         raise ParseError.new("unexpected token", lex)
       end
     end
+    # Tests next literals sequence is WithStatement or not.
     #
-    # 12.10
-    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.10
     def with_statement(context)
       return nil unless lex.eql_lit?(ECMA262::ID_WITH)
 
@@ -360,9 +364,9 @@ module Minjs::Lex
         raise ParseError.new("unexpected token", lex)
       end
     end
+    # Tests next literals sequence is SwitchStatement or not.
     #
-    # 12.11
-    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.11
     def switch_statement(context)
       return nil unless lex.eql_lit?(ECMA262::ID_SWITCH)
 
@@ -397,9 +401,11 @@ module Minjs::Lex
       end
       _case_block
     end
+    private :case_block
+
+    # Tests next literals sequence is LabelledStatement or not.
     #
-    # 12.12
-    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.12
     def labelled_statement(context)
       lex.eval_lit {
         if i=identifier(context) and s1=lex.eql_lit?(ECMA262::PUNC_COLON)
@@ -413,9 +419,9 @@ module Minjs::Lex
         end
       }
     end
+    # Tests next literals sequence is ThrowStatement or not.
     #
-    # 12.13
-    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.13
     def throw_statement(context)
       return nil unless lex.eql_lit?(ECMA262::ID_THROW)
 
@@ -431,9 +437,9 @@ module Minjs::Lex
         end
       end
     end
+    # Tests next literals sequence is TryStatement or not.
     #
-    # 12.14
-    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.14
     def try_statement(context)
       return nil unless lex.eql_lit?(ECMA262::ID_TRY)
       #
@@ -471,9 +477,11 @@ module Minjs::Lex
       b
     end
 
+    private :try_catch, :try_finally
+
+    # Tests next literals sequence is DebuggerStatement or not.
     #
-    # 12.15
-    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.15
     def debugger_statement(context)
       return nil unless lex.eql_lit?(ECMA262::ID_DEBUGGER)
       if semicolon(context)

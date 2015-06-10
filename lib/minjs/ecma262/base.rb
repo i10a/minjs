@@ -66,7 +66,7 @@ module Minjs
         j.join("")
       end
 
-      # replace child (if own it) object
+      # Replaces child (if own it) object
       #
       # @param from [Base] from
       # @param to [Base] to
@@ -119,6 +119,7 @@ module Minjs
         @statement_list = statement_list #array
       end
 
+      # Groups statements and reduce number of them as few as posibble.
       def grouping
         remove_empty_statement
         new_sl = []
@@ -182,10 +183,14 @@ module Minjs
         @statement_list = new_sl
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(@statement_list.collect{|s| s.deep_dup})
       end
 
+      # Replaces children object
+      # @see Base#replace
       def replace(from, to)
         idx = @statement_list.index(from)
         if idx
@@ -193,10 +198,13 @@ module Minjs
         end
       end
 
+      # Removes statement from statement list
+      # @param st statement
       def remove(st)
         @statement_list.delete(st)
       end
 
+      # Removes empty statement in this statement list
       def remove_empty_statement
         @statement_list.reject!{|x|
           x.class == StEmpty
@@ -218,15 +226,18 @@ module Minjs
         @statement_list == obj.statement_list
       end
 
-      # convert element to JavaScript string
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         concat options, @statement_list
       end
 
+      # Returns number of the statements
       def length
         @statement_list.length
       end
 
+      # return true if this can convert to expression.
       def to_exp?
         @statement_list.each do |s|
           return false if s.to_exp? == false
@@ -234,6 +245,7 @@ module Minjs
         return true
       end
 
+      # Converts statement list to expression and returns it.
       def to_exp(options = {})
         return nil if to_exp? == false
         t = @statement_list[0].to_exp(options)
@@ -250,14 +262,23 @@ module Minjs
         @statement_list.each(&block)
       end
 
+      # Returns the statement at index
+      # @param i index
+      # @return [Statement] statement
       def [](i)
         @statement_list[i]
       end
 
-      def []=(i, s)
-        @statement_list[i] = s
+      # Sets the statement at index.
+      # @param i index
+      # @param st statement
+      def []=(i, st)
+        @statement_list[i] = st
       end
 
+      # Returns index of statement.
+      # @param st statement.
+      # @return [Fixnum] index of statement.
       def index(st)
         @statement_list.index(st)
       end
@@ -294,10 +315,14 @@ module Minjs
         @context = context
       end
 
+      # duplicate object
+      # @see Base#deep_dup
       def deep_dup
         self.class.new(context, source_elements.deep_dup)
       end
 
+      # Replaces children object
+      # @see Base#replace
       def replace(from, to)
         if from == @source_elements
           @source_elements = to
@@ -316,6 +341,8 @@ module Minjs
         self.class == obj.class and self.source_elements == obj.source_elements
       end
 
+      # Returns a ECMAScript string containg the representation of element.
+      # @see Base#to_js
       def to_js(options = {})
         concat options, @source_elements
       end

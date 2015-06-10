@@ -1001,44 +1001,44 @@ module Minjs::Lex
       end
       left_hand = t
       punc = lex.peek_lit(:div)
-      if punc == ECMA262::PUNC_LET ||
-         punc == ECMA262::PUNC_DIVLET ||
-         punc == ECMA262::PUNC_MULLET ||
-         punc == ECMA262::PUNC_MODLET ||
-         punc == ECMA262::PUNC_ADDLET ||
-         punc == ECMA262::PUNC_SUBLET ||
-         punc == ECMA262::PUNC_LSHIFTLET ||
-         punc == ECMA262::PUNC_RSHIFTLET ||
-         punc == ECMA262::PUNC_URSHIFTLET ||
-         punc == ECMA262::PUNC_ANDLET ||
-         punc == ECMA262::PUNC_ORLET ||
-         punc == ECMA262::PUNC_XORLET
+      if punc == ECMA262::PUNC_ASSIGN ||
+         punc == ECMA262::PUNC_DIVASSIGN ||
+         punc == ECMA262::PUNC_MULASSIGN ||
+         punc == ECMA262::PUNC_MODASSIGN ||
+         punc == ECMA262::PUNC_ADDASSIGN ||
+         punc == ECMA262::PUNC_SUBASSIGN ||
+         punc == ECMA262::PUNC_LSHIFTASSIGN ||
+         punc == ECMA262::PUNC_RSHIFTASSIGN ||
+         punc == ECMA262::PUNC_URSHIFTASSIGN ||
+         punc == ECMA262::PUNC_ANDASSIGN ||
+         punc == ECMA262::PUNC_ORASSIGN ||
+         punc == ECMA262::PUNC_XORASSIGN
         lex.fwd_after_peek
         if b = assignment_exp(context, options)
           case punc
-          when ECMA262::PUNC_LET
+          when ECMA262::PUNC_ASSIGN
             ECMA262::ExpAssign.new(left_hand, b)
-          when ECMA262::PUNC_DIVLET
+          when ECMA262::PUNC_DIVASSIGN
             ECMA262::ExpDivAssign.new(left_hand, b)
-          when ECMA262::PUNC_MULLET
+          when ECMA262::PUNC_MULASSIGN
             ECMA262::ExpMulAssign.new(left_hand, b)
-          when ECMA262::PUNC_MODLET
+          when ECMA262::PUNC_MODASSIGN
             ECMA262::ExpModAssign.new(left_hand, b)
-          when ECMA262::PUNC_ADDLET
+          when ECMA262::PUNC_ADDASSIGN
             ECMA262::ExpAddAssign.new(left_hand, b)
-          when ECMA262::PUNC_SUBLET
+          when ECMA262::PUNC_SUBASSIGN
             ECMA262::ExpSubAssign.new(left_hand, b)
-          when ECMA262::PUNC_LSHIFTLET
+          when ECMA262::PUNC_LSHIFTASSIGN
             ECMA262::ExpLShiftAssign.new(left_hand, b)
-          when ECMA262::PUNC_RSHIFTLET
+          when ECMA262::PUNC_RSHIFTASSIGN
             ECMA262::ExpRShiftAssign.new(left_hand, b)
-          when ECMA262::PUNC_URSHIFTLET
+          when ECMA262::PUNC_URSHIFTASSIGN
             ECMA262::ExpURShiftAssign.new(left_hand, b)
-          when ECMA262::PUNC_ANDLET
+          when ECMA262::PUNC_ANDASSIGN
             ECMA262::ExpAndAssign.new(left_hand, b)
-          when ECMA262::PUNC_ORLET
+          when ECMA262::PUNC_ORASSIGN
             ECMA262::ExpOrAssign.new(left_hand, b)
-          when ECMA262::PUNC_XORLET
+          when ECMA262::PUNC_XORASSIGN
             ECMA262::ExpXorAssign.new(left_hand, b)
           else
             raise "internal error"

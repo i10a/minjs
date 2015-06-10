@@ -40,29 +40,29 @@ module Minjs
     #punctuator
     PUNC_CONDIF = Punctuator.get('?')
     #punctuator
-    PUNC_LET = Punctuator.get('=')
+    PUNC_ASSIGN = Punctuator.get('=')
     #punctuator
-    PUNC_DIVLET = Punctuator.get('/=')
+    PUNC_DIVASSIGN = Punctuator.get('/=')
     #punctuator
-    PUNC_MULLET = Punctuator.get('*=')
+    PUNC_MULASSIGN = Punctuator.get('*=')
     #punctuator
-    PUNC_MODLET = Punctuator.get('%=')
+    PUNC_MODASSIGN = Punctuator.get('%=')
     #punctuator
-    PUNC_ADDLET = Punctuator.get('+=')
+    PUNC_ADDASSIGN = Punctuator.get('+=')
     #punctuator
-    PUNC_SUBLET = Punctuator.get('-=')
+    PUNC_SUBASSIGN = Punctuator.get('-=')
     #punctuator
-    PUNC_LSHIFTLET = Punctuator.get('<<=')
+    PUNC_LSHIFTASSIGN = Punctuator.get('<<=')
     #punctuator
-    PUNC_RSHIFTLET = Punctuator.get('>>=')
+    PUNC_RSHIFTASSIGN = Punctuator.get('>>=')
     #punctuator
-    PUNC_URSHIFTLET = Punctuator.get('>>>=')
+    PUNC_URSHIFTASSIGN = Punctuator.get('>>>=')
     #punctuator
-    PUNC_ANDLET = Punctuator.get('&=')
+    PUNC_ANDASSIGN = Punctuator.get('&=')
     #punctuator
-    PUNC_XORLET = Punctuator.get('^=')
+    PUNC_XORASSIGN = Punctuator.get('^=')
     #punctuator
-    PUNC_ORLET = Punctuator.get('|=')
+    PUNC_ORASSIGN = Punctuator.get('|=')
     #punctuator
     PUNC_LOR = Punctuator.get('||')
     #punctuator
