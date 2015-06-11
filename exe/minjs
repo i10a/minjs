@@ -1,6 +1,7 @@
 #!/usr/bin/env ruby
 
 require 'minjs'
+require 'minjs/compressor/compressor'
 
 argv = ARGV.dup
 f = []
@@ -17,6 +18,6 @@ argv.each do |x|
   end
 end
 
-prog = Minjs::Compressor.new(:debug => false)
+prog = Minjs::Compressor::Compressor.new(:debug => false)
 prog.compress(f.join("\n"), options)
 puts prog.to_js(options)

@@ -8,7 +8,7 @@ describe 'Compression' do
       c.parse <<-EOS
 (!0)+a
 EOS
-      js = c.remove_paren.to_js
+      js = c.add_remove_paren.to_js
       expect(js).to eq "!0+a;"
     end
 
@@ -24,7 +24,7 @@ for((a) in (a,b))
 for(var a=(1) in (a,b))
 ;
 EOS
-      js = c.remove_paren.to_js
+      js = c.add_remove_paren.to_js
       expect(js).to eq "for(a,b;c,d;e,f);for(var a=1;c,d;e,f);for(a in a,b);for(var a=1 in a,b);"
     end
     it 'remove paren of switch statements' do
@@ -35,7 +35,7 @@ case (1,2):
 ;
 }
 EOS
-      js = c.remove_paren.to_js
+      js = c.add_remove_paren.to_js
       expect(js).to eq "switch(1,2){case 1,2:}"
     end
 
@@ -50,7 +50,7 @@ return (1,2);
 with((1,2)){};
 throw (1,2);
 EOS
-      js = c.remove_paren.to_js
+      js = c.add_remove_paren.to_js
       expect(js).to eq "var a=1,b=(1,2);if(1,2);do{}while(1,2);while(1,2){}return 1,2;with(1,2){}throw(1,2);";
     end
 
@@ -71,7 +71,7 @@ EOS
 a=({a:b, c:d});
 ((((('a')))));
 EOS
-      js = c.remove_paren.to_js
+      js = c.add_remove_paren.to_js
       expect(js).to eq "this;foo;0;3.14;\"aaa\";/regexp/;null;true;false;[1,2,3];a={a:b,c:d};\"a\";"
     end
 
@@ -84,7 +84,7 @@ new (A);
 new (A)(a,b,c);
 new (A)(a,(b?c:d),(c,d));
 EOS
-      js = c.remove_paren.to_js
+      js = c.add_remove_paren.to_js
       expect(js).to eq "a[0];a.b;new A;new A(a,b,c);new A(a,b?c:d,(c,d));";
     end
 
@@ -94,7 +94,7 @@ EOS
 (a)++;
 (b[0])--;
 EOS
-      js = c.remove_paren.to_js
+      js = c.add_remove_paren.to_js
       expect(js).to eq "a++;b[0]--;"
     end
 
@@ -107,7 +107,7 @@ EOS
 (+ a)++;
 +(a[0]);//remove
 EOS
-      js = c.remove_paren.to_js
+      js = c.add_remove_paren.to_js
       expect(js).to eq "+(a*b);+a++;+ ++a;(+a)++;+a[0];"
     end
 
@@ -124,7 +124,7 @@ a/(!b);
 a%(b%c);// does not remove
 a%(!b);
 EOS
-      js = c.remove_paren.to_js
+      js = c.add_remove_paren.to_js
       expect(js).to eq "a*b*c;a*(b*c);a*!b;a/b/c;a/(b/c);a/!b;a%b%c;a%(b%c);a%!b;"
     end
 
@@ -138,7 +138,7 @@ a+(b*c);
 a-(b-c);// does not remove
 a-(b*c);
 EOS
-      js = c.remove_paren.to_js
+      js = c.add_remove_paren.to_js
       expect(js).to eq "a+b+c;a+(b+c);a+b*c;a-b-c;a-(b-c);a-b*c;"
     end
 
@@ -154,7 +154,7 @@ EOS
 (a<<b)in(c<<d);
 (a==b)in(c==d);
 EOS
-      js = c.remove_paren.to_js
+      js = c.add_remove_paren.to_js
       expect(js).to eq "a+b<<c+d>>e+f>>>g+h;a<<b<c<<d;a<<b>c<<d;a<<b<=c<<d;a<<b>=c<<d;a<<b instanceof c<<d;a<<b in c<<d;(a==b)in(c==d);"
     end
 
@@ -170,7 +170,7 @@ EOS
 (a>b)!==(c<d);//remove
 (a&b)!==(c&d);
 EOS
-      js = c.remove_paren.to_js
+      js = c.add_remove_paren.to_js
       expect(js).to eq "a>b==c<d;(a&b)==(c&d);a>b!=c<d;(a&b)!=(c&d);a>b===c<d;(a&b)===(c&d);a>b!==c<d;(a&b)!==(c&d);"
     end
 
@@ -185,7 +185,7 @@ EOS
 (a&b)|(c&d);//remove
 (a^b)|(c^d);//remove
 EOS
-      js = c.remove_paren.to_js
+      js = c.add_remove_paren.to_js
       expect(js).to eq "a==b&c==d;(a^b)&(c^d);(a|b)&(c|d);a&b^c&d;(a|b)^(c|d);a&b|c&d;a^b|c^d;";
     end
 
@@ -196,7 +196,7 @@ EOS
 (a||b)&&(b||c);
 (a&b)||(b&c);//remove
 EOS
-      js = c.remove_paren.to_js
+      js = c.add_remove_paren.to_js
       expect(js).to eq "a&&b||b&&c;(a||b)&&(b||c);a&b||b&c;"
     end
 
@@ -206,7 +206,7 @@ EOS
 (a||b)?(a=1):(b=2);//remove all paren
 (a=b)?(a=1,b=2):(b=2)//remove 3rd paren
 EOS
-      js = c.remove_paren.to_js
+      js = c.add_remove_paren.to_js
       expect(js).to eq "a||b?a=1:b=2;(a=b)?(a=1,b=2):b=2;"
     end
 
@@ -217,7 +217,7 @@ a=(b?c:d);//remove
 a=(b,c);
 (a)=(b,c);//left-hand remove
 EOS
-      js = c.remove_paren.to_js
+      js = c.add_remove_paren.to_js
       expect(js).to eq "a=b?c:d;a=(b,c);a=(b,c);"
     end
 
@@ -227,7 +227,7 @@ EOS
 // ECMA262 say, expression statement cannot start with an opening curly brace
 ({a:'b'})
 EOS
-      js = c.remove_paren.to_js
+      js = c.add_remove_paren.to_js
       expect(js).to eq "({a:\"b\"});"
     end
 
@@ -237,7 +237,7 @@ EOS
 // ECMA262 say, expression statement cannot start with the function keyword
 (function(a,b){console.log(a,b)}(1,2))
 EOS
-      js = c.remove_paren.to_js
+      js = c.add_remove_paren.to_js
       expect(js).to eq "(function(a,b){console.log(a,b)}(1,2));"
     end
   end

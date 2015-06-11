@@ -74,7 +74,7 @@ module Minjs
         concat(options, "{", @statement_list, "}")
       end
 
-      # true if statement can convert to expression
+      # true if block can convert to expression
       def to_exp?
         t = @statement_list.statement_list.select{|s|
           s.class != StEmpty
@@ -90,6 +90,7 @@ module Minjs
 
       end
 
+      # @return true if block can convert to single statement.
       def to_statement?
         t = @statement_list.statement_list.select{|s|
           s.class != StEmpty
@@ -97,6 +98,7 @@ module Minjs
         t.length == 1 || t.length == 0
       end
 
+      # Converts block to single statement and return it.
       def to_statement
         t = @statement_list.statement_list.select{|s|
           s.class != StEmpty
@@ -109,24 +111,31 @@ module Minjs
         end
       end
 
+      # @return true if block can convert to 'return statement'
       def to_return?
         to_statement? and to_statement.to_return?
       end
 
+      # Converts block to 'return statement' and returns it
       def to_return
         to_statement.to_return
       end
 
+      # @return true if block is empty
       def empty?
         @statement_list.statement_list.select{|s|
           s.class != StEmpty
         }.length == 0
       end
 
+      # Returns the statement at index
+      # @param i index
+      # @return [Statement] statement
       def [](i)
         @statement_list[i]
       end
 
+      # Removes empty statement in this block.
       def remove_empty_statement
         statement_list.remove_empty_statement
       end
@@ -202,8 +211,8 @@ module Minjs
         end
       end
 
+      # If variable has no initializer, this method moves it to latter
       def normalization
-        # if var has no initializer, move it to latter
         v1 = []
         v2 = []
         @vars.each do |x|
@@ -216,6 +225,7 @@ module Minjs
         @vars = v1.concat(v2)
       end
 
+      # remove parenthesis if possible
       def remove_paren
         @vars.each do |x|
           if x[1] and x[1].kind_of? ExpParen and x[1].val.priority <= PRIORITY_ASSIGNMENT
@@ -225,6 +235,7 @@ module Minjs
         self
       end
 
+      # add parenthesis if need
       def add_paren
         @vars.each do |x|
           if x[1] and x[1].priority > PRIORITY_ASSIGNMENT
@@ -264,6 +275,7 @@ module Minjs
         ";;"
       end
 
+      # return true if statement can convert to empty statement.
       def empty?
         true
       end
@@ -320,6 +332,7 @@ module Minjs
         true
       end
 
+      # remove parenthesis if possible
       def remove_paren
         if @exp.kind_of? ExpParen
           @exp = @exp.val if @exp.remove_paren?
@@ -327,6 +340,7 @@ module Minjs
         self
       end
 
+      # add parenthesis if need
       def add_paren
         self
       end
@@ -390,6 +404,7 @@ module Minjs
         end
       end
 
+      # return true if statement can convert to return statement.
       def to_return?
         if !@else_st
           return false
@@ -398,6 +413,7 @@ module Minjs
         end
       end
 
+      # Converts block to 'return statement' and returns it
       def to_return
         then_exp = then_st.exp;
         if @else_st
@@ -459,6 +475,7 @@ module Minjs
         end
       end
 
+      # remove parenthesis if possible
       def remove_paren
         if @cond.kind_of? ExpParen
           @cond = @cond.val
@@ -466,10 +483,12 @@ module Minjs
         self
       end
 
+      # add parenthesis if need
       def add_paren
         self
       end
 
+      # Removes empty statement in this then-clause or else-clause
       def remove_empty_statement
         if @then_st.kind_of? StBlock
           @then_st.remove_empty_statement
@@ -530,6 +549,7 @@ module Minjs
         concat(options, :while, "(", @exp, ")", statement)
       end
 
+      # remove parenthesis if possible
       def remove_paren
         if @exp.kind_of? ExpParen
           @exp = @exp.val
@@ -537,6 +557,7 @@ module Minjs
         self
       end
 
+      # add parenthesis if need
       def add_paren
         self
       end
@@ -592,6 +613,7 @@ module Minjs
         concat options, :do, statement, :while, "(", @exp, ")", ";"
       end
 
+      # remove parenthesis if possible
       def remove_paren
         if @exp.kind_of? ExpParen
           @exp = @exp.val
@@ -599,6 +621,7 @@ module Minjs
         self
       end
 
+      # add parenthesis if need
       def add_paren
         self
       end
@@ -670,6 +693,7 @@ module Minjs
         concat options, :for, "(", @exp1, ";;", @exp2, ";;", @exp3, ")", statement
       end
 
+      # remove parenthesis if possible
       def remove_paren
         if @exp1.kind_of? ExpParen
           @exp1 = @exp1.val
@@ -683,6 +707,7 @@ module Minjs
         self
       end
 
+      # add parenthesis if need
       def add_paren
         self
       end
@@ -741,9 +766,7 @@ module Minjs
         yield parent, self
       end
 
-      #
-      # for(var ...; ; ) => for(...; ; )
-      #
+      # converts for-var-statement to for-statement
       def to_st_for
         tt = nil
         @var_decl_list.each{|x|
@@ -790,6 +813,7 @@ module Minjs
         concat options, t, statement
       end
 
+      # remove parenthesis if possible
       def remove_paren
         @var_decl_list.each do|x|
           if x[1] and x[1].kind_of? ExpParen
@@ -805,6 +829,7 @@ module Minjs
         self
       end
 
+      # add parenthesis if need
       def add_paren
         self
       end
@@ -864,6 +889,7 @@ module Minjs
         concat options, :for, '(', @exp1, :in, @exp2, ')', statement
       end
 
+      # remove parenthesis if possible
       def remove_paren
         if @exp1.kind_of? ExpParen and @exp1.val.priority <= PRIORITY_LEFT_HAND_SIDE
           @exp1 = @exp1.val
@@ -874,6 +900,7 @@ module Minjs
         self
       end
 
+      # add parenthesis if need
       def add_paren
         if @exp1.priority > PRIORITY_LEFT_HAND_SIDE
           @exp1 = ExpParen.new(@exp1)
@@ -922,6 +949,7 @@ module Minjs
         end
       end
 
+      # converts for-in-var-statement to for-var-statement
       def to_st_for_in
         if @var_decl[1]
           t = ExpAssign.new(@var_decl[0], @var_decl[1])
@@ -957,6 +985,7 @@ module Minjs
         concat options, :for, "(", :var, _var_decl, :in, @exp2, ")", statement
       end
 
+      # remove parenthesis if possible
       def remove_paren
         if @var_decl[1] and @var_decl[1].kind_of? ExpParen
           @var_decl[1] = @var_decl[1].val
@@ -967,6 +996,7 @@ module Minjs
         self
       end
 
+      # add parenthesis if need
       def add_paren
         self
       end
@@ -1081,10 +1111,12 @@ module Minjs
         yield parent, self
       end
 
+      # return true if statement can convert to return statement.
       def to_return?
         true
       end
 
+      # Converts block to 'return statement' and returns it
       def to_return
         self
       end
@@ -1104,6 +1136,7 @@ module Minjs
         end
       end
 
+      # remove parenthesis if possible
       def remove_paren
         if @exp.kind_of? ExpParen
           @exp = @exp.val
@@ -1111,6 +1144,7 @@ module Minjs
         self
       end
 
+      # add parenthesis if need
       def add_paren
         self
       end
@@ -1164,6 +1198,7 @@ module Minjs
         concat options, :with, "(", @exp, ")", @statement
       end
 
+      # remove parenthesis if possible
       def remove_paren
         if @exp.kind_of? ExpParen
           @exp = @exp.val
@@ -1171,6 +1206,7 @@ module Minjs
         self
       end
 
+      # add parenthesis if need
       def add_paren
         self
       end
@@ -1245,6 +1281,7 @@ module Minjs
         t = concat(options, t, "}")
       end
 
+      # remove parenthesis if possible
       def remove_paren
         if @exp.kind_of? ExpParen
           @exp = @exp.val
@@ -1257,6 +1294,7 @@ module Minjs
         self
       end
 
+      # add parenthesis if need
       def add_paren
         self
       end

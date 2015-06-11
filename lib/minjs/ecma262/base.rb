@@ -112,6 +112,9 @@ module Minjs
       end
     end
 
+    # Class of ECMA262 Statement List
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 12.1
     class StatementList < Base
       attr_reader :statement_list
 
@@ -284,6 +287,9 @@ module Minjs
       end
     end
 
+    # Class of ECMA262 Source Elements
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 14
     class SourceElements < StatementList
       #
       # source_elements: [statement, statement, ...]
@@ -292,13 +298,17 @@ module Minjs
         @statement_list = source_elements
       end
 
+      # alias of statement_list
       def source_elements
         @statement_list
       end
 
+      # alias of statement_list=
       def source_elements=(source_elements)
         @statement_list = source_elements
       end
+
+      alias :source_elements :statement_list
 
       # compare object
       def ==(obj)
@@ -306,6 +316,9 @@ module Minjs
       end
     end
 
+    # Class of ECMA262 Program
+    #
+    # @see http://www.ecma-international.org/ecma-262 ECMA262 14
     class Prog < Base
       attr_reader :source_elements
       attr_reader :context

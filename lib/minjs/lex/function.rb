@@ -1,4 +1,5 @@
 module Minjs::Lex
+  # Function
   module Function
     include Minjs
     # Tests next literal is FunctionDeclaration or not.

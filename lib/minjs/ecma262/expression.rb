@@ -1,21 +1,38 @@
 module Minjs
   module ECMA262
+    #priority
     PRIORITY_PRIMARY = 10
+    #priority
     PRIORITY_LEFT_HAND_SIDE = 20
+    #priority
     PRIORITY_POSTFIX = 30
+    #priority
     PRIORITY_UNARY = 40
+    #priority
     PRIORITY_MULTIPLICATIVE = 50
+    #priority
     PRIORITY_ADDITIVE = 60
+    #priority
     PRIORITY_SHIFT = 70
+    #priority
     PRIORITY_RELATIONAL = 80
+    #priority
     PRIORITY_EQUALITY = 90
+    #priority
     PRIORITY_BITWISE_AND = 100
+    #priority
     PRIORITY_BITWISE_XOR = 106
+    #priority
     PRIORITY_BITWISE_OR = 108
+    #priority
     PRIORITY_LOGICAL_AND = 110
+    #priority
     PRIORITY_LOGICAL_OR = 116
+    #priority
     PRIORITY_CONDITIONAL = 120
+    #priority
     PRIORITY_ASSIGNMENT = 130
+    #priority
     PRIORITY_COMMA = 140
 
     # Base class of ECMA262 expression element
@@ -35,6 +52,9 @@ module Minjs
         999
       end
 
+      def side_effect?
+        return true
+      end
     end
 
     # Module of typically binary operation expression.
@@ -158,6 +178,12 @@ module Minjs
       # @see Base#to_js
       def to_js(options = {})
         concat options, sym, @val
+      end
+
+      # Returns this element has side effect or not.
+      # @return [Boolean]
+      def side_effect?
+        @val.side_effect?
       end
     end
 
@@ -372,7 +398,7 @@ module Minjs
 
       # Returns results of ToBoolean()
       #
-      # Returns _true_ or _false if trivial,
+      # Returns _true_ or _false_ if trivial,
       # otherwise nil.
       #
       # @return [Boolean]
@@ -1068,7 +1094,7 @@ module Minjs
           return
         end
 
-        if (e = ecma262_eval(:boolean)) != nil
+        if (e = to_ecma262_boolean) != nil and @val.side_effect? == false
           if e
             parent.replace(self, ExpLogicalNot.new(ECMA262Numeric.new(0)))
           else
@@ -1083,7 +1109,7 @@ module Minjs
 
       # Returns results of ToBoolean()
       #
-      # Returns _true_ or _false if trivial,
+      # Returns _true_ or _false_ if trivial,
       # otherwise nil.
       #
       # @return [Boolean]
@@ -1095,24 +1121,19 @@ module Minjs
         !@val.to_ecma262_boolean
       end
 
+      # Returns results of ToNumber()
+      #
+      # Returns number if value is trivial,
+      # otherwise nil.
+      #
+      # @return [Numeric]
+      #
+      # @see http://www.ecma-international.org/ecma-262 ECMA262 9.3
       def to_ecma262_number
         if @val.respond_to? :to_ecma262_number
           v = @val.to_ecma262_number
           return nil if v.nil?
           v == 0 ? 1 : 0
-        end
-      end
-
-      def ecma262_eval(type)
-        if @val.respond_to? :ecma262_eval
-          e = @val.ecma262_eval(type)
-          if e.nil?
-            return nil
-          else
-            return !e
-          end
-        else
-          nil
         end
       end
 
@@ -1143,12 +1164,6 @@ module Minjs
       # @return [Fixnum] expression priority
       def priority
         PRIORITY_MULTIPLICATIVE
-      end
-
-      def swap
-        t = @val
-        @val = @val2
-        @val2 = t
       end
 
       # reduce expression if available
@@ -1239,12 +1254,6 @@ module Minjs
       # @return [Fixnum] expression priority
       def priority
         PRIORITY_ADDITIVE
-      end
-
-      def swap
-        t = @val
-        @val = @val2
-        @val2 = t
       end
 
       # reduce expression if available
@@ -1709,12 +1718,6 @@ module Minjs
         PRIORITY_BITWISE_AND
       end
 
-      def swap
-        t = @val
-        @val = @val2
-        @val2 = t
-      end
-
       # return results of 'typeof' operator.
       #
       # @return [Symbol] :number
@@ -1743,12 +1746,6 @@ module Minjs
         PRIORITY_BITWISE_XOR
       end
 
-      def swap
-        t = @val
-        @val = @val2
-        @val2 = t
-      end
-
       # return results of 'typeof' operator.
       #
       # @return [Symbol] :number
@@ -1775,12 +1772,6 @@ module Minjs
       # @return [Fixnum] expression priority
       def priority
         PRIORITY_BITWISE_OR
-      end
-
-      def swap
-        t = @val
-        @val = @val2
-        @val2 = t
       end
 
       # return results of 'typeof' operator.
@@ -1814,7 +1805,7 @@ module Minjs
 
       # Returns results of ToBoolean()
       #
-      # Returns _true_ or _false if trivial,
+      # Returns _true_ or _false_ if trivial,
       # otherwise nil.
       #
       # @return [Boolean]
@@ -1864,7 +1855,7 @@ module Minjs
 
       # Returns results of ToBoolean()
       #
-      # Returns _true_ or _false if trivial,
+      # Returns _true_ or _false_ if trivial,
       # otherwise nil.
       #
       # @return [Boolean]

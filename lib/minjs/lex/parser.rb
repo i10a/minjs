@@ -1116,7 +1116,14 @@ module Minjs::Lex
       @codes[pos0..pos1].pack("U*")
     end
 
-    def debug_str(pos = nil, row = nil, col = nil)
+    # Returns string of input data around _pos_
+    #
+    # @param pos position
+    # @param row row
+    # @param col column
+    # @return [String] string
+    #
+    def debug_str(pos = nil, row = 0, col = 0)
       if pos.nil?
         pos = @head_pos or @pos
       end

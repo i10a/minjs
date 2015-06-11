@@ -14,12 +14,23 @@ module Minjs
         false
       end
 
+      # Returns this node has side effect or not.
+      # @return [Boolean]
+      def side_effect?
+        true
+      end
+
       # @return [Fixnum] expression priority
       def priority
         PRIORITY_PRIMARY
       end
     end
 
+    # Class of psedo element.
+    #
+    # This class means element is division punctuator or regular expression literal,
+    # but lexical parser cannot determine which of them.
+    #
     class DivOrRegexpLiteral < Literal
       # Traverses this children and itself with given block.
       #
@@ -33,11 +44,15 @@ module Minjs
       end
 
       @@instance = self.new()
+
+      # get instance
       def self.get
         @@instance
       end
+      private_class_method :new
     end
 
+    # DivOrRegexpLiteral
     LIT_DIV_OR_REGEXP_LITERAL = DivOrRegexpLiteral.get
 
     # Class of ECMA262 WhiteSpace element
@@ -72,6 +87,8 @@ module Minjs
       end
 
       @@instance = self.new()
+
+      # get instance
       def self.get
         @@instance
       end
@@ -110,6 +127,8 @@ module Minjs
       end
 
       @@instance = self.new()
+
+      # get instance
       def self.get
         @@instance
       end
@@ -140,10 +159,6 @@ module Minjs
       # @see Base#traverse
       def traverse(parent, &block)
         yield parent, self
-      end
-
-      def to_s
-        "this"
       end
 
       # compare object
@@ -189,10 +204,6 @@ module Minjs
         yield parent, self
       end
 
-      def to_s
-        "null"
-      end
-
       # compare object
       def ==(obj)
         self.class == obj.class
@@ -210,13 +221,15 @@ module Minjs
       end
 
       @@instance = self.new(nil)
+
+      # get instance
       def self.get
         @@instance
       end
 
       # Returns results of ToBoolean()
       #
-      # Returns _true_ or _false if trivial,
+      # Returns _true_ or _false_ if trivial,
       # otherwise nil.
       #
       # @return [Boolean]
@@ -226,10 +239,26 @@ module Minjs
         false
       end
 
+      # Returns results of ToString()
+      #
+      # Returns string if value is trivial,
+      # otherwise nil.
+      #
+      # @return [Numeric]
+      #
+      # @see http://www.ecma-international.org/ecma-262 ECMA262 9.8
       def to_ecma262_string
         "null"
       end
 
+      # Returns results of ToNumber()
+      #
+      # Returns number if value is trivial,
+      # otherwise nil.
+      #
+      # @return [Numeric]
+      #
+      # @see http://www.ecma-international.org/ecma-262 ECMA262 9.3
       def to_ecma262_number
         0
       end
@@ -291,6 +320,14 @@ module Minjs
         @val == :true
       end
 
+      # Returns results of ToString()
+      #
+      # Returns string if value is trivial,
+      # otherwise nil.
+      #
+      # @return [Numeric]
+      #
+      # @see http://www.ecma-international.org/ecma-262 ECMA262 9.8
       def to_ecma262_string
         if @val == :false
           "false"
@@ -301,7 +338,7 @@ module Minjs
 
       # Returns results of ToBoolean()
       #
-      # Returns _true_ or _false if trivial,
+      # Returns _true_ or _false_ if trivial,
       # otherwise nil.
       #
       # @return [Boolean]
@@ -315,6 +352,14 @@ module Minjs
         end
       end
 
+      # Returns results of ToNumber()
+      #
+      # Returns number if value is trivial,
+      # otherwise nil.
+      #
+      # @return [Numeric]
+      #
+      # @see http://www.ecma-international.org/ecma-262 ECMA262 9.3
       def to_ecma262_number
         if @val == :false
           0
@@ -332,6 +377,8 @@ module Minjs
 
       @@true = self.new(:true)
       @@false = self.new(:false)
+
+      # get instance
       def self.get(val)
         if val.to_sym == :true || val == true
           @@true
@@ -431,7 +478,7 @@ module Minjs
 
       # Returns results of ToBoolean()
       #
-      # Returns _true_ or _false if trivial,
+      # Returns _true_ or _false_ if trivial,
       # otherwise nil.
       #
       # @return [Boolean]
@@ -445,10 +492,25 @@ module Minjs
         end
       end
 
+      # Returns results of ToString()
+      #
+      # Returns string if value is trivial,
+      # otherwise nil.
+      #
+      # @return [Numeric]
+      #
+      # @see http://www.ecma-international.org/ecma-262 ECMA262 9.8
       def to_ecma262_string
         @val.dup
       end
-      # 9.3.1 ToNumber Applied to the String Type
+      # Returns results of ToNumber()
+      #
+      # Returns number if value is trivial,
+      # otherwise nil.
+      #
+      # @return [Numeric]
+      #
+      # @see http://www.ecma-international.org/ecma-262 ECMA262 9.3
       def to_ecma262_number
         begin
           pos1 = pos0 = pos = 0
@@ -554,6 +616,12 @@ module Minjs
       # @return [Symbol] :string
       def ecma262_typeof
         :string
+      end
+
+      # Returns this node has side effect or not.
+      # @return [Boolean]
+      def side_effect?
+        return false
       end
     end
 
@@ -712,29 +780,39 @@ module Minjs
         true
       end
 
+      # to integer
       def to_i
         to_ecma262_string.to_i
       end
 
+      # to float
       def to_f
         to_ecma262_string.to_f
       end
 
+      # True if number is NaN
       def nan?
         @number.kind_of? Float and @number.nan?
       end
 
+      # True if number is Infinity
       def infinity?
         @number == Float::INFINITY || @number == -Float::INFINITY
       end
 
+      # True if number not Infinity nor NaN
       def number?
         !nan? and !infinity?
       end
 
+      # Returns results of ToString()
       #
-      # 9.8.1
+      # Returns string if value is trivial,
+      # otherwise nil.
       #
+      # @return [Numeric]
+      #
+      # @see http://www.ecma-international.org/ecma-262 ECMA262 9.8
       def to_ecma262_string
         if nan?
           "NaN"
@@ -775,7 +853,7 @@ module Minjs
 
       # Returns results of ToBoolean()
       #
-      # Returns _true_ or _false if trivial,
+      # Returns _true_ or _false_ if value is trivial,
       # otherwise nil.
       #
       # @return [Boolean]
@@ -789,6 +867,20 @@ module Minjs
         end
       end
 
+      # Returns this node has side effect or not.
+      # @return [Boolean]
+      def side_effect?
+        return false
+      end
+
+      # Returns results of ToNumber()
+      #
+      # Returns number if value is trivial,
+      # otherwise nil.
+      #
+      # @return [Numeric]
+      #
+      # @see http://www.ecma-international.org/ecma-262 ECMA262 9.3
       def to_ecma262_number
         if nan?
           nil
@@ -808,14 +900,14 @@ module Minjs
         :number
       end
 
-      def ecma262_eval(type)
-        case type
-        when :boolean
-          to_ecma262_boolean
-        else
-          nil
-        end
-      end
+#      def ecma262_eval(type)
+#        case type
+#        when :boolean
+#          to_ecma262_boolean
+#        else
+#          nil
+#        end
+#      end
     end
 
     #NaN element
@@ -847,7 +939,7 @@ module Minjs
 
       # Returns results of ToBoolean()
       #
-      # Returns _true_ or _false if trivial,
+      # Returns _true_ or _false_ if trivial,
       # otherwise nil.
       #
       # @return [Boolean]
@@ -918,7 +1010,7 @@ module Minjs
 
       # Returns results of ToBoolean()
       #
-      # Returns _true_ or _false if trivial,
+      # Returns _true_ or _false_ if trivial,
       # otherwise nil.
       #
       # @return [Boolean]
@@ -992,7 +1084,7 @@ module Minjs
 
       # Returns results of ToBoolean()
       #
-      # Returns _true_ or _false if trivial,
+      # Returns _true_ or _false_ if trivial,
       # otherwise nil.
       #
       # @return [Boolean]
@@ -1095,6 +1187,7 @@ module Minjs
         @val = val.to_sym
       end
 
+      # get instance
       def self.get(context, val)
         if reserved?(val)
           @@sym[val] ||= self.new(context, val)
@@ -1103,14 +1196,24 @@ module Minjs
         end
       end
 
+      # reserved word list
+      #
+      # @see http://www.ecma-international.org/ecma-262 ECMA262 7.6.1
       RESERVED_WORD = Set.new [
-        :break, :do, :instanceof, :typeof, :case, :else,
-        :new, :var, :catch, :finally, :return, :void, :continue,
-        :for, :switch, :while,:debugger, :function, :this, :with,
-        :default, :if, :throw, :delete, :in, :try,
-        :class, :enum, :extends, :super, :const, :export, :import,
-        :implements, :let, :private, :public, :yield,
-        :interface, :package, :protected, :static,
+        #keywords
+        :break, :do, :instanceof, :typeof,
+        :case, :else, :new, :var,
+        :catch, :finally, :return, :void,
+        :continue, :for, :switch, :while,
+        :debugger, :function, :this, :with,
+        :default, :if, :throw,
+        :delete, :in, :try,
+        #future reserved words
+        :class, :enum, :extends, :super,
+        :const, :export, :import,
+        #future reserved words(strict mode) (TODO)
+        #:implements, :let, :private, :public, :yield,
+        #:interface, :package, :protected, :static,
         :null, :false, :true
       ]
 
@@ -1154,6 +1257,7 @@ module Minjs
         true
       end
 
+      # @return [EnvRecord] binding environment
       def binding_env(type = :var)
         return nil if context.nil?
         if type == :var

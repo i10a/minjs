@@ -33,7 +33,7 @@ module Minjs
           tmp.close
         end
         #TODO
-        t = Minjs::Compressor.new(:logger => logger).compress(data).to_js
+        t = Minjs::Compressor::Compressor.new(:logger => logger).compress(data).to_js
         if logger.info?
           tmp = open(output, "w")
           tmp.write(t)

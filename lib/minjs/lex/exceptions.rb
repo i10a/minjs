@@ -1,4 +1,5 @@
 module Minjs::Lex
+  # ParseError
   class ParseError < StandardError
     def initialize(error_message = nil, lex = nil)
       super(error_message)
@@ -8,6 +9,7 @@ module Minjs::Lex
       end
     end
 
+    # to string
     def to_s
       t = ''
       t << super

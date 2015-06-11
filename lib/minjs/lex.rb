@@ -1,4 +1,5 @@
 module Minjs
+  #Lex
   module Lex
   end
 end

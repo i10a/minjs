@@ -1,5 +1,6 @@
 # coding: utf-8
 module Minjs
+  # Ctype
   module Ctype
     # Tests character _code_ is OctalDigit or not.
     #

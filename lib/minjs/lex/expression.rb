@@ -1,5 +1,6 @@
 # coding: utf-8
 module Minjs::Lex
+  # Expression
   module Expression
     include Minjs
     # Tests next literal is PrimaryExpression or not.
@@ -31,8 +32,8 @@ module Minjs::Lex
         end
       end
 
-      t = identifier(context) ||
-          literal(context) ||
+      t = literal(context) ||
+          identifier(context) ||
           array_literal(context) ||
           object_literal(context)
 
@@ -64,13 +65,13 @@ module Minjs::Lex
       if a.kind_of? ECMA262::ECMA262Numeric or a.kind_of? ECMA262::ECMA262String or a.kind_of? ECMA262::ECMA262RegExp
         lex.fwd_after_peek
         a
-      elsif a.eql? ECMA262::ID_NULL
+      elsif a .eql? ECMA262::ID_NULL
         lex.fwd_after_peek
         ECMA262::Null.get
-      elsif a.eql? ECMA262::ID_TRUE
+      elsif a .eql? ECMA262::ID_TRUE
         lex.fwd_after_peek
         ECMA262::Boolean.get(:true)
-      elsif a.eql? ECMA262::ID_FALSE
+      elsif a .eql? ECMA262::ID_FALSE
         lex.fwd_after_peek
         ECMA262::Boolean.get(:false)
       else
