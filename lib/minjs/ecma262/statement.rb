@@ -87,7 +87,6 @@ module Minjs
         @statement_list.statement_list.select{|s|
           s.class != StEmpty
         }[0].to_exp.deep_dup
-
       end
 
       # @return true if block can convert to single statement.
@@ -145,20 +144,20 @@ module Minjs
     # @see http://www.ecma-international.org/ecma-262 ECMA262 12.2
     class StVar < Statement
       attr_reader :vars
-      attr_reader :context
+      attr_reader :var_env
       #
       # vars:
       #  [[name0,init0],[name1,init1],...]
       #
-      def initialize(context, vars)
+      def initialize(var_env, vars)
         @vars = vars
-        @context = context
+        @var_env = var_env
       end
 
       # duplicate object
       # @see Base#deep_dup
       def deep_dup
-        self.class.new(@context,
+        self.class.new(@var_env,
                        @vars.collect{|x,y|
                          [x.deep_dup, y ? y.deep_dup : nil]
                        })
@@ -717,15 +716,15 @@ module Minjs
     #
     # @see http://www.ecma-international.org/ecma-262 ECMA262 12.6.3
     class StForVar < Statement
-      attr_reader :context
+      attr_reader :var_env
       attr_reader :var_decl_list, :exp2, :exp3, :statement
 
       #
       # var_decl_list
       #  [[name0, init0],[name1, init1], ...]
       #
-      def initialize(context, var_decl_list, exp2, exp3, statement)
-        @context = context
+      def initialize(var_env, var_decl_list, exp2, exp3, statement)
+        @var_env = var_env
         @var_decl_list = var_decl_list
         @exp2 = exp2
         @exp3 = exp3
@@ -735,7 +734,7 @@ module Minjs
       # duplicate object
       # @see Base#deep_dup
       def deep_dup
-        self.class.new(@context,
+        self.class.new(@var_env,
                        @var_decl_list.collect{|x,y|
                          [x.deep_dup, y.deep_dup]
                        },
@@ -913,11 +912,11 @@ module Minjs
     #
     # @see http://www.ecma-international.org/ecma-262 ECMA262 12.6.4
     class StForInVar < Statement
-      attr_reader :context
+      attr_reader :var_env
       attr_reader :var_decl, :exp2, :statement
 
-      def initialize(context, var_decl, exp2, statement)
-        @context = context
+      def initialize(var_env, var_decl, exp2, statement)
+        @var_env = var_env
         @var_decl = var_decl
         @exp2 = exp2
         @statement = statement
@@ -926,7 +925,7 @@ module Minjs
       # duplicate object
       # @see Base#deep_dup
       def deep_dup
-        self.class.new(@context,
+        self.class.new(@var_env,
                        [@var_decl[0].deep_dup, @var_decl[1] ? @var_decl[1].deep_dup : nil],
                        @exp2.deep_dup,
                        @statement.deep_dup)
@@ -1154,10 +1153,10 @@ module Minjs
     #
     # @see http://www.ecma-international.org/ecma-262 ECMA262 12.10
     class StWith < Statement
-      attr_reader :exp, :statement, :context
+      attr_reader :exp, :statement, :var_env
 
-      def initialize(context, exp, statement)
-        @context = context
+      def initialize(var_env, exp, statement)
+        @var_env = var_env
         @exp = exp
         @statement = statement
       end
@@ -1165,7 +1164,7 @@ module Minjs
       # duplicate object
       # @see Base#deep_dup
       def deep_dup
-        self.class.new(@context, @exp.deep_dup, @statement.deep_dup)
+        self.class.new(@var_env, @exp.deep_dup, @statement.deep_dup)
       end
 
       # Replaces children object.
@@ -1382,15 +1381,67 @@ module Minjs
       end
     end
 
+    class StTryCatch < Statement
+      attr_reader :var_env
+      attr_reader :arg
+      attr_reader :block
+      attr_accessor :exe_context
+
+      def initialize(var_env, arg, block)
+        @var_env = var_env
+        @arg = arg
+        @block = block
+      end
+
+      def to_js(options = {})
+        concat(options, :catch, "(", @arg, ")", @block)
+      end
+
+      # duplicate object
+      # @see Base#deep_dup
+      def deep_dup
+        self.class.new(@var_env,
+                       @arg.deep_dup,
+                       @block.deep_dup)
+      end
+
+      # Traverses this children and itself with given block.
+      def traverse(parent, &block)
+        @arg.traverse(self, &block)
+        @block.traverse(self, &block)
+        yield parent, self
+      end
+
+      # Replaces children object.
+      # @see Base#replace
+      def replace(from, to)
+        if from .eql? @arg
+          @arg = to
+        elsif from .eql? @block
+          @block = to
+        end
+      end
+
+      def enter(outer_exe_context)
+        catch_env = LexEnv.new_declarative_env(outer_exe_context.lex_env)
+        catch_env.record.create_mutable_binding(@arg, nil)
+        catch_env.record.set_mutable_binding(@arg, :undefined, nil, nil)
+
+        new_exe_context = ExeContext.new
+        new_exe_context.lex_env = catch_env
+        new_exe_context
+      end
+    end
+
     # Base class of ECMA262 TryStatement element.
     #
     # @see http://www.ecma-international.org/ecma-262 ECMA262 12.14
     class StTry < Statement
-      attr_reader :context
+      attr_reader :var_env
       attr_reader :try, :catch, :finally
 
-      def initialize(context, try, catch, finally)
-        @context = context
+      def initialize(var_env, try, catch, finally)
+        @var_env = var_env
         @try = try
         @catch = catch
         @finally = finally
@@ -1399,9 +1450,9 @@ module Minjs
       # duplicate object
       # @see Base#deep_dup
       def deep_dup
-        self.class.new(@context,
+        self.class.new(@var_env,
                        @try.deep_dup,
-                       @catch ? [@catch[0].deep_dup, @catch[1].deep_dup] : nil,
+                       @catch ? @catch.deep_dup : nil,
                        @finally ? @finally.deep_dup : nil)
       end
 
@@ -1410,10 +1461,8 @@ module Minjs
       def replace(from, to)
         if from .eql? @try
           @try = to
-        elsif from .eql? @catch[0]
-          @catch[0] = to
-        elsif from .eql? @catch[1]
-          @catch[1] = to
+        elsif from .eql? @catch
+          @catch = to
         elsif from .eql? @finally
           @finally = to
         end
@@ -1422,10 +1471,7 @@ module Minjs
       # Traverses this children and itself with given block.
       def traverse(parent, &block)
         @try.traverse(self, &block)
-        if @catch
-          @catch[0].traverse(self, &block)
-          @catch[1].traverse(self, &block)
-        end
+        @catch.traverse(self, &block) if @catch
         @finally.traverse(self, &block) if @finally
         yield parent, self
       end
@@ -1442,13 +1488,14 @@ module Minjs
       # @see Base#to_js
       def to_js(options = {})
         if @catch and @finally
-          concat(options, :try, @try, :catch, "(", @catch[0], ")", @catch[1], :finally, @finally)
+          concat(options, :try, @try, @catch, :finally, @finally)
         elsif @catch
-          concat(options, :try, @try, :catch, "(", @catch[0], ")", @catch[1])
+          concat(options, :try, @try, @catch)
         else
           concat(options, :try, @try, :finally, @finally)
         end
       end
+
     end
 
     # Base class of ECMA262 DebuggerStatement element.
@@ -1486,10 +1533,11 @@ module Minjs
       attr_reader :name
       attr_reader :args
       attr_reader :statements
-      attr_reader :context
+      attr_reader :var_env
+      attr_accessor :exe_context
 
-      def initialize(context, name, args, statements, options = {})
-        @context = context
+      def initialize(var_env, name, args, statements, options = {})
+        @var_env = var_env
         @name = name
         @args = args #=> array
         @statements = statements #=> Prog
@@ -1506,10 +1554,10 @@ module Minjs
       # duplicate object
       # @see Base#deep_dup
       def deep_dup
-        self.class.new(@context, @name ? @name.deep_dup : nil,
-                       @args.collect{|args|args.deep_dup},
-                       @statements.deep_dup,
-                       {decl: @decl, getter: @getter, setter: @setter})
+        self.class.new(@var_env, @name ? @name.deep_dup : nil,
+                           @args.collect{|args|args.deep_dup},
+                           @statements.deep_dup,
+                           {decl: @decl, getter: @getter, setter: @setter})
       end
 
       # Traverses this children and itself with given block.
@@ -1561,6 +1609,19 @@ module Minjs
       # Returns true if this object is function declaration
       def decl?
         @decl
+      end
+
+      def enter(outer_exe_context)
+        local_env = LexEnv.new_declarative_env(outer_exe_context.lex_env)
+        var_env.record.binding.each do |k, v|
+          local_env.record.create_mutable_binding(k, nil)
+          val = v.delete(:value)
+          local_env.record.set_mutable_binding(k, val, nil, v)
+        end
+        new_exe_context = ExeContext.new
+        new_exe_context.lex_env = local_env
+        new_exe_context.var_env = var_env
+        new_exe_context
       end
     end
   end

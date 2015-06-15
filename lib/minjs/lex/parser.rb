@@ -33,11 +33,6 @@ module Minjs::Lex
       @eval_nest = 0
     end
 
-    # return Parser itself
-    def lex
-      self
-    end
-
     # clear cache of ECMA262 elements
     def clear_cache
       @lit_cache = {}
@@ -284,7 +279,7 @@ module Minjs::Lex
           @pos += 1
         else
           name = chars.pack("U*").to_sym
-          return ECMA262::IdentifierName.get(nil, name)
+          return ECMA262::IdentifierName.get(name)
         end
       end
     end

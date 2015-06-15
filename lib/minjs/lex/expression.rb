@@ -10,32 +10,32 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     #
     # @return [ECMA262::ECMA262Object] expression
     #
     # @see ECMA262 11.1
-    def primary_exp(context)
+    def primary_exp(var_env)
       @logger.debug "*** primary_exp"
 
-      if lex.eql_lit?(ECMA262::ID_THIS)
+      if eql_lit?(ECMA262::ID_THIS)
         @logger.debug "*** primary_exp => this"
-        return ECMA262::This.new(context)
+        return ECMA262::This.new
       end
       # (exp)
-      if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS)
-        if a=exp(context, {}) and lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS)
+      if eql_lit?(ECMA262::PUNC_LPARENTHESIS)
+        if a=exp(var_env, {}) and eql_lit?(ECMA262::PUNC_RPARENTHESIS)
           @logger.debug "*** primary_exp => ()"
           return ECMA262::ExpParen.new(a)
         else
-          raise ParseError.new("no `)' at end of expression", lex)
+          raise ParseError.new("no `)' at end of expression", self)
         end
       end
 
-      t = literal(context) ||
-          identifier(context) ||
-          array_literal(context) ||
-          object_literal(context)
+      t = literal(var_env) ||
+          identifier(var_env) ||
+          array_literal(var_env) ||
+          object_literal(var_env)
 
       @logger.debug {
         "*** primary_exp => #{t ? t.to_js : t}"
@@ -50,29 +50,29 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     # @return [ECMA262::Base] expression
     #
     # @see ECMA262 7.8, 7.8.1, 7.8.2
-    def literal(context)
+    def literal(var_env)
       # Literal ::
       # NullLiteral
       # BooleanLiteral
       # NumericLiteral
       # StringLiteral
       # RegularExpressionLiteral
-      a = lex.peek_lit(:regexp)
+      a = peek_lit(:regexp)
       if a.kind_of? ECMA262::ECMA262Numeric or a.kind_of? ECMA262::ECMA262String or a.kind_of? ECMA262::ECMA262RegExp
-        lex.fwd_after_peek
+        fwd_after_peek
         a
       elsif a .eql? ECMA262::ID_NULL
-        lex.fwd_after_peek
+        fwd_after_peek
         ECMA262::Null.get
       elsif a .eql? ECMA262::ID_TRUE
-        lex.fwd_after_peek
+        fwd_after_peek
         ECMA262::Boolean.get(:true)
       elsif a .eql? ECMA262::ID_FALSE
-        lex.fwd_after_peek
+        fwd_after_peek
         ECMA262::Boolean.get(:false)
       else
         nil
@@ -86,16 +86,16 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     #
     # @return [ECMA262::Literal] expression
     #
     # @see ECMA262 11.1.2
-    def identifier(context)
-      a = lex.peek_lit(:regexp)
+    def identifier(var_env)
+      a = peek_lit(:regexp)
       if a.kind_of? ECMA262::IdentifierName and !a.reserved?
-        lex.fwd_after_peek
-        a.context = context
+        fwd_after_peek
+        #a.var_env = var_env
         a
       else
         nil
@@ -108,24 +108,24 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     #
     # @return [ECMA262::ECMA262Array] expression
     #
     # @see ECMA262 11.1.4
-    def array_literal(context)
-      return nil unless lex.eql_lit?(ECMA262::PUNC_LSQBRAC)
+    def array_literal(var_env)
+      return nil unless eql_lit?(ECMA262::PUNC_LSQBRAC)
       t = []
       while true
-        if lex.eql_lit?(ECMA262::PUNC_COMMA)
+        if eql_lit?(ECMA262::PUNC_COMMA)
           t.push(nil)
-        elsif lex.eql_lit?(ECMA262::PUNC_RSQBRAC)
+        elsif eql_lit?(ECMA262::PUNC_RSQBRAC)
           break
-        elsif a = assignment_exp(context, {})
+        elsif a = assignment_exp(var_env, {})
           t.push(a)
-          lex.eql_lit?(ECMA262::PUNC_COMMA)
+          eql_lit?(ECMA262::PUNC_COMMA)
         else
-          raise ParseError.new("no `]' end of array", lex)
+          raise ParseError.new("no `]' end of array", self)
         end
       end
       ECMA262::ECMA262Array.new(t)
@@ -137,12 +137,12 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     #
     # @return [ECMA262::ECMA262Object] expression
     #
     # @see ECMA262 11.1.5
-    def object_literal(context)
+    def object_literal(var_env)
       #
       # 11.1.5
       #
@@ -151,12 +151,12 @@ module Minjs::Lex
       # { PropertyNameAndValueList }
       # { PropertyNameAndValueList , }
       #
-      return nil unless lex.eql_lit?(ECMA262::PUNC_LCURLYBRAC)
+      return nil unless eql_lit?(ECMA262::PUNC_LCURLYBRAC)
       #{}
-      if lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
+      if eql_lit?(ECMA262::PUNC_RCURLYBRAC)
         ECMA262::ECMA262Object.new([])
       else
-        ECMA262::ECMA262Object.new(property_name_and_value_list(context))
+        ECMA262::ECMA262Object.new(property_name_and_value_list(var_env))
       end
     end
 
@@ -167,13 +167,13 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     #
     # @return [Array<Array>] expression
     #
     # @see ECMA262 11.1.5
     #
-    def property_name_and_value_list(context)
+    def property_name_and_value_list(var_env)
       # PropertyNameAndValueList :
       # PropertyAssignment
       # PropertyNameAndValueList , PropertyAssignment
@@ -183,67 +183,65 @@ module Minjs::Lex
       # get PropertyName ( ) { FunctionBody }
       # set PropertyName ( PropertySetParameterList ) { FunctionBody }
       h = []
-      while !lex.eof?
+      while !eof?
         #get
-        if lex.match_lit? ECMA262::ID_GET
+        if match_lit? ECMA262::ID_GET
           # {get : val}
-          if lex.eql_lit? ECMA262::PUNC_COLON
-            b = assignment_exp(context, {})
+          if eql_lit? ECMA262::PUNC_COLON
+            b = assignment_exp(var_env, {})
             h.push([ECMA262::ID_GET, b])
           # {get name(){}}
           else
-            new_context = ECMA262::Context.new
-            new_context.lex_env = context.lex_env.new_declarative_env()
-            new_context.var_env = context.var_env.new_declarative_env()
-            if(a = property_name(context) and
-               lex.eql_lit? ECMA262::PUNC_LPARENTHESIS and
-               lex.eql_lit? ECMA262::PUNC_RPARENTHESIS and
-               lex.eql_lit? ECMA262::PUNC_LCURLYBRAC and
-               b = func_body(new_context) and
-               lex.eql_lit? ECMA262::PUNC_RCURLYBRAC)
-              h.push([a, ECMA262::StFunc.new(new_context, ECMA262::ID_GET, [], b, :getter => true)])
+            new_var_env = ECMA262::LexEnv.new(outer: var_env)
+            if(a = property_name(var_env) and
+               eql_lit? ECMA262::PUNC_LPARENTHESIS and
+               eql_lit? ECMA262::PUNC_RPARENTHESIS and
+               eql_lit? ECMA262::PUNC_LCURLYBRAC and
+               b = func_body(new_var_env) and
+               eql_lit? ECMA262::PUNC_RCURLYBRAC)
+              h.push([a, f = ECMA262::StFunc.new(new_var_env, ECMA262::ID_GET, [], b, :getter => true)])
+              #new_var_env.func = f
             else
-              raise ParseError.new("unexpceted token", lex)
+              raise ParseError.new("unexpceted token", self)
             end
           end
         #set
-        elsif lex.match_lit?(ECMA262::ID_SET)
+        elsif match_lit?(ECMA262::ID_SET)
           # {set : val}
-          if lex.eql_lit? ECMA262::PUNC_COLON
-            b = assignment_exp(context, {})
+          if eql_lit? ECMA262::PUNC_COLON
+            b = assignment_exp(var_env, {})
             h.push([ECMA262::ID_SET, b])
           # {set name(arg){}}
           else
-            new_context = ECMA262::Context.new
-            new_context.lex_env = context.lex_env.new_declarative_env()
-            new_context.var_env = context.var_env.new_declarative_env()
-            if(a = property_name(context) and
-               lex.eql_lit? ECMA262::PUNC_LPARENTHESIS and
-               arg = property_set_parameter_list(new_context) and
-               lex.eql_lit? ECMA262::PUNC_RPARENTHESIS and
-               lex.eql_lit? ECMA262::PUNC_LCURLYBRAC and
-               b = func_body(new_context) and
-               lex.eql_lit? ECMA262::PUNC_RCURLYBRAC)
-              h.push([a, ECMA262::StFunc.new(new_context, ECMA262::ID_SET, arg, b, :setter => true)])
+            new_var_env = ECMA262::LexEnv.new(outer: var_env)
+            if(a = property_name(var_env) and
+               eql_lit? ECMA262::PUNC_LPARENTHESIS and
+               arg = property_set_parameter_list(new_var_env) and
+               eql_lit? ECMA262::PUNC_RPARENTHESIS and
+               eql_lit? ECMA262::PUNC_LCURLYBRAC and
+               b = func_body(new_var_env) and
+               eql_lit? ECMA262::PUNC_RCURLYBRAC)
+              h.push([a, f = ECMA262::StFunc.new(new_var_env, ECMA262::ID_SET, arg, b, :setter => true)])
+              #new_var_env.func = f
             else
-              raise ParseError.new("unexpceted token", lex)
+              raise ParseError.new("unexpceted token", self)
             end
           end
         #property
-        elsif(a = property_name(context) and
-              lex.eql_lit? ECMA262::PUNC_COLON and
-              b = assignment_exp(context, {}))
+        elsif(a = property_name(var_env) and
+              eql_lit? ECMA262::PUNC_COLON and
+              b = assignment_exp(var_env, {}))
           h.push([a, b])
         else
-          raise ParseError.new("unexpceted token", lex)
+          raise ParseError.new("unexpceted token", self)
         end
 
-        if lex.eql_lit?(ECMA262::PUNC_COMMA)
-          break if lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
-        elsif lex.eql_lit?(ECMA262::PUNC_RCURLYBRAC)
+        if eql_lit?(ECMA262::PUNC_COMMA)
+          break if eql_lit?(ECMA262::PUNC_RCURLYBRAC)
+        elsif eql_lit?(ECMA262::PUNC_RCURLYBRAC)
           break
         else
-          raise ParseError.new("no `}' end of object", lex)
+          raise ParseError.new("no `}' end of object", self)
         end
       end
       h
@@ -256,7 +254,7 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     #
     # @return [ECMA262::Base] expression
     #
@@ -264,12 +262,12 @@ module Minjs::Lex
     # 11.1.5
     #
     #
-    def property_name(context)
+    def property_name(var_env)
       # PropertyName :
       # IdentifierName
       # StringLiteral
       # NumericLiteral
-      a = lex.fwd_lit(nil)
+      a = fwd_lit(nil)
       if a.kind_of?(ECMA262::ECMA262String)
         a
       elsif a.kind_of?(ECMA262::IdentifierName)
@@ -279,7 +277,7 @@ module Minjs::Lex
       elsif a.eql?(ECMA262::PUNC_COLON)
         nil
       else
-        raise ParseError.new("unexpceted token", lex)
+        raise ParseError.new("unexpceted token", self)
       end
     end
 
@@ -290,19 +288,18 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     #
     # @return [Array<ECMA262::Base>] arguments
     #
     # @see ECMA262 11.1.5
-    def property_set_parameter_list(context)
+    def property_set_parameter_list(var_env)
       # PropertySetParameterList :
       # Identifier
-      argName = identifier(context)
-      context.var_env.record.create_mutable_binding(argName, nil)
-      context.var_env.record.set_mutable_binding(argName, :undefined, nil, {:_parameter_list => true})
-      context.lex_env.record.create_mutable_binding(argName, nil)
-      context.lex_env.record.set_mutable_binding(argName, :undefined, nil, {:_parameter_list => true})
+      argName = identifier(var_env)
+
+      var_env.record.create_mutable_binding(argName, nil)
+      var_env.record.set_mutable_binding(argName, :undefined, nil, _parameter_list: true)
       [argName]
     end
 
@@ -313,11 +310,11 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     # @return [ECMA262::Base] expression
     #
     # @see ECMA262 11.2
-    def left_hand_side_exp(context)
+    def left_hand_side_exp(var_env)
       #
       # LeftHandSideExpression :
       # NewExpression
@@ -325,8 +322,8 @@ module Minjs::Lex
       #
       @logger.debug "*** left_hand_side_exp"
 
-      t = call_exp(context) || new_exp(context)
-      #t = new_exp(context) || call_exp(context)
+      t = call_exp(var_env) || new_exp(var_env)
+      #t = new_exp(var_env) || call_exp(var_env)
 
       @logger.debug{
         "*** left_hand_side_exp => #{t ? t.to_js: t}"
@@ -364,23 +361,23 @@ module Minjs::Lex
     #      MemberExpression [lookahead ∉ {(}]
     #      new NewExpression [lookahead ∉ {(}]
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
     #
     # @return [ECMA262::Base] expression
     #
     # @see ECMA262 11.2
     # @see #call_exp
-    def new_exp(context)
+    def new_exp(var_env)
       # NewExpression :
       # MemberExpression
       # new NewExpression
-      if lex.eql_lit?(ECMA262::ID_NEW)
-        if a = new_exp(context)
-          if lex.eql_lit? ECMA262::PUNC_LPARENTHESIS
+      if eql_lit?(ECMA262::ID_NEW)
+        if a = new_exp(var_env)
+          if eql_lit? ECMA262::PUNC_LPARENTHESIS
             # minjs evaluate CallExpression first, so
             # program never falls to here.
-            raise ParseError.new("unexpceted token", lex)
+            raise ParseError.new("unexpceted token", self)
             nil # this is not NewExpression, may be MemberExpression.
           end
           #puts "new_exp> #{a.to_js}"
@@ -388,11 +385,11 @@ module Minjs::Lex
         else
           # minjs evaluate CallExpression first, so
           # raise exception when program falls to here.
-          raise ParseError.new("unexpceted token", lex)
+          raise ParseError.new("unexpceted token", self)
           #nil
         end
       else
-        member_exp(context)
+        member_exp(var_env)
       end
     end
     # Tests next literal is CallExpression or not.
@@ -404,14 +401,14 @@ module Minjs::Lex
     #
     # @see ECMA262 11.2
     # @see #new_exp
-    def call_exp(context)
+    def call_exp(var_env)
       # CallExpression :
       # MemberExpression Arguments
       # CallExpression Arguments
       # CallExpression [ Expression ]
       # CallExpression . IdentifierName
-      if a = member_exp(context)
-        if b = arguments(context)
+      if a = member_exp(var_env)
+        if b = arguments(var_env)
           t = ECMA262::ExpCall.new(a, b)
         # if b is nil, this may be MemberExpression of NewExpression
         else
@@ -422,19 +419,19 @@ module Minjs::Lex
       end
 
       while true
-        if b = arguments(context)
+        if b = arguments(var_env)
           t = ECMA262::ExpCall.new(t, b)
-        elsif lex.eql_lit?(ECMA262::PUNC_LSQBRAC)
-          if b=exp(context, {}) and lex.eql_lit?(ECMA262::PUNC_RSQBRAC)
+        elsif eql_lit?(ECMA262::PUNC_LSQBRAC)
+          if b=exp(var_env, {}) and eql_lit?(ECMA262::PUNC_RSQBRAC)
             t = ECMA262::ExpPropBrac.new(t, b)
           else
-            raise ParseError.new("unexpceted token", lex)
+            raise ParseError.new("unexpceted token", self)
           end
-        elsif lex.eql_lit?(ECMA262::PUNC_PERIOD)
-          if (b=lex.fwd_lit(nil)).kind_of?(ECMA262::IdentifierName)
+        elsif eql_lit?(ECMA262::PUNC_PERIOD)
+          if (b=fwd_lit(nil)).kind_of?(ECMA262::IdentifierName)
             t = ECMA262::ExpProp.new(t, b)
           else
-            raise ParseError.new("unexpceted token", lex)
+            raise ParseError.new("unexpceted token", self)
           end
         else
           break
@@ -450,14 +447,14 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
     #
     # @return [ECMA262::Base] expression
     #
     # @see ECMA262 11.2
     #
-    def member_exp(context)
+    def member_exp(var_env)
       # MemberExpression :
       # PrimaryExpression
       # FunctionExpression
@@ -465,10 +462,10 @@ module Minjs::Lex
       # MemberExpression . IdentifierName
       # new MemberExpression Arguments
       #
-      t = lex.eval_lit{
-        if lex.eql_lit? ECMA262::ID_NEW
-           if a = member_exp(context)
-             b = arguments(context)
+      t = eval_lit{
+        if eql_lit? ECMA262::ID_NEW
+           if a = member_exp(var_env)
+             b = arguments(var_env)
              # if b is nil, this may be NewExpression
              if b
                s = b.collect{|x| x.to_js}.join(',');
@@ -481,21 +478,21 @@ module Minjs::Lex
              return nil
            end
         end
-      } || primary_exp(context) || func_exp(context)
+      } || primary_exp(var_env) || func_exp(var_env)
       return nil if t.nil?
 
       while true
-        if lex.eql_lit?(ECMA262::PUNC_LSQBRAC)
-          if b=exp(context, {}) and lex.eql_lit?(ECMA262::PUNC_RSQBRAC)
+        if eql_lit?(ECMA262::PUNC_LSQBRAC)
+          if b=exp(var_env, {}) and eql_lit?(ECMA262::PUNC_RSQBRAC)
             t = ECMA262::ExpPropBrac.new(t, b)
           else
-            raise ParseError.new("unexpceted token", lex)
+            raise ParseError.new("unexpceted token", self)
           end
-        elsif lex.eql_lit?(ECMA262::PUNC_PERIOD)
-          if (b=lex.fwd_lit(nil)).kind_of?(ECMA262::IdentifierName)
+        elsif eql_lit?(ECMA262::PUNC_PERIOD)
+          if (b=fwd_lit(nil)).kind_of?(ECMA262::IdentifierName)
             t = ECMA262::ExpProp.new(t, b)
           else
-            raise ParseError.new("unexpceted token", lex)
+            raise ParseError.new("unexpceted token", self)
           end
         else
           break
@@ -510,31 +507,31 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     #
     # @return [Array<ECMA262::Base>] arguments
     #
     # @see ECMA262 11.2
-    def arguments(context)
+    def arguments(var_env)
       # Arguments :
       # ( )
       # ( ArgumentList )
-      return nil if lex.eql_lit?(ECMA262::PUNC_LPARENTHESIS).nil?
-      return [] if lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS)
+      return nil if eql_lit?(ECMA262::PUNC_LPARENTHESIS).nil?
+      return [] if eql_lit?(ECMA262::PUNC_RPARENTHESIS)
 
       args = []
       while true
-        if t = assignment_exp(context, {})
+        if t = assignment_exp(var_env, {})
           args.push(t)
         else
-          raise ParseError.new("unexpected token", lex)
+          raise ParseError.new("unexpected token", self)
         end
-        if lex.eql_lit?(ECMA262::PUNC_COMMA)
+        if eql_lit?(ECMA262::PUNC_COMMA)
           ;
-        elsif lex.eql_lit?(ECMA262::PUNC_RPARENTHESIS)
+        elsif eql_lit?(ECMA262::PUNC_RPARENTHESIS)
           break
         else
-          raise ParseError.new("unexpected token", lex)
+          raise ParseError.new("unexpected token", self)
         end
       end
       args
@@ -547,16 +544,16 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     #
     # @return [ECMA262::ECMA262Object] expression
     #
     # @see ECMA262 11.3
-    def postfix_exp(context)
-      exp = left_hand_side_exp(context)
+    def postfix_exp(var_env)
+      exp = left_hand_side_exp(var_env)
       return nil if exp.nil?
-      if punc = (lex.eql_lit_nolt?(ECMA262::PUNC_INC) ||
-                 lex.eql_lit_nolt?(ECMA262::PUNC_DEC))
+      if punc = (eql_lit_nolt?(ECMA262::PUNC_INC) ||
+                 eql_lit_nolt?(ECMA262::PUNC_DEC))
         if punc == ECMA262::PUNC_INC
           ECMA262::ExpPostInc.new(exp)
         else
@@ -574,24 +571,24 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
     # @return [ECMA262::Base] expression
     #
     # see ECMA262 11.4
-    def unary_exp(context)
-      if punc = (lex.eql_lit?(ECMA262::ID_DELETE) ||
-                 lex.eql_lit?(ECMA262::ID_VOID) ||
-                 lex.eql_lit?(ECMA262::ID_TYPEOF) ||
-                 lex.eql_lit?(ECMA262::PUNC_INC) ||
-                 lex.eql_lit?(ECMA262::PUNC_DEC) ||
-                 lex.eql_lit?(ECMA262::PUNC_ADD) ||
-                 lex.eql_lit?(ECMA262::PUNC_SUB) ||
-                 lex.eql_lit?(ECMA262::PUNC_NOT) ||
-                 lex.eql_lit?(ECMA262::PUNC_LNOT))
-        exp = unary_exp(context)
+    def unary_exp(var_env)
+      if punc = (eql_lit?(ECMA262::ID_DELETE) ||
+                 eql_lit?(ECMA262::ID_VOID) ||
+                 eql_lit?(ECMA262::ID_TYPEOF) ||
+                 eql_lit?(ECMA262::PUNC_INC) ||
+                 eql_lit?(ECMA262::PUNC_DEC) ||
+                 eql_lit?(ECMA262::PUNC_ADD) ||
+                 eql_lit?(ECMA262::PUNC_SUB) ||
+                 eql_lit?(ECMA262::PUNC_NOT) ||
+                 eql_lit?(ECMA262::PUNC_LNOT))
+        exp = unary_exp(var_env)
         if exp.nil?
-          raise ParseError.new("unexpceted token", lex)
+          raise ParseError.new("unexpceted token", self)
         elsif punc == ECMA262::PUNC_INC
           ECMA262::ExpPreInc.new(exp)
         elsif punc == ECMA262::PUNC_DEC
@@ -614,7 +611,7 @@ module Minjs::Lex
             end
         end
       else
-        postfix_exp(context)
+        postfix_exp(var_env)
       end
     end
 
@@ -625,21 +622,21 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
     #
     # @return [ECMA262::Base] expression
     #
     # @see ECMA262 11.5
-    def multiplicative_exp(context)
-      a = unary_exp(context)
+    def multiplicative_exp(var_env)
+      a = unary_exp(var_env)
       return nil if !a
       t = a
-      while punc = lex.eql_lit?(ECMA262::PUNC_MUL) ||
-                   lex.eql_lit?(ECMA262::PUNC_DIV, :div) ||
-                   lex.eql_lit?(ECMA262::PUNC_MOD)
+      while punc = eql_lit?(ECMA262::PUNC_MUL) ||
+                   eql_lit?(ECMA262::PUNC_DIV, :div) ||
+                   eql_lit?(ECMA262::PUNC_MOD)
 
-        if b = unary_exp(context)
+        if b = unary_exp(var_env)
           if punc == ECMA262::PUNC_MUL
             t = ECMA262::ExpMul.new(t, b)
           elsif punc == ECMA262::PUNC_DIV
@@ -648,7 +645,7 @@ module Minjs::Lex
             t = ECMA262::ExpMod.new(t, b)
           end
         else
-          raise ParseError.new("unexpceted token", lex)
+          raise ParseError.new("unexpceted token", self)
         end
       end
       t
@@ -661,29 +658,29 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     #
     # @return [ECMA262::Base] expression
     #
     # @see ECMA262 11.6
-    def additive_exp(context)
+    def additive_exp(var_env)
       # AdditiveExpression :
       #   MultiplicativeExpression AdditiveExpression +
       #   MultiplicativeExpression AdditiveExpression -
       #   MultiplicativeExpression
-      a = multiplicative_exp(context)
+      a = multiplicative_exp(var_env)
       return nil if !a
 
       t = a
-      while punc = lex.eql_lit?(ECMA262::PUNC_ADD) || lex.eql_lit?(ECMA262::PUNC_SUB)
-        if b = multiplicative_exp(context)
+      while punc = eql_lit?(ECMA262::PUNC_ADD) || eql_lit?(ECMA262::PUNC_SUB)
+        if b = multiplicative_exp(var_env)
           if punc == ECMA262::PUNC_ADD
             t = ECMA262::ExpAdd.new(t, b)
           else
             t = ECMA262::ExpSub.new(t, b)
           end
         else
-          raise ParseError.new("unexpceted token", lex)
+          raise ParseError.new("unexpceted token", self)
         end
       end
       t
@@ -695,20 +692,20 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
     # @return [ECMA262::Base] expression
     #
     # see ECMA262 11.8
-    def shift_exp(context)
-      a = additive_exp(context)
+    def shift_exp(var_env)
+      a = additive_exp(var_env)
       return nil if !a
 
       t = a
-      while punc = lex.eql_lit?(ECMA262::PUNC_LSHIFT) ||
-                   lex.eql_lit?(ECMA262::PUNC_RSHIFT) ||
-                   lex.eql_lit?(ECMA262::PUNC_URSHIFT)
-        if b = additive_exp(context)
+      while punc = eql_lit?(ECMA262::PUNC_LSHIFT) ||
+                   eql_lit?(ECMA262::PUNC_RSHIFT) ||
+                   eql_lit?(ECMA262::PUNC_URSHIFT)
+        if b = additive_exp(var_env)
           if punc == ECMA262::PUNC_LSHIFT
             t = ECMA262::ExpLShift.new(t, b)
           elsif punc == ECMA262::PUNC_RSHIFT
@@ -717,7 +714,7 @@ module Minjs::Lex
             t = ECMA262::ExpURShift.new(t, b)
           end
         else
-          raise ParseError.new("unexpceted token", lex)
+          raise ParseError.new("unexpceted token", self)
         end
       end
       t
@@ -729,12 +726,12 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
     # @return [ECMA262::Base] expression
     #
     # see ECMA262 11.8
-    def relational_exp(context, options)
+    def relational_exp(var_env, options)
       #RelationalExpression :
       # ShiftExpression
       # RelationalExpression < ShiftExpression
@@ -743,14 +740,14 @@ module Minjs::Lex
       # RelationalExpression >= ShiftExpression
       # RelationalExpression instanceof ShiftExpression
       # RelationalExpression in ShiftExpression
-      a = shift_exp(context)
+      a = shift_exp(var_env)
       return nil if !a
 
       t = a
-      while (punc = lex.eql_lit?(ECMA262::PUNC_LT) || lex.eql_lit?(ECMA262::PUNC_GT) ||
-                    lex.eql_lit?(ECMA262::PUNC_LTEQ) || lex.eql_lit?(ECMA262::PUNC_GTEQ) ||
-                    lex.eql_lit?(ECMA262::ID_INSTANCEOF) || (!options[:no_in] && lex.eql_lit?(ECMA262::ID_IN)))
-        if b = shift_exp(context)
+      while (punc = eql_lit?(ECMA262::PUNC_LT) || eql_lit?(ECMA262::PUNC_GT) ||
+                    eql_lit?(ECMA262::PUNC_LTEQ) || eql_lit?(ECMA262::PUNC_GTEQ) ||
+                    eql_lit?(ECMA262::ID_INSTANCEOF) || (!options[:no_in] && eql_lit?(ECMA262::ID_IN)))
+        if b = shift_exp(var_env)
           if punc == ECMA262::PUNC_LT
             t = ECMA262::ExpLt.new(t, b)
           elsif punc == ECMA262::PUNC_GT
@@ -766,7 +763,7 @@ module Minjs::Lex
           else
           end
         else
-          raise ParseError.new("unexpceted token", lex)
+          raise ParseError.new("unexpceted token", self)
         end
       end
       t
@@ -778,22 +775,22 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
     #
     # @return [ECMA262::Base] expression
     #
     # @see ECMA262 11.9
-    def equality_exp(context, options)
-      a = relational_exp(context, options)
+    def equality_exp(var_env, options)
+      a = relational_exp(var_env, options)
       return nil if !a
 
       t = a
-      while punc = lex.eql_lit?(ECMA262::PUNC_EQ) ||
-                   lex.eql_lit?(ECMA262::PUNC_NEQ) ||
-                   lex.eql_lit?(ECMA262::PUNC_SEQ) ||
-                   lex.eql_lit?(ECMA262::PUNC_SNEQ)
-        if b = relational_exp(context, options)
+      while punc = eql_lit?(ECMA262::PUNC_EQ) ||
+                   eql_lit?(ECMA262::PUNC_NEQ) ||
+                   eql_lit?(ECMA262::PUNC_SEQ) ||
+                   eql_lit?(ECMA262::PUNC_SNEQ)
+        if b = relational_exp(var_env, options)
           if punc == ECMA262::PUNC_EQ
             t = ECMA262::ExpEq.new(t, b)
           elsif punc == ECMA262::PUNC_NEQ
@@ -804,7 +801,7 @@ module Minjs::Lex
             t = ECMA262::ExpStrictNotEq.new(t, b)
           end
         else
-          raise ParseError.new("unexpceted token", lex)
+          raise ParseError.new("unexpceted token", self)
         end
       end
       t
@@ -817,22 +814,22 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
     #
     # @return [ECMA262::Base] expression
     #
     # @see ECMA262 11.10
-    def bitwise_and_exp(context, options)
-      a = equality_exp(context, options)
+    def bitwise_and_exp(var_env, options)
+      a = equality_exp(var_env, options)
       return nil if !a
 
       t = a
-      while punc = lex.eql_lit?(ECMA262::PUNC_AND)
-        if b = equality_exp(context, options)
+      while punc = eql_lit?(ECMA262::PUNC_AND)
+        if b = equality_exp(var_env, options)
           t = ECMA262::ExpAnd.new(t, b)
         else
-          raise ParseError.new("unexpceted token", lex)
+          raise ParseError.new("unexpceted token", self)
         end
       end
       t
@@ -845,22 +842,22 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
     #
     # @return [ECMA262::Base] expression
     #
     # @see ECMA262 11.10
-    def bitwise_xor_exp(context, options)
-      a = bitwise_and_exp(context, options)
+    def bitwise_xor_exp(var_env, options)
+      a = bitwise_and_exp(var_env, options)
       return nil if !a
 
       t = a
-      while punc = lex.eql_lit?(ECMA262::PUNC_XOR)
-        if b = bitwise_and_exp(context, options)
+      while punc = eql_lit?(ECMA262::PUNC_XOR)
+        if b = bitwise_and_exp(var_env, options)
           t = ECMA262::ExpXor.new(t, b)
         else
-          raise ParseError.new("unexpceted token", lex)
+          raise ParseError.new("unexpceted token", self)
         end
       end
 
@@ -874,22 +871,22 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
     #
     # @return [ECMA262::Base] expression
     #
     # @see ECMA262 11.10
-    def bitwise_or_exp(context, options)
-      a = bitwise_xor_exp(context, options)
+    def bitwise_or_exp(var_env, options)
+      a = bitwise_xor_exp(var_env, options)
       return nil if !a
 
       t = a
-      while punc = lex.eql_lit?(ECMA262::PUNC_OR)
-        if b = bitwise_xor_exp(context, options)
+      while punc = eql_lit?(ECMA262::PUNC_OR)
+        if b = bitwise_xor_exp(var_env, options)
           t = ECMA262::ExpOr.new(t, b)
         else
-          raise ParseError.new("unexpceted token", lex)
+          raise ParseError.new("unexpceted token", self)
         end
       end
       t
@@ -902,21 +899,21 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     # @return [ECMA262::Base] expression
     # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
     #
     # @see ECMA262 11.11
-    def logical_and_exp(context, options)
-      a = bitwise_or_exp(context, options)
+    def logical_and_exp(var_env, options)
+      a = bitwise_or_exp(var_env, options)
       return nil if !a
 
       t = a
-      while punc = lex.eql_lit?(ECMA262::PUNC_LAND)
-        if b = bitwise_or_exp(context, options)
+      while punc = eql_lit?(ECMA262::PUNC_LAND)
+        if b = bitwise_or_exp(var_env, options)
           t = ECMA262::ExpLogicalAnd.new(t, b)
         else
-          raise ParseError.new("unexpceted token", lex)
+          raise ParseError.new("unexpceted token", self)
         end
       end
 
@@ -930,21 +927,21 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     # @return [ECMA262::Base] expression
     # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
     #
     # @see ECMA262 11.12
-    def logical_or_exp(context, options)
-      a = logical_and_exp(context, options)
+    def logical_or_exp(var_env, options)
+      a = logical_and_exp(var_env, options)
       return nil if !a
 
       t = a
-      while punc = lex.eql_lit?(ECMA262::PUNC_LOR)
-        if b = logical_and_exp(context, options)
+      while punc = eql_lit?(ECMA262::PUNC_LOR)
+        if b = logical_and_exp(var_env, options)
           t = ECMA262::ExpLogicalOr.new(t, b)
         else
-          raise ParseError.new("unexpceted token", lex)
+          raise ParseError.new("unexpceted token", self)
         end
       end
 
@@ -957,20 +954,20 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     #
     # @return [ECMA262::Base] expression
     #
     # @see ECMA262 11.12
-    def cond_exp(context, options)
-      a = logical_or_exp(context, options)
+    def cond_exp(var_env, options)
+      a = logical_or_exp(var_env, options)
       return nil if !a
 
-      if lex.eql_lit?(ECMA262::PUNC_CONDIF)
-        if b=assignment_exp(context, options) and lex.eql_lit?(ECMA262::PUNC_COLON) and c=assignment_exp(context, options)
+      if eql_lit?(ECMA262::PUNC_CONDIF)
+        if b=assignment_exp(var_env, options) and eql_lit?(ECMA262::PUNC_COLON) and c=assignment_exp(var_env, options)
           ECMA262::ExpCond.new(a, b, c)
         else
-          raise ParseError.new("unexpceted token", lex)
+          raise ParseError.new("unexpceted token", self)
         end
       else
         a
@@ -983,25 +980,25 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
     #
     # @see ECMA262 11.13
-    def assignment_exp(context, options)
+    def assignment_exp(var_env, options)
       # AssignmentExpression :
       #  ConditionalExpression
       #  LeftHandSideExpression = AssignmentExpression
       #  LeftHandSideExpression AssignmentOperator AssignmentExpression
       @logger.debug "*** assignment_exp"
 
-      t = cond_exp(context, options)
+      t = cond_exp(var_env, options)
       return nil if t.nil?
 
       if !t.left_hand_side_exp?
         return  t
       end
       left_hand = t
-      punc = lex.peek_lit(:div)
+      punc = peek_lit(:div)
       if punc == ECMA262::PUNC_ASSIGN ||
          punc == ECMA262::PUNC_DIVASSIGN ||
          punc == ECMA262::PUNC_MULASSIGN ||
@@ -1014,8 +1011,8 @@ module Minjs::Lex
          punc == ECMA262::PUNC_ANDASSIGN ||
          punc == ECMA262::PUNC_ORASSIGN ||
          punc == ECMA262::PUNC_XORASSIGN
-        lex.fwd_after_peek
-        if b = assignment_exp(context, options)
+        fwd_after_peek
+        if b = assignment_exp(var_env, options)
           case punc
           when ECMA262::PUNC_ASSIGN
             ECMA262::ExpAssign.new(left_hand, b)
@@ -1045,7 +1042,7 @@ module Minjs::Lex
             raise "internal error"
           end
         else
-          raise ParseError.new("unexpceted token", lex)
+          raise ParseError.new("unexpceted token", self)
         end
       else
         @logger.debug {
@@ -1062,25 +1059,25 @@ module Minjs::Lex
     # forward lexical parser position.
     # Otherwise return nil and position is not changed.
     #
-    # @param context [Context] Lexical Environment
+    # @param var_env [EnvRecord] Lexical Environment
     # @option options :no_in [Boolean] If set, the parser interpret as RelationExpressionNoIn
     #
     # @return [ECMA262::Base] expression
     #
     # @see ECMA262 11.14
-    def exp(context, options)
+    def exp(var_env, options)
       # Expression :
       # AssignmentExpression
       # Expression , AssignmentExpression
       @logger.debug "*** expression"
 
-      t = assignment_exp(context, options)
+      t = assignment_exp(var_env, options)
       return nil if t.nil?
-      while punc = lex.eql_lit?(ECMA262::PUNC_COMMA)
-        if b = assignment_exp(context, options)
+      while punc = eql_lit?(ECMA262::PUNC_COMMA)
+        if b = assignment_exp(var_env, options)
           t = ECMA262::ExpComma.new(t, b)
         else
-          raise ParseError.new("unexpceted token", lex)
+          raise ParseError.new("unexpceted token", self)
         end
       end
       @logger.debug{

@@ -1,3 +1,4 @@
+# coding: utf-8
 module Minjs
   module ECMA262
     # class of Environment Record
@@ -30,7 +31,7 @@ module Minjs
           n = n.val
         end
         @binding[n][:value] = v
-        @binding[n].merge!(options)
+        @binding[n].merge!(options || {})
       end
     end
 
@@ -50,16 +51,19 @@ module Minjs
     #
     # @see http://www.ecma-international.org/ecma-262 ECMA262 10.2
     class LexEnv
-      attr_reader :record
+      attr_accessor :record
       attr_reader :outer
       attr_reader :type
 
       def initialize(options = {})
         @outer = options[:outer]
-        if options[:type] == :object
+        @type = (options[:type] || :declarative)
+        if options[:record]
           @record = ObjectEnvRecord.new
-        else #if options[:type] == :declarative
+        elsif options[:type] == :declarative
           @record = DeclarativeEnvRecord.new
+        elsif options[:type] == :object or true
+          @record = ObjectEnvRecord.new
         end
       end
 
@@ -68,6 +72,13 @@ module Minjs
       # @see http://www.ecma-international.org/ecma-262 ECMA262 10.2.2.2
       def new_declarative_env(outer = nil)
         e = LexEnv.new(outer: (outer || self), type: :declarative)
+      end
+
+      # NewDeclarativeEnvironment(E)
+      #
+      # @see http://www.ecma-international.org/ecma-262 ECMA262 10.2.2.2
+      def self.new_declarative_env(e)
+        env = LexEnv.new(outer: e, type: :declarative)
       end
 
       # NewObjectEnvironment(O, E)
@@ -93,32 +104,15 @@ module Minjs
     # Class of Execution Contexts
     #
     # @see http://www.ecma-international.org/ecma-262 ECMA262 10.3
-    class Context
+    class ExeContext
       attr_accessor :lex_env
       attr_accessor :var_env
       attr_accessor :this_binding
-
       def initialize(options = {})
         @var_env = LexEnv.new(options)
         @lex_env = LexEnv.new(options)
-        #TODO
         @this_binding = nil
-#        ExObject.new(
-#          {
-#            attr: {
-#              writable: true,
-#              enumerable: false,
-#              configurable: true
-#            }
-#          }
-#        )
       end
-
-      # debug
-      def debug
-        @var_env.debug
-      end
-
     end
   end
 end

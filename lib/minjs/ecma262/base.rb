@@ -2,16 +2,13 @@ module Minjs
   module ECMA262
     #ECMA262 Elements
     class Base
+      attr_accessor :parent
+
       # Returns a ECMAScript string containg the representation of element.
       # @param options [Hash] options for Base#concat
       # @return [String] ECMAScript string.
       def to_js(options = {})
         self.class.to_s + "??"
-      end
-
-      # to string
-      def to_s
-        to_js({})
       end
 
       # concatenate some of ECMA262 elements and convert it to ECMAScript
@@ -321,17 +318,18 @@ module Minjs
     # @see http://www.ecma-international.org/ecma-262 ECMA262 14
     class Prog < Base
       attr_reader :source_elements
-      attr_reader :context
+      attr_reader :var_env
+      attr_accessor :exe_context
 
-      def initialize(context, source_elements)
+      def initialize(var_env, source_elements)
         @source_elements = source_elements
-        @context = context
+        @var_env = var_env
       end
 
       # duplicate object
       # @see Base#deep_dup
       def deep_dup
-        self.class.new(context, source_elements.deep_dup)
+        self.class.new(var_env, source_elements.deep_dup)
       end
 
       # Replaces children object

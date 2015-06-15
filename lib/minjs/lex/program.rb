@@ -15,12 +15,12 @@ module Minjs::Lex
     # @return [ECMA262::Prog] element
     #
     # @see http://www.ecma-international.org/ecma-262 ECMA262 14
-    def program(context)
-      prog = source_elements(context)
-      if lex.eof?
+    def program(var_env)
+      prog = source_elements(var_env)
+      if eof?
         return prog
       else
-        raise ParseError.new("unexpceted token", lex)
+        raise ParseError.new("unexpceted token", self)
       end
     end
 
@@ -34,19 +34,19 @@ module Minjs::Lex
     # @return [ECMA262::SourceElements] element
     #
     # @see http://www.ecma-international.org/ecma-262 ECMA262 14
-    def source_elements(context)
+    def source_elements(var_env)
       prog = []
-      while t = source_element(context)
+      while t = source_element(var_env)
         prog.push(t)
       end
-      ECMA262::Prog.new(context, ECMA262::SourceElements.new(prog))
+      ECMA262::Prog.new(var_env, ECMA262::SourceElements.new(prog))
     end
 
-    def source_element(context)
-      #lex.eval_lit{
-      statement(context)
-      #} or lex.eval_lit{ => statement
-      #  func_declaration(context)
+    def source_element(var_env)
+      #eval_lit{
+      statement(var_env)
+      #} or eval_lit{ => statement
+      #  func_declaration(var_env)
       #}
     end
 

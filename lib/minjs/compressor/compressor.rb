@@ -88,7 +88,7 @@ module Minjs::Compressor
     # @return self
     def parse(data)
       @lex = Minjs::Lex::Parser.new(data, :logger => @logger)
-      @global_context = ECMA262::Context.new
+      @global_var_env = ECMA262::LexEnv.new(outer: nil)
       @heading_comments = []
 
       while a = (@lex.comment || @lex.line_terminator || @lex.white_space)
@@ -98,7 +98,8 @@ module Minjs::Compressor
             !(@heading_comments[-2].kind_of?(ECMA262::SingleLineComment))
         @heading_comments.pop
       end
-      @prog = @lex.program(@global_context)
+      @prog = @lex.program(@global_var_env)
+      @prog.exe_context = ECMA262::ExeContext.new
 
       remove_empty_statement
       @lex.clear_cache
@@ -203,12 +204,12 @@ module Minjs::Compressor
       node.traverse(nil) {|parent, st|
         if st.kind_of? ECMA262::Prog
           vars = nil
-          context = st.context
+          var_env = st.var_env
           #
           # collect all of var variable in this function
           #
           var_vars = {}
-          context.var_env.record.binding.each do|k, v|
+          var_env.record.binding.each do|k, v|
             if v and v[:_parameter_list].nil? and !v[:value].kind_of?(ECMA262::StFunc)
               var_vars[k] = true
             end
@@ -218,7 +219,7 @@ module Minjs::Compressor
           # if variable has initializer
           #
           st.traverse(parent){|parent2, st2|
-            if st2.kind_of? ECMA262::StVar and st2.context.var_env == context.var_env
+            if st2.kind_of? ECMA262::StVar and st2.var_env == var_env
               exp = nil
               st2.vars.each do |name, initializer|
                 if initializer
@@ -234,18 +235,18 @@ module Minjs::Compressor
               else
                 parent2.replace(st2, ECMA262::StEmpty.new())
               end
-            elsif st2.kind_of? ECMA262::StForVar and st2.context.var_env == context.var_env
+            elsif st2.kind_of? ECMA262::StForVar and st2.var_env == var_env
               parent2.replace(st2, st2.to_st_for)
-            elsif st2.kind_of? ECMA262::StForInVar and st2.context.var_env == context.var_env
+            elsif st2.kind_of? ECMA262::StForInVar and st2.var_env == var_env
               parent2.replace(st2, st2.to_st_for_in)
             end
           }
           if var_vars.length > 0
             elems = st.source_elements.source_elements
             v = ECMA262::StVar.new(
-              context,
+              var_env,
               var_vars.collect do |k, v|
-                [ECMA262::IdentifierName.get(context, k)]
+                [ECMA262::IdentifierName.get(k)]
               end
             )
 
@@ -341,7 +342,7 @@ module Minjs::Compressor
       remove_empty_statement
       then_to_block
       node.traverse(nil) {|parent, st|
-        if st.kind_of? ECMA262::StBlock and !parent.kind_of?(ECMA262::StTry) and !parent.kind_of?(ECMA262::StIf)
+        if st.kind_of? ECMA262::StBlock and !parent.kind_of?(ECMA262::StTry) and !parent.kind_of?(ECMA262::StIf) and !parent.kind_of?(ECMA262::StTryCatch)
             if st.to_statement?
               parent.replace(st, st.to_statement)
             end
@@ -569,20 +570,20 @@ module Minjs::Compressor
 
     # Compresses variable name as short as possible.
     #
-    # This method collects and counts all variables under this function,
+    # This method collects and counts all variables under the function/catch,
     # then trying to rename var_vars(see bellow) to
     # new name.
     #
     # outer_vars::
-    #    Variables which locate out of this function(or global variable)
+    #    Variables which locate out of this function/catch(or global variable)
     #    Them name cannot be renamed
     # nesting_vars::
-    #    Variables which locate in the function of this function.
+    #    Variables which locate in the function/catch of this function/catch.
     #    Them name cannot be renamed
     # var_vars::
-    #    Variables which have same scope in this function.
+    #    Variables which have same scope in this function/catch.
     # all_vars::
-    #    All variables under this function.
+    #    All variables under this function/catch.
     #
     # 1. If the new name is not in all_vars, the name can be renamed to it.
     # 2. If the new name belongs to var_vars, the name cannot be renamed.
@@ -592,9 +593,15 @@ module Minjs::Compressor
     #
     #
     def compress_var(node = @prog)
+      scopes = []
       func_scopes = []
       catch_scopes = []
       with_scopes = []
+
+      node.traverse(nil) {|parent, st|
+        st.parent = parent
+      }
+
       #
       # ECMA262 10.2:
       #
@@ -607,8 +614,10 @@ module Minjs::Compressor
       node.traverse(nil) {|parent, st|
         if st.kind_of? ECMA262::StFunc
           func_scopes.push([parent, st])
-        elsif st.kind_of? ECMA262::StTry
+          scopes.push([parent, st])
+        elsif st.kind_of? ECMA262::StTryCatch
           catch_scopes.push([parent, st])
+          scopes.push([parent, st])
         elsif st.kind_of? ECMA262::StWith
           with_scopes.push([parent, st])
         end
@@ -653,42 +662,53 @@ module Minjs::Compressor
       #console.log(eee); 	//=>global
       #test();
       #
-      catch_scopes.each{|parent, st|
-        if st.catch
-          catch_context = ECMA262::Context.new
-          catch_context.lex_env = st.context.lex_env.new_declarative_env()
-          catch_context.var_env = st.context.var_env
-          catch_context.lex_env.record.create_mutable_binding(st.catch[0], nil)
-          catch_context.lex_env.record.set_mutable_binding(st.catch[0], :undefined, nil)
-          st.catch[0].context = catch_context
+      scopes.reverse!
 
-          st.catch[1].traverse(parent){|parent2, st2|
-            if st2.kind_of? ECMA262::IdentifierName and st2 == st.catch[0] and st2.binding_env == st.catch[0].binding_env
-              st2.context = catch_context
+      # outer
+      scopes = scopes.collect {|parent, st|
+        if st.kind_of? ECMA262::StFunc or st.kind_of? ECMA262::StTryCatch
+          outer = st.parent
+          while outer
+            if outer.kind_of? ECMA262::StFunc or outer.kind_of? ECMA262::StTryCatch
+              break
+            end
+            outer = outer.parent
+          end
+        end
+        if outer.nil?
+          outer = @prog
+        end
+        [parent, st, outer]
+      }
+
+      # exe_context
+      scopes.each {|parent, st, outer|
+        if st.kind_of? ECMA262::StFunc
+          st.exe_context = st.enter(outer.exe_context)
+          st.traverse(nil) {|parent2, st2|
+            if st2.kind_of? ECMA262::IdentifierName
+              if st.decl? and st2 .eql? st.name
+                ;
+              elsif st.var_env.record.binding[st2.to_s.to_sym]
+                st2.exe_context = st.exe_context
+              end
             end
           }
-          func_scopes.unshift([parent, st])
+        elsif st.kind_of? ECMA262::StTryCatch
+          st.exe_context = st.enter(outer.exe_context)
+          st.traverse(nil) {|parent2, st2|
+            if st2.kind_of? ECMA262::IdentifierName
+              if st2 == st.arg
+                st2.exe_context = st.exe_context
+              end
+            end
+          }
         end
       }
-#      with_scopes.each{|st, parent|
-#        with_context = ECMA262::Context.new
-#        with_context.lex_env = st.context.lex_env.new_declarative_env()
-#        with_context.var_env = st.context.var_env
-#        st.statement.traverse(st) {|st2|
-#          if st2.kind_of? ECMA262::IdentifierName and st2.binding_env == st.context.var_env
-#            st2.context = with_context
-#            with_context.lex_env.record.create_mutable_binding(st2, nil)
-#            with_context.lex_env.record.set_mutable_binding(st2, :undefined, nil)
-#          end
-#        }
-#      }
-      func_scopes.reverse!
-      func_scopes.each {|parent, st|
-        if st.kind_of? ECMA262::StFunc
-          context = st.context
-        elsif st.kind_of? ECMA262::StTry
-          context = st.catch[0].context
-        end
+
+      scopes.each {|parent, st|
+        exe_context = st.exe_context
+
         var_sym = :a
         all_vars = {}
         var_vars = {}
@@ -700,30 +720,28 @@ module Minjs::Compressor
         st.traverse(parent) {|parent2, st2|
           if st2.kind_of? ECMA262::IdentifierName
             var_name = st2.val.to_sym
-            #st2_var_env = st2.binding_env
-            st2_lex_env = st2.binding_env(:lex)
             all_vars[var_name] ||= 0
             all_vars[var_name] += 1
-            if st2_lex_env == nil #global
+            if st2.exe_context == nil #global
               outer_vars[var_name] ||= 0
               outer_vars[var_name] += 1
-            elsif st2_lex_env == @global_context.lex_env #global
+            elsif st2.exe_context.lex_env == @prog.exe_context.lex_env
               outer_vars[var_name] ||= 0
               outer_vars[var_name] += 1
-            elsif st2_lex_env == context.lex_env
+            elsif st2.exe_context.lex_env == exe_context.lex_env
               var_vars[var_name] ||= 0
               var_vars[var_name] += 1
               var_vars_list.push(st2)
             else
-              e = st2.binding_env(:lex)
+              e = st2.exe_context.lex_env
               while e
-                e = e.outer
-                if e == context.lex_env
+                if e == exe_context.lex_env
                   nesting_vars[var_name] ||= 0
                   nesting_vars[var_name] += 1
                   nesting_vars_list.push(st2)
                   break
                 end
+                e = e.outer
                 if e.nil?
                   outer_vars[var_name] ||= 0
                   outer_vars[var_name] += 1
@@ -733,6 +751,19 @@ module Minjs::Compressor
             end
           end
         }
+
+#        puts "*" * 30
+#        puts st.to_js
+#        puts "*" * 30
+#        puts "all_vars"
+#        puts all_vars
+#        puts "outer_vars"
+#        puts outer_vars
+#        puts "var_vars"
+#        puts var_vars
+#        puts "nesting_vars"
+#        puts nesting_vars
+
         unless var_vars[:eval]
           eval_flag = false
           st.traverse(parent) {|parent2, st2|
@@ -769,7 +800,7 @@ module Minjs::Compressor
           while true
             #condition b
             if outer_vars[var_sym]
-              #STDERR.puts "outer_vars has #{var_sym}"
+            #STDERR.puts "outer_vars has #{var_sym}"
             elsif var_vars[var_sym]
               #STDERR.puts "var_vars has #{var_sym}(#{var_vars[var_sym]})"
             #condigion c
@@ -783,8 +814,7 @@ module Minjs::Compressor
           if nesting_vars[var_sym]
             #STDERR.puts "nesting_vars has #{var_sym}"
             nesting_vars_list.each do |x|
-              #raise 'error' if x.binding_env(:var).nil?
-              raise 'error' if x.binding_env(:lex).nil?
+              #raise 'error' if x.binding_env(x.exe_context.var_env).nil?
             end
 
             var_sym2 = "XXX#{var_sym.to_s}".to_sym
@@ -792,13 +822,12 @@ module Minjs::Compressor
               var_sym2 = next_sym(var_sym2)
             end
             #STDERR.puts "#{var_sym}->#{var_sym2}"
+
             rl = {}
             nesting_vars_list.each do |x|
               if x.val.to_sym == var_sym
-                _var_env = x.binding_env(:var)
-                _lex_env = x.binding_env(:lex)
+                _var_env = x.binding_env(x.exe_context.var_env)
                 rl[_var_env] = true
-                rl[_lex_env] = true
               end
             end
             rl.keys.each do |_env|
@@ -814,26 +843,24 @@ module Minjs::Compressor
                   @val = var_sym2
                 }
               end
-              #raise 'error' if x.binding_env(:var).nil?
-              raise x.to_js if x.binding_env(:lex).nil?
             end
           end
           rename_table[name] = var_sym
           var_sym = next_sym(var_sym)
         }
         var_vars_list.each {|st2|
-          raise st2.to_js if st2.binding_env(:lex).nil?
+          #raise 'error' if st2.binding_env(st2.exe_context.var_env).nil?
         }
 
         rename_table.each do |name, new_name|
           if name != new_name
-            if context.var_env.record.binding[name]
-              context.var_env.record.binding[new_name] = context.var_env.record.binding[name]
-              context.var_env.record.binding.delete(name)
+            if exe_context.var_env.record.binding[name]
+              exe_context.var_env.record.binding[new_name] = exe_context.var_env.record.binding[name]
+              exe_context.var_env.record.binding.delete(name)
             end
-            if context.lex_env.record.binding[name]
-              context.lex_env.record.binding[new_name] = context.lex_env.record.binding[name]
-              context.lex_env.record.binding.delete(name)
+            if exe_context.lex_env.record.binding[name]
+              exe_context.lex_env.record.binding[new_name] = exe_context.lex_env.record.binding[name]
+              exe_context.lex_env.record.binding.delete(name)
             end
           end
         end
@@ -843,10 +870,13 @@ module Minjs::Compressor
               if rename_table[@val]
                 @val = rename_table[@val]
                 #raise 'error' if st2.binding_env(:var).nil?
-                raise st2.to_js if st2.binding_env(:lex).nil?
+                #raise st2.to_js if st2.binding_env(:lex).nil?
               end
             }
         }
+      }
+      node.traverse(nil) {|parent, st|
+        st.parent = nil
       }
       self
     end

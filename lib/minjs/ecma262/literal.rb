@@ -142,16 +142,13 @@ module Minjs
     #
     # @see http://www.ecma-international.org/ecma-262 ECMA262 11.1.1
     class This < Literal
-      attr_reader :context
-
-      def initialize(context)
-        @context = context
+      def initialize
       end
 
       # duplicate object
       # @see Base#deep_dup
       def deep_dup
-        self.class.new(@context)
+        self.class.new
       end
 
       # Traverses this children and itself with given block.
@@ -1000,7 +997,7 @@ module Minjs
       # Returns a ECMAScript string containg the representation of element.
       # @see Base#to_js
       def to_js(options = {})
-        "[" + @val.collect{|x| x.to_s}.join(",") + "]"
+        "[" + @val.collect{|x| x ? x.to_js : ""}.join(",") + "]"
       end
 
       # @return [Boolean] true if expression is kind of LeftHandSideExpression.
@@ -1177,22 +1174,21 @@ module Minjs
     #
     # @see http://www.ecma-international.org/ecma-262 ECMA262 7.6
     class IdentifierName < Literal
-      attr_accessor :context
+      attr_accessor :exe_context
       attr_reader :val
 
       @@sym = {}
 
-      def initialize(context, val)
-        @context = context
+      def initialize(val)
         @val = val.to_sym
       end
 
       # get instance
-      def self.get(context, val)
+      def self.get(val)
         if reserved?(val)
-          @@sym[val] ||= self.new(context, val)
+          @@sym[val] ||= self.new(val)
         else
-          self.new(context, val)
+          self.new(val)
         end
       end
 
@@ -1238,7 +1234,7 @@ module Minjs
       # duplicate object
       # @see Base#deep_dup
       def deep_dup
-        self.class.new(@context, @val)
+        self.class.new(@val)
       end
 
       # compare object
@@ -1252,19 +1248,19 @@ module Minjs
         val.to_s
       end
 
+      def to_s
+        val.to_s
+      end
+
       # @return [Boolean] true if expression is kind of LeftHandSideExpression.
       def left_hand_side_exp?
         true
       end
 
       # @return [EnvRecord] binding environment
-      def binding_env(type = :var)
-        return nil if context.nil?
-        if type == :var
-          v = context.var_env
-        else
-          v = context.lex_env
-        end
+      def binding_env(lex_env)
+        return nil if lex_env.nil?
+        v = lex_env
 
         while v
           if v.record.binding[val]
@@ -1278,67 +1274,67 @@ module Minjs
     end
 
     # reserved word "this"
-    ID_THIS = IdentifierName.get(nil, :this)
+    ID_THIS = IdentifierName.get(:this)
     # reserved word "var"
-    ID_VAR = IdentifierName.get(nil, :var)
+    ID_VAR = IdentifierName.get(:var)
     # reserved word "in"
-    ID_IN = IdentifierName.get(nil, :in)
+    ID_IN = IdentifierName.get(:in)
     # reserved word "instanceof"
-    ID_INSTANCEOF = IdentifierName.get(nil, :instanceof)
+    ID_INSTANCEOF = IdentifierName.get(:instanceof)
     # reserved word "function"
-    ID_FUNCTION = IdentifierName.get(nil, :function)
+    ID_FUNCTION = IdentifierName.get(:function)
     # reserved word "null"
-    ID_NULL = IdentifierName.get(nil, :null)
+    ID_NULL = IdentifierName.get(:null)
     # reserved word "true"
-    ID_TRUE = IdentifierName.get(nil, :true)
+    ID_TRUE = IdentifierName.get(:true)
     # reserved word "false"
-    ID_FALSE = IdentifierName.get(nil, :false)
+    ID_FALSE = IdentifierName.get(:false)
     # reserved word "new"
-    ID_NEW = IdentifierName.get(nil, :new)
+    ID_NEW = IdentifierName.get(:new)
     # reserved word "delete"
-    ID_DELETE = IdentifierName.get(nil, :delete)
+    ID_DELETE = IdentifierName.get(:delete)
     # reserved word "void"
-    ID_VOID = IdentifierName.get(nil, :void)
+    ID_VOID = IdentifierName.get(:void)
     # reserved word "typeof"
-    ID_TYPEOF = IdentifierName.get(nil, :typeof)
+    ID_TYPEOF = IdentifierName.get(:typeof)
     # reserved word "if"
-    ID_IF = IdentifierName.get(nil, :if)
+    ID_IF = IdentifierName.get(:if)
     # reserved word "else"
-    ID_ELSE = IdentifierName.get(nil, :else)
+    ID_ELSE = IdentifierName.get(:else)
     # reserved word "for"
-    ID_FOR = IdentifierName.get(nil, :for)
+    ID_FOR = IdentifierName.get(:for)
     # reserved word "while"
-    ID_WHILE = IdentifierName.get(nil, :while)
+    ID_WHILE = IdentifierName.get(:while)
     # reserved word "do"
-    ID_DO = IdentifierName.get(nil, :do)
+    ID_DO = IdentifierName.get(:do)
     # reserved word "continue"
-    ID_CONTINUE = IdentifierName.get(nil, :continue)
+    ID_CONTINUE = IdentifierName.get(:continue)
     # reserved word "break"
-    ID_BREAK = IdentifierName.get(nil, :break)
+    ID_BREAK = IdentifierName.get(:break)
     # reserved word "return"
-    ID_RETURN = IdentifierName.get(nil, :return)
+    ID_RETURN = IdentifierName.get(:return)
     # reserved word "with"
-    ID_WITH = IdentifierName.get(nil, :with)
+    ID_WITH = IdentifierName.get(:with)
     # reserved word "switch"
-    ID_SWITCH = IdentifierName.get(nil, :switch)
+    ID_SWITCH = IdentifierName.get(:switch)
     # reserved word "throw"
-    ID_THROW = IdentifierName.get(nil, :throw)
+    ID_THROW = IdentifierName.get(:throw)
     # reserved word "try"
-    ID_TRY = IdentifierName.get(nil, :try)
+    ID_TRY = IdentifierName.get(:try)
     # reserved word "catch"
-    ID_CATCH = IdentifierName.get(nil, :catch)
+    ID_CATCH = IdentifierName.get(:catch)
     # reserved word "finally"
-    ID_FINALLY = IdentifierName.get(nil, :finally)
+    ID_FINALLY = IdentifierName.get(:finally)
     # reserved word "debugger"
-    ID_DEBUGGER = IdentifierName.get(nil, :debugger)
+    ID_DEBUGGER = IdentifierName.get(:debugger)
     # reserved word "case"
-    ID_CASE = IdentifierName.get(nil, :case)
+    ID_CASE = IdentifierName.get(:case)
     # reserved word "default"
-    ID_DEFAULT = IdentifierName.get(nil, :default)
+    ID_DEFAULT = IdentifierName.get(:default)
     # get (non-reserved word)
-    ID_GET = IdentifierName.get(nil, :get)
+    ID_GET = IdentifierName.get(:get)
     # set (non-reserved word)
-    ID_SET = IdentifierName.get(nil, :set)
+    ID_SET = IdentifierName.get(:set)
 
   end
 end
