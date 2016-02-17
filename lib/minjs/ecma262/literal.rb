@@ -427,9 +427,9 @@ module Minjs
         dq = @val.to_s.each_codepoint.select{|x| x == 0x22}.length
         sq = @val.to_s.each_codepoint.select{|x| x == 0x27}.length
         if dq <= sq
-          t = "\""
+          t = "\"".dup
         else
-          t = "\'"
+          t = "\'".dup
         end
 
         @val.to_s.each_codepoint do |c|
